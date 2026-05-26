@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:sqlite:data/media.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: 0
+  ai:
+    openai:
+      api-key: ${LLM_API_KEY:}
+      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${LLM_MODEL:deepseek-v4-pro}
+          temperature: 0.0
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.hibernate.SQL_SLOW: INFO
+#    com.nonu1l.media.service.PreCacheService: DEBUG
+#    com.nonu1l.media.service.RequestCacheUtil: DEBUG

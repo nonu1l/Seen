@@ -1,0 +1,14 @@
+data/
+jsondata/
+*.db
+*.sqlite
+target/
+node_modules/
+dist/
+.superpowers/
+.idea/
+*.iml
+.vscode/
+*.log
+.env
+/src/main/resources/static/
