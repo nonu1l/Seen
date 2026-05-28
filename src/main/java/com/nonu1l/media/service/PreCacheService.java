@@ -11,6 +11,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * 预缓存，用于搜索时提前加载搜索结果
+ * @author nonu1l
+ * @date 2026/05/29
+ */
 @Service
 public class PreCacheService {
 

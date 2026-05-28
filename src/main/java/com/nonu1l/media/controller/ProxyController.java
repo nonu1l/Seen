@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Bangumi 页面代理 — 绕过 X-Frame-Options，注入暗色主题样式。
+ * 页面内嵌访问 Bangumi 临时开发 （未最终定版）
  */
 @RestController
 @RequestMapping("/api/proxy")

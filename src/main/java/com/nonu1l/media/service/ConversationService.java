@@ -101,6 +101,10 @@ public class ConversationService {
         String history = buildHistory(session.getId());
         IntentAnalysisResult result = analysisService.analyze(userInput, history);
 
+        /*
+         * 数据保存
+         * 由这里决定是否需要保存及修改
+         */
         return transactionTemplate.execute(
                 tx -> saveAssistantResponse(session, result, userMsg, now));
     }

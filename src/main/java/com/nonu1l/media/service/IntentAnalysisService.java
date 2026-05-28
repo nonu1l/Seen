@@ -16,6 +16,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * 意图分析 Service
+ *
+ * @author nonu1l
+ * @date 2026/05/28
+ */
 @Service
 public class IntentAnalysisService {
 

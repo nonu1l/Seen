@@ -25,12 +25,16 @@ public interface WorkRepository extends JpaRepository<Work, Long> {
         """, nativeQuery = true)
     List<Object[]> findAllWithLatestRecord();
 
+
+    /**
+     *  内联使用最大id查询
+     */
     @Query("""
         SELECT w FROM Work w
-        LEFT JOIN Record r ON r.id = (
+        JOIN Record r ON r.id = (
             SELECT MAX(r2.id) FROM Record r2 WHERE r2.workId = w.id
         )
-        ORDER BY r.id DESC NULLS LAST
+        ORDER BY r.id DESC
         """)
     List<Work> findAllOrderByLatestRecord();
 

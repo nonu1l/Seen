@@ -11,6 +11,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
+                /*开发临时放行CROS问题*/
                 .allowedOriginPatterns(
                         "http://localhost:5173",
                         "http://127.0.0.1:5173",

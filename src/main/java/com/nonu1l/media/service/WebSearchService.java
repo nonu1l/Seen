@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,7 @@ public class WebSearchService {
             headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
 
             String html = restTemplate.getForObject(
-                    URL + "?q=" + java.net.URLEncoder.encode(query, "UTF-8"),
+                    URL + "?q=" + java.net.URLEncoder.encode(query, StandardCharsets.UTF_8),
                     String.class);
 
             if (html == null) return results;
