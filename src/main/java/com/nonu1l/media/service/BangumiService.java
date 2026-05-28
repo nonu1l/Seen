@@ -55,12 +55,12 @@ public class BangumiService {
                 for (JsonNode item : data) results.add(mapSubject(item));
             }
 
-            // 搜索完成后异步预热详情缓存（跳过已缓存的）
-            List<Long> ids = results.stream()
-                    .map(WorkSearchResult::getId)
-                    .filter(Objects::nonNull)
-                    .toList();
-            if (!ids.isEmpty()) preCacheService.preCache(ids);
+            // 搜索完成后异步预热详情缓存（跳过已缓存的） [正在开发LLM功能，暂时注释预缓存]
+//            List<Long> ids = results.stream()
+//                    .map(WorkSearchResult::getId)
+//                    .filter(Objects::nonNull)
+//                    .toList();
+//            if (!ids.isEmpty()) preCacheService.preCache(ids);
 
         } catch (Exception e) {
             log.error("Bangumi search failed query={}", query, e);
@@ -171,14 +171,31 @@ public class BangumiService {
 
         String airDate = text(item, "date");
         if (airDate == null) airDate = text(item, "air_date");
-        if (airDate != null && airDate.length() >= 4) r.setYear(airDate.substring(0, 4));
+        if (airDate != null && airDate.length() >= 4) {
+            r.setYear(airDate.substring(0, 4));
+            r.setAirDate(airDate);
+        } else {
+            r.setAirDate("");
+        }
         r.setPlot(text(item, "summary"));
+
+        // 总集数
+        JsonNode epsNode = item.get("total_episodes");
+        if (epsNode != null && !epsNode.isNull() && epsNode.asInt() > 0) {
+            r.setEpsCount(epsNode.asInt());
+        }
+        // 条目类型
+        if (item.has("type") && !item.get("type").isNull()) {
+            r.setSubjectType(item.get("type").asInt());
+        }
 
         JsonNode rating = item.get("rating");
         if (rating != null && rating.has("score")) {
             double score = rating.get("score").asDouble();
             if (score > 0) r.setScore(score);
+            if (rating.has("rank") && !rating.get("rank").isNull()) r.setRank(rating.get("rank").asInt());
         }
+
 
         // meta_tags 为字符串数组，如 ["喜剧","TV","日本","漫画改"]
         JsonNode tagsNode = item.get("meta_tags");

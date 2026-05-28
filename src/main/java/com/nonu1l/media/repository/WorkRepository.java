@@ -3,6 +3,7 @@ package com.nonu1l.media.repository;
 import com.nonu1l.media.model.entity.Work;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -23,4 +24,20 @@ public interface WorkRepository extends JpaRepository<Work, Long> {
         ORDER BY r.id DESC NULLS LAST
         """, nativeQuery = true)
     List<Object[]> findAllWithLatestRecord();
+
+    @Query("""
+        SELECT w FROM Work w
+        LEFT JOIN Record r ON r.id = (
+            SELECT MAX(r2.id) FROM Record r2 WHERE r2.workId = w.id
+        )
+        ORDER BY r.id DESC NULLS LAST
+        """)
+    List<Work> findAllOrderByLatestRecord();
+
+    @Query("""
+        SELECT w FROM Work w
+        WHERE LOWER(COALESCE(w.nameCn, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(COALESCE(w.name, ''))   LIKE LOWER(CONCAT('%', :keyword, '%'))
+        """)
+    List<Work> searchByName(@Param("keyword") String keyword);
 }

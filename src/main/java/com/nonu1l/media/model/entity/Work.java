@@ -8,9 +8,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * 作品实体。
- * 表示一个影视/动画作品，数据来自 Bangumi API。
- * 每个 Work 可以有多条 Record（标记记录）。
+ * 作品实体 — 数据来自 Bangumi API，标记时落库一份快照。
  */
 @Entity
 @Table(name = "work")
@@ -19,7 +17,6 @@ import java.time.Instant;
 @NoArgsConstructor
 public class Work {
 
-    /** Bangumi 条目 ID */
     @Id
     @Column(name = "id")
     private Long id;
@@ -30,13 +27,28 @@ public class Work {
     /** 中文标题 */
     private String nameCn;
 
-    /** 作品平台类型（如 TV、电影、剧场版） */
+    /** Bangumi 平台类型（TV / 剧场版 / OVA 等） */
     private String platform;
 
-    /** 创建时间 */
+    /** 封面图 URL */
+    private String coverUrl;
+
+    /** 年份 */
+    private String year;
+
+    /** 简介 */
+    @Column(columnDefinition = "TEXT")
+    private String plot;
+
+    /** Bangumi 评分 */
+    private Double score;
+
+    /** 标签（JSON 数组字符串） */
+    @Column(columnDefinition = "TEXT")
+    private String tagsCache;
+
     @Column(updatable = false)
     private Instant createdAt;
 
-    /** 更新时间 */
     private Instant updatedAt;
 }

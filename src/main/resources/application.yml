@@ -20,12 +20,14 @@ spring:
               LOG_QUERIES_SLOWER_THAN_MS: 0
   ai:
     openai:
-      api-key: ${LLM_API_KEY:}
+      api-key: ${LLM_API_KEY:sk-1234}
       base-url: ${LLM_BASE_URL:https://api.deepseek.com}
       chat:
         options:
-          model: ${LLM_MODEL:deepseek-v4-pro}
+          model: ${LLM_MODEL:deepseek-v4-flash}
           temperature: 0.0
+
+seen:
   sql:
     init:
       mode: always
@@ -34,7 +36,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    org.hibernate.SQL_SLOW: INFO
+#    org.hibernate.orm.jdbc.bind: TRACE
+#    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG
 #    com.nonu1l.media.service.RequestCacheUtil: DEBUG

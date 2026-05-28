@@ -25,4 +25,12 @@ public class WorkSearchResult {
     private Double score;
     /** 数据来源标识（固定 "bangumi"） */
     private String source;
+    /** 完整上映日期 yyyy-MM-dd */
+    private String airDate;
+    /** 总集数 */
+    private Integer epsCount;
+    /** Bangumi 条目类型：2=动画, 6=真人 */
+    private Integer subjectType;
+    /** Bangumi 排名 */
+    private Integer rank;
 }

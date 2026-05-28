@@ -19,12 +19,19 @@ public class WorksController {
 
     public WorksController(WorkService workService) { this.workService = workService; }
 
+    /**
+     * 默认列表卡片显示
+     */
     @PostMapping("/list")
     public ResponseEntity<List<WorkListItem>> list() {
         try { return ResponseEntity.ok(workService.listAll()); }
         catch (Exception e) { log.error("list failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+    /**
+     * 搜索
+     *
+     */
     @PostMapping("/search")
     public ResponseEntity<SearchResponse> search(@RequestBody Map<String, String> body) {
         try {
@@ -34,6 +41,11 @@ public class WorksController {
         } catch (Exception e) { log.error("search failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+
+    /**
+     * 详情 / 明细
+     *
+     */
     @PostMapping("/details")
     public ResponseEntity<WorkDetail> details(@RequestBody Map<String, String> body) {
         try {
@@ -44,6 +56,10 @@ public class WorksController {
         } catch (Exception e) { log.error("details failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+    /**
+     * 标记 -> 想看 在看 看过 搁置 抛弃
+     *
+     */
     @PostMapping("/mark")
     public ResponseEntity<WorkListItem> mark(@RequestBody MarkRequest req) {
         try { return ResponseEntity.ok(workService.mark(req)); }
@@ -51,16 +67,21 @@ public class WorksController {
         catch (Exception e) { log.error("mark failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
-    @PostMapping("/rewatch")
-    public ResponseEntity<WorkListItem> rewatch(@RequestBody Map<String, Object> body) {
-        try {
-            Number workId = (Number) body.get("workId");
-            if (workId == null) return ResponseEntity.badRequest().build();
-            return ResponseEntity.ok(workService.rewatch(workId.longValue()));
-        } catch (IllegalStateException e) { return ResponseEntity.status(409).build(); }
-        catch (Exception e) { log.error("rewatch failed", e); return ResponseEntity.internalServerError().build(); }
-    }
+    //多刷接口，暂停开发这部分
+    // @PostMapping("/rewatch")
+    // public ResponseEntity<WorkListItem> rewatch(@RequestBody Map<String, Object> body) {
+    //     try {
+    //         Number workId = (Number) body.get("workId");
+    //         if (workId == null) return ResponseEntity.badRequest().build();
+    //         return ResponseEntity.ok(workService.rewatch(workId.longValue()));
+    //     } catch (IllegalStateException e) { return ResponseEntity.status(409).build(); }
+    //     catch (Exception e) { log.error("rewatch failed", e); return ResponseEntity.internalServerError().build(); }
+    // }
 
+    /**
+     * 取消标记
+     *
+     */
     @PostMapping("/unmark")
     public ResponseEntity<Map<String, Boolean>> unmark(@RequestBody Map<String, Object> body) {
         try {
@@ -71,6 +92,9 @@ public class WorksController {
         } catch (Exception e) { log.error("unmark failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+    /**
+     * 更新评分和评价
+     */
     @PostMapping("/update-review")
     public ResponseEntity<WorkListItem> updateReview(@RequestBody Map<String, Object> body) {
         try {
@@ -84,6 +108,9 @@ public class WorksController {
         catch (Exception e) { log.error("updateReview failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+    /**
+     * 获取中文角色（演员）名字
+     */
     @PostMapping("/character-names")
     public ResponseEntity<Map<Long, String>> characterNames(@RequestBody Map<String, Object> body) {
         try {
@@ -99,6 +126,9 @@ public class WorksController {
         } catch (Exception e) { log.error("characterNames failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
+    /**
+     * 字典接口
+     */
     @GetMapping("/dict")
     public ResponseEntity<Map<String, Object>> dict() {
         try { return ResponseEntity.ok(workService.getDict()); }

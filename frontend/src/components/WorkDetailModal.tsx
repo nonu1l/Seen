@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Status, WorkDetail } from '../api/types';
 import { Cover } from './Cover';
 import { StarRating } from './StarRating';
+import { BangumiFrame } from './BangumiFrame';
 
 interface Props { id: number; platform: string; onClose: (changed: boolean) => void; }
 
@@ -25,6 +26,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
   const [cnNames, setCnNames] = useState<Record<number, string>>({});
   const [cnLoading, setCnLoading] = useState<Set<number>>(new Set());
   const [plotExpanded, setPlotExpanded] = useState(false);
+  const [bangumiOpen, setBangumiOpen] = useState(false);
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   useEffect(() => {
@@ -74,7 +76,8 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     } catch (e: any) { setError(e?.message || '标记失败'); }
   };
 
-  const rewatch = async () => { if (!d?.id) return; try { await api.rewatch(d.id); setChanged(true); await refresh(); } catch (e: any) { setError(e?.message || '操作失败'); } };
+  // FIXME: 保留
+  // const rewatch = async () => { if (!d?.id) return; try { await api.rewatch(d.id); setChanged(true); await refresh(); } catch (e: any) { setError(e?.message || '操作失败'); } };
   const saveReview = async () => {
     if (!d?.id) return; setSaving(true);
     try { await api.updateReview(d.id, rating, review.trim() || null); setChanged(true); }
@@ -83,12 +86,12 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
   };
   const unmark = async () => {
     if (!d?.id) return;
-    if (!window.confirm('确定要取消标记吗？')) return;
+    if (!window.confirm('确定要删除该记录吗？将同时删除作品信息和所有标记记录。')) return;
     try { await api.unmark(d.id); setChanged(true); onClose(true); }
     catch (e: any) { setError(e?.message || '操作失败'); }
   };
 
-  const rwDisabled = !d?.id || d.status === 'wish' || d.status === 'dropped' || (d.watchedCount ?? 0) === 0;
+{/* FIXME: 保留 const rwDisabled = !d?.id || d.status === 'wish' || d.status === 'dropped' || (d.watchedCount ?? 0) === 0; */}
   const pLabel = d?.platform || platform;
 
   return (
@@ -133,6 +136,11 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                   {d.runtime != null && <span className="badge badge-muted">{d.runtime} 分钟</span>}
                   {d.score != null && d.score > 0 && <span className="badge badge-accent">{d.score.toFixed(1)}</span>}
                 </div>
+                <button onClick={() => setBangumiOpen(true)}
+                  className="text-[11px] mt-1 underline underline-offset-2 transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
+                  在 Bangumi 查看详情
+                </button>
                 {d.plot && (
                   <div className="hidden sm:block text-[13px] text-[color:var(--text-secondary)] leading-relaxed">
                     <div className={!plotExpanded ? 'line-clamp-3' : ''}>{d.plot}</div>
@@ -153,6 +161,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                 </button>
               </div>
             )}
+
 
             {/* Cast */}
             {d.cast && d.cast.length > 0 && (
@@ -186,6 +195,18 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
               </div>
             )}
 
+            {/* FIXME: 保留
+              <button onClick={rewatch} disabled={rwDisabled}
+                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors"
+                style={{ borderColor:'var(--border)', color: rwDisabled ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: rwDisabled ? 0.35 : 1, cursor: rwDisabled ? 'not-allowed' : 'pointer' }}>
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                多刷{(d.watchedCount ?? 0) > 1 ? ` ×${d.watchedCount}` : ''}
+              </button>
+              */}
+
+
             {/* Mark section */}
             <div className="space-y-3 pt-3" style={{borderTop:'1px solid var(--border)'}}>
               <p className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">我的标记</p>
@@ -206,6 +227,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                   );
                 })}
               </div>
+{/* FIXME: 保留
               <button onClick={rewatch} disabled={rwDisabled}
                 className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors"
                 style={{ borderColor:'var(--border)', color: rwDisabled ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: rwDisabled ? 0.35 : 1, cursor: rwDisabled ? 'not-allowed' : 'pointer' }}>
@@ -214,6 +236,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                 </svg>
                 多刷{(d.watchedCount ?? 0) > 1 ? ` ×${d.watchedCount}` : ''}
               </button>
+              */}
 
               {d.id != null && (<>
                 <div>
@@ -229,7 +252,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                     className="dark-textarea" placeholder="写下你的感想..." />
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={unmark} className="btn-ghost" style={{height:32,fontSize:12,padding:'0 12px'}}>取消标记</button>
+                  <button onClick={unmark} className="btn-ghost" style={{height:32,fontSize:12,padding:'0 12px'}}>删除记录</button>
                   <button onClick={saveReview} disabled={saving} className="btn-primary" style={{height:32,fontSize:12,padding:'0 14px'}}>
                     {saving ? '保存中...' : '保存'}
                   </button>
@@ -239,6 +262,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
           </>)}
         </div>
       </div>
+      {d && <BangumiFrame subjectId={d.id ?? id} open={bangumiOpen} onClose={() => setBangumiOpen(false)} />}
     </div>
   );
 }
