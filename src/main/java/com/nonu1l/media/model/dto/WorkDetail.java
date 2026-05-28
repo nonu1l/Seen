@@ -37,6 +37,7 @@ public class WorkDetail {
     private String status;
     private Double myRating;
     private String myReview;
-    private boolean rewatched;
+    // 多刷功能，暂停开发
+    // private boolean rewatched;
     private Integer watchedCount;
 }

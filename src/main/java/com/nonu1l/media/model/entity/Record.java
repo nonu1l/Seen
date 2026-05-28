@@ -21,15 +21,28 @@ public class Record {
     @Column(name = "work_id", nullable = false)
     private Long workId;
 
-    /** wish / doing / collect / on_hold / dropped */
     @Column(nullable = false)
     private String status;
 
-    /** 0-10，步进 1；null = 未评分 */
     private Double rating;
 
     private String review;
 
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
+    @PrePersist
+    void prePersist() {
+        Instant now = Instant.now();
+        if (this.createdAt == null) this.createdAt = now;
+        if (this.updatedAt == null) this.updatedAt = now;
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        this.updatedAt = Instant.now();
+    }
 }

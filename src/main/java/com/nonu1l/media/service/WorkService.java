@@ -10,6 +10,7 @@ import com.nonu1l.media.repository.WorkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -36,23 +37,29 @@ public class WorkService {
     }
 
     public List<WorkListItem> listAll() {
-        List<Work> works = workRepo.findAll();
+        List<Work> works = workRepo.findAllOrderByLatestRecord();
+        if (works.isEmpty()) return List.of();
+
+        // 批量加载最新 Record，替代逐条查询
+        Set<Long> ids = new HashSet<>();
+        for (Work w : works) ids.add(w.getId());
+        Map<Long, Record> recordMap = new HashMap<>();
+        for (Record r : recordRepo.findLatestByWorkIds(ids)) {
+            recordMap.put(r.getWorkId(), r);
+        }
+
         List<WorkListItem> results = new ArrayList<>();
         for (Work w : works) {
             try {
-                WorkListItem it = buildListItem(w);
+                WorkListItem it = buildListItem(w, recordMap.get(w.getId()));
                 if (it != null) results.add(it);
             } catch (Exception e) {
-                log.warn("listAll item failed: {}", e.getMessage());
+                log.warn("listAll item failed workId={}: {}", w.getId(), e.getMessage());
             }
         }
         return results;
     }
 
-    /**
-     * 以 Bangumi 远程结果为主，匹配本地标记状态。
-     * 已标记的标注状态，未标记的保留供标记。
-     */
     public SearchResponse search(String query) {
         List<WorkSearchResult> remote = bangumiService.search(query);
 
@@ -62,15 +69,26 @@ public class WorkService {
             if (w.getId() != null) localIds.add(w.getId());
         }
 
+        // 批量加载 Record
+        Set<Long> ids = new HashSet<>();
+        for (Work w : allWorks) ids.add(w.getId());
+        Map<Long, Record> recordMap = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (Record r : recordRepo.findLatestByWorkIds(ids)) {
+                recordMap.put(r.getWorkId(), r);
+            }
+        }
+
         List<WorkListItem> local = new ArrayList<>();
         List<WorkSearchResult> works = new ArrayList<>();
 
         for (WorkSearchResult r : remote) {
             if (r.getId() != null && localIds.contains(r.getId())) {
-                workRepo.findById(r.getId()).ifPresent(w -> {
-                    WorkListItem it = buildListItem(w);
+                Work w = workRepo.findById(r.getId()).orElse(null);
+                if (w != null) {
+                    WorkListItem it = buildListItem(w, recordMap.get(w.getId()));
                     if (it != null) local.add(it);
-                });
+                }
             } else {
                 works.add(r);
             }
@@ -83,7 +101,7 @@ public class WorkService {
         }
         for (Work w : allWorks) {
             if (w.getId() != null && !remoteIds.contains(w.getId()) && matches(w, query)) {
-                WorkListItem it = buildListItem(w);
+                WorkListItem it = buildListItem(w, recordMap.get(w.getId()));
                 if (it != null) local.add(it);
             }
         }
@@ -123,7 +141,6 @@ public class WorkService {
                 });
                 long watched = recordRepo.countByWorkIdAndStatus(wid, "collect");
                 d.setWatchedCount((int) watched);
-                d.setRewatched(watched > 1);
             });
         }
         return d;
@@ -136,36 +153,69 @@ public class WorkService {
         if (id == null) throw new IllegalArgumentException("invalid id");
 
         Work work = upsertWork(id, req.getMeta());
-        Optional<Record> latest = recordRepo.findLatestByWorkId(id);
+        Record saved;
 
+        Optional<Record> latest = recordRepo.findLatestByWorkId(id);
         if (latest.isPresent() && !latest.get().getStatus().equals(req.getStatus())) {
             Record r = latest.get();
             r.setStatus(req.getStatus());
-            recordRepo.save(r);
+            saved = recordRepo.save(r);
         } else if (latest.isEmpty()) {
             Record r = new Record();
             r.setWorkId(id);
             r.setStatus(req.getStatus());
             r.setCreatedAt(Instant.now());
-            recordRepo.save(r);
+            saved = recordRepo.save(r);
+        } else {
+            saved = latest.get();
         }
-        return buildListItem(work);
+
+        return buildListItem(work, saved);
     }
 
-    public WorkListItem rewatch(Long workId) {
-        if (recordRepo.countByWorkIdAndStatus(workId, "collect") == 0)
-            throw new IllegalStateException("rewatch requires existing watched record");
-        Record r = new Record();
-        r.setWorkId(workId);
-        r.setStatus("collect");
-        r.setCreatedAt(Instant.now());
-        recordRepo.save(r);
-        return buildListItem(workRepo.findById(workId).orElse(null));
-    }
-
+    @Transactional
     public void unmark(Long workId) {
         recordRepo.deleteAllByWorkId(workId);
         workRepo.deleteById(workId);
+    }
+
+    /**
+     * AI 模式标记：总是新增一条 record，保留历史记录可追溯。
+     * 参数为 null 的字段自动从旧记录沿用（缺什么补什么）。
+     * @return 包含新旧记录的上下文
+     */
+    public MarkResult markNew(MarkRequest req, Double rating, String review) {
+        if (req.getId() == null)
+            throw new IllegalArgumentException("id required");
+        Long id = parseId(req.getId());
+        if (id == null) throw new IllegalArgumentException("invalid id");
+
+        Work work = upsertWork(id, req.getMeta());
+        Record previous = recordRepo.findLatestByWorkId(id).orElse(null);
+
+        // null / 空串字段从旧记录沿用
+        String newStatus = (req.getStatus() != null && !req.getStatus().isBlank()) ? req.getStatus() : null;
+        String status = newStatus != null ? newStatus
+                : (previous != null ? previous.getStatus() : "collect");
+        Double r = rating != null ? rating
+                : (previous != null ? previous.getRating() : null);
+        String rv = review != null ? review
+                : (previous != null ? previous.getReview() : null);
+
+        Record rec = new Record();
+        rec.setWorkId(id);
+        rec.setStatus(status);
+        if (r != null) rec.setRating(r);
+        if (rv != null && !rv.isEmpty()) rec.setReview(rv);
+        recordRepo.save(rec);
+
+        return new MarkResult(buildListItem(work, rec), previous);
+    }
+
+    @Transactional
+    public void undoLastRecord(Long workId) {
+        recordRepo.findLatestIdByWorkId(workId)
+                .ifPresent(recordRepo::deleteRecordById);
     }
 
     public WorkListItem updateReview(Long workId, Double rating, String review) {
@@ -174,8 +224,29 @@ public class WorkService {
         r.setRating(rating);
         r.setReview(review);
         recordRepo.save(r);
-        return buildListItem(workRepo.findById(workId).orElse(null));
+        Work w = workRepo.findById(workId).orElse(null);
+        return buildListItem(w, r);
     }
+
+    /**
+     * AI 模式更新评分/影评：总是新建一条 record，保留历史。
+     */
+    public WorkListItem updateReviewNew(Long workId, Double rating, String review) {
+        Record previous = recordRepo.findLatestByWorkId(workId)
+                .orElseThrow(() -> new IllegalStateException("no record to update"));
+
+        Record r = new Record();
+        r.setWorkId(workId);
+        r.setStatus(previous.getStatus());
+        r.setRating(rating);
+        r.setReview(review);
+        recordRepo.save(r);
+
+        return buildListItem(workRepo.findById(workId).orElse(null), r);
+    }
+
+    /** markNew 的返回值：新记录 + 旧记录（用于前端对比展示） */
+    public record MarkResult(WorkListItem item, Record previousRecord) {}
 
     public String getCharacterName(Long id) {
         return bangumiService.getCharacterName(id);
@@ -190,38 +261,38 @@ public class WorkService {
 
     // ── private helpers ────────────────────────────────────────────
 
-    private WorkListItem buildListItem(Work w) {
+    /** 从 Work 实体 + Record 直接组装 WorkListItem，不再调用 Bangumi API */
+    private WorkListItem buildListItem(Work w, Record latestRecord) {
         if (w == null) return null;
-        try {
-            WorkSearchResult b = bangumiService.getById(String.valueOf(w.getId()));
-            WorkListItem it = new WorkListItem();
-            it.setId(w.getId());
-            it.setPlatform(w.getPlatform());
-            if (b != null) {
-                it.setNameOrig(b.getNameOrig());
-                it.setNameCn(b.getNameCn());
-                it.setCoverUrl(b.getCoverUrl());
-                it.setYear(b.getYear());
-                it.setTags(b.getTags());
-                it.setPlot(b.getPlot());
-                it.setScore(b.getScore());
-            } else {
-                it.setNameCn(w.getNameCn() != null ? w.getNameCn() : w.getName());
-            }
+        WorkListItem it = new WorkListItem();
+        it.setId(w.getId());
+        it.setPlatform(w.getPlatform());
+        it.setNameOrig(w.getName());
+        it.setNameCn(w.getNameCn() != null ? w.getNameCn() : w.getName());
+        it.setCoverUrl(w.getCoverUrl());
+        it.setYear(w.getYear());
+        it.setPlot(w.getPlot());
+        it.setScore(w.getScore());
+        it.setTags(parseTags(w.getTagsCache()));
 
-            recordRepo.findLatestByWorkId(w.getId()).ifPresent(r -> {
-                it.setStatus(r.getStatus());
-                it.setMyRating(r.getRating());
-                it.setMyReview(r.getReview());
-                it.setLatestRecordAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
-            });
-            long watched = recordRepo.countByWorkIdAndStatus(w.getId(), "collect");
-            it.setRewatched(watched > 1);
-            it.setRecordsCount((int) watched);
-            return it;
+        if (latestRecord != null) {
+            it.setStatus(latestRecord.getStatus());
+            it.setMyRating(latestRecord.getRating());
+            it.setMyReview(latestRecord.getReview());
+            it.setLatestRecordAt(latestRecord.getCreatedAt() != null ? latestRecord.getCreatedAt().toString() : null);
+        }
+        long watched = recordRepo.countByWorkIdAndStatus(w.getId(), "collect");
+        it.setRecordsCount((int) watched);
+        return it;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> parseTags(String tagsJson) {
+        if (tagsJson == null || tagsJson.isBlank()) return List.of();
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(tagsJson, List.class);
         } catch (Exception e) {
-            log.warn("buildListItem failed for workId={}: {}", w.getId(), e.getMessage());
-            return null;
+            return List.of();
         }
     }
 
@@ -252,6 +323,17 @@ public class WorkService {
         if (meta.getNameOrig() != null) w.setName(meta.getNameOrig());
         if (meta.getNameCn() != null) w.setNameCn(meta.getNameCn());
         if (meta.getPlatform() != null) w.setPlatform(meta.getPlatform());
+        if (meta.getCoverUrl() != null) w.setCoverUrl(meta.getCoverUrl());
+        if (meta.getYear() != null) w.setYear(meta.getYear());
+        if (meta.getPlot() != null) w.setPlot(meta.getPlot());
+        if (meta.getScore() != null) w.setScore(meta.getScore());
+        if (meta.getTags() != null && !meta.getTags().isEmpty()) {
+            try {
+                w.setTagsCache(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(meta.getTags()));
+            } catch (Exception e) {
+                log.debug("Failed to serialize tags: {}", e.getMessage());
+            }
+        }
     }
 
     private boolean matches(Work w, String query) {

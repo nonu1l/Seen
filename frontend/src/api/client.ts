@@ -1,4 +1,4 @@
-import type { WorkListItem, SearchResponse, WorkDetail, MarkRequest, DictResponse } from './types';
+import type { WorkListItem, SearchResponse, WorkDetail, MarkRequest, DictResponse, ConversationState, AiChatResponse, ConversationCardVO } from './types';
 
 const BASE = '/api';
 
@@ -39,4 +39,24 @@ export const api = {
 
   getCharacterNames: (ids: number[]) =>
     request<Record<number, string>>('/works/character-names', { method: 'POST', body: JSON.stringify({ ids }) }),
+
+  // ── Conversation ──
+
+  getConversationState: () =>
+    request<ConversationState>('/conversation/state'),
+
+  sendMessage: (userInput: string) =>
+    request<AiChatResponse>('/conversation/send', { method: 'POST', body: JSON.stringify({ userInput }) }),
+
+  saveCard: (cardId: number, rating?: number | null, review?: string | null, status?: string | null) =>
+    request<ConversationCardVO>(`/conversation/cards/${cardId}/save`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, review, status }),
+    }),
+
+  undoCard: (cardId: number) =>
+    request<ConversationCardVO>(`/conversation/cards/${cardId}/undo`, { method: 'POST' }),
+
+  resetConversation: () =>
+    request<{ ok: boolean }>('/conversation/reset', { method: 'POST' }),
 };

@@ -87,3 +87,44 @@ export interface MarkRequest {
   status: Status;
   meta?: WorkSearchResult;
 }
+
+// ── Conversation ──
+
+export interface ConversationMessageVO {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationCardVO {
+  id: number;
+  messageId: number;
+  subjectId: number;
+  nameCn: string;
+  coverUrl: string | null;
+  year: string | null;
+  platform: string | null;
+  rating: number | null;
+  review: string | null;
+  status: Status | null;
+  cardState: CardState;
+  /** 以下为 AI 新增记录时的历史对比 */
+  previousRating: number | null;
+  previousReview: string | null;
+  previousStatus: Status | null;
+}
+
+export type CardState = 'PENDING' | 'SAVED' | 'EXCLUDED' | 'EDITABLE' | 'CONFLICT' | 'UNMARKED' | 'RESTORED';
+
+export interface AiChatResponse {
+  messageId: number;
+  replyText: string;
+  cards: ConversationCardVO[];
+}
+
+export interface ConversationState {
+  sessionId: number;
+  messages: ConversationMessageVO[];
+  cards: ConversationCardVO[];
+}

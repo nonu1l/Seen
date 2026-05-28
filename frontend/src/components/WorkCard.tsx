@@ -14,7 +14,7 @@ const LABEL: Record<Status, string> = { wish: '想看', doing: '在看', collect
 
 export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Props) {
   const status: Status | null = unmarked ? null : ((data as WorkListItem).status ?? null);
-  const rewatched = !unmarked && (data as WorkListItem).rewatched;
+{/* FIXME: 保留 const rewatched = !unmarked && (data as WorkListItem).rewatched; */}
 
   return (
     <div
@@ -58,7 +58,7 @@ export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Pro
                 {LABEL[status]}
               </span>
             )}
-            {rewatched && <span className="rewatch-pill">多刷</span>}
+{/* FIXME: 保留 {rewatched && <span className="rewatch-pill">多刷</span>} */}
           </div>
 
           <div onClick={e => e.stopPropagation()}>

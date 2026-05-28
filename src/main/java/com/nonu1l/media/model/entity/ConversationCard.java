@@ -1,0 +1,50 @@
+package com.nonu1l.media.model.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "conversation_card")
+@Getter
+@Setter
+@NoArgsConstructor
+public class ConversationCard {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "session_id", nullable = false)
+    private Long sessionId;
+
+    @Column(name = "message_id", nullable = false)
+    private Long messageId;
+
+    @Column(name = "subject_id", nullable = false)
+    private Long subjectId;
+
+    @Column(name = "name_cn")
+    private String nameCn;
+
+    @Column(name = "cover_url")
+    private String coverUrl;
+
+    private String year;
+
+    /** Bangumi 平台类型（TV / 剧场版 等） */
+    @Column(length = 30)
+    private String platform;
+
+    private Integer rating;
+
+    @Column(columnDefinition = "TEXT")
+    private String review;
+
+    @Column(length = 20)
+    private String status;
+
+    @Column(name = "card_state", nullable = false, length = 20)
+    private String cardState;
+}
