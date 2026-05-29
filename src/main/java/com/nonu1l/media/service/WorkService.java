@@ -9,6 +9,7 @@ import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +26,18 @@ public class WorkService {
     private final SubjectTypeRepository     subjectTypeRepo;
     private final RecordStatusRepository    recordStatusRepo;
     private final BangumiService            bangumiService;
+    private final String                    bangumiProxy;
 
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
-                       BangumiService bangumiService) {
+                       BangumiService bangumiService,
+                       @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
         this.subjectTypeRepo   = subjectTypeRepo;
         this.recordStatusRepo  = recordStatusRepo;
         this.bangumiService    = bangumiService;
+        this.bangumiProxy      = bangumiProxy;
     }
 
     public List<WorkListItem> listAll() {
@@ -255,7 +259,8 @@ public class WorkService {
     public Map<String, Object> getDict() {
         return Map.of(
                 "subjectTypes", subjectTypeRepo.findAll(),
-                "recordStatuses", recordStatusRepo.findAll()
+                "recordStatuses", recordStatusRepo.findAll(),
+                "bangumiProxy", bangumiProxy
         );
     }
 

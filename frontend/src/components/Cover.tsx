@@ -1,3 +1,5 @@
+import { rewriteBangumiUrl } from '../api/proxy';
+
 interface Props {
   src: string | null | undefined;
   alt: string;
@@ -9,7 +11,7 @@ export function Cover({ src, alt, className }: Props) {
     <div className={`cover-placeholder relative w-full h-full ${className ?? ''}`}>
       {src ? (
         <img
-          src={src}
+          src={rewriteBangumiUrl(src)}
           alt={alt}
           loading="lazy"
           className="h-full w-full object-cover"

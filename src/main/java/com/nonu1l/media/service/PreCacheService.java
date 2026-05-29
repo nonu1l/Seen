@@ -3,6 +3,7 @@ package com.nonu1l.media.service;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,16 +21,22 @@ import java.util.concurrent.atomic.AtomicLong;
 public class PreCacheService {
 
     private static final Logger log = LoggerFactory.getLogger(PreCacheService.class);
-    private static final String BASE = "https://api.bgm.tv/v0";
-    private static final long TTL_SUBJECT = 600;    // 10 分钟
-    private static final long TTL_CHARS = 600;      // 10 分钟
+    private static final long TTL_SUBJECT = 600;
+    private static final long TTL_CHARS = 600;
 
+    private final String base;
     private final RequestCacheUtil cache;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final AtomicLong batchCounter = new AtomicLong(0);
 
-    public PreCacheService(RequestCacheUtil cache) {
+    public PreCacheService(RequestCacheUtil cache,
+                           @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
         this.cache = cache;
+        if (!bangumiProxy.isBlank()) {
+            this.base = bangumiProxy + "/api";
+        } else {
+            this.base = "https://api.bgm.tv/v0";
+        }
     }
 
     public void preCache(List<Long> ids) {
@@ -38,8 +45,8 @@ public class PreCacheService {
         List<CompletableFuture<Void>> futures = ids.stream()
             .map(id -> CompletableFuture.runAsync(() -> {
                 if (batchId != batchCounter.get()) return;
-                cache.cacheGet(BASE + "/subjects/" + id, TTL_SUBJECT);
-                cache.cacheGet(BASE + "/subjects/" + id + "/characters", TTL_CHARS);
+                cache.cacheGet(base + "/subjects/" + id, TTL_SUBJECT);
+                cache.cacheGet(base + "/subjects/" + id + "/characters", TTL_CHARS);
             }, executor))
             .toList();
         // 异步等待全部完成，输出总耗时
