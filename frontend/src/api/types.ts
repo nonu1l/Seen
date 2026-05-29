@@ -14,6 +14,7 @@ export interface RecordStatus {
 export interface DictResponse {
   subjectTypes: SubjectType[];
   recordStatuses: RecordStatus[];
+  bangumiProxy: string;
 }
 
 export interface CastMember {

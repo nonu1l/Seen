@@ -1,0 +1,11 @@
+{
+  "name": "bangumi-proxy",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260529.1",
+    "typescript": "^6.0.3"
+  }
+}

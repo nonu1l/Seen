@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useHomeList } from '../api/hooks';
+import { setBangumiProxy } from '../api/proxy';
 import type { Status, WorkListItem, WorkSearchResult } from '../api/types';
 import { WorkCard } from '../components/WorkCard';
 import { WorkDetailModal } from '../components/WorkDetailModal';
@@ -13,6 +14,10 @@ export default function HomePage() {
   const { query, setQuery, marked, search, loading, error, refresh, refreshSearch } = useHomeList();
   const [opened, setOpened] = useState<OpenedWork | null>(null);
   const showingSearch = query.trim().length > 0;
+
+  useEffect(() => {
+    api.getDict().then(d => setBangumiProxy(d.bangumiProxy));
+  }, []);
 
   const merged = useMemo(() => {
     if (!showingSearch || !search) return { marked, unmarked: [] as WorkSearchResult[] };

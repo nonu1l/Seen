@@ -7,6 +7,7 @@ import com.nonu1l.media.model.entity.SubjectType;
 import com.nonu1l.media.repository.SubjectTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -15,9 +16,9 @@ import java.util.*;
 public class BangumiService {
 
     private static final Logger log = LoggerFactory.getLogger(BangumiService.class);
-    private static final String BASE = "https://api.bgm.tv/v0";
     private static final long TTL_CHARACTER = 1209600; // 14 days
 
+    private final String base;
     private final ObjectMapper objectMapper;
     private final SubjectTypeRepository subjectTypeRepository;
     private final RequestCacheUtil cache;
@@ -25,11 +26,17 @@ public class BangumiService {
     private volatile List<Integer> cachedSubjectTypes;
 
     public BangumiService(ObjectMapper objectMapper, SubjectTypeRepository subjectTypeRepository,
-                          RequestCacheUtil cache, PreCacheService preCacheService) {
+                          RequestCacheUtil cache, PreCacheService preCacheService,
+                          @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
         this.objectMapper = objectMapper;
         this.subjectTypeRepository = subjectTypeRepository;
         this.cache = cache;
         this.preCacheService = preCacheService;
+        if (!bangumiProxy.isBlank()) {
+            this.base = bangumiProxy + "/api";
+        } else {
+            this.base = "https://api.bgm.tv/v0";
+        }
     }
 
     public List<WorkSearchResult> search(String query) {
@@ -44,7 +51,7 @@ public class BangumiService {
                             "sort", "match",
                             "filter", java.util.Map.of("type", types)));
 
-            String json = post(BASE + "/search/subjects?limit=20", body, 300);
+            String json = post(base + "/search/subjects?limit=20", body, 300);
             if (json == null) return results;
 
             JsonNode data = objectMapper
@@ -70,7 +77,7 @@ public class BangumiService {
 
     public WorkSearchResult getById(String subjectId) {
         try {
-            String json = get(BASE + "/subjects/" + subjectId, 1800);
+            String json = get(base + "/subjects/" + subjectId, 1800);
             if (json == null) return null;
             return mapSubject(objectMapper.readTree(json));
         } catch (Exception e) {
@@ -81,7 +88,7 @@ public class BangumiService {
 
     public DetailedWork getDetailed(String subjectId) {
         try {
-            String json = get(BASE + "/subjects/" + subjectId, 1800);
+            String json = get(base + "/subjects/" + subjectId, 1800);
             if (json == null) return null;
             JsonNode item = objectMapper.readTree(json);
 
@@ -109,7 +116,7 @@ public class BangumiService {
 
             // 获取角色/声优信息（最多 12 条，不含中文名）
             try {
-                String charJson = get(BASE + "/subjects/" + subjectId + "/characters", 3600);
+                String charJson = get(base + "/subjects/" + subjectId + "/characters", 3600);
                 if (charJson != null) {
                     JsonNode chars = objectMapper.readTree(charJson);
                     if (chars.isArray()) {
@@ -234,7 +241,7 @@ public class BangumiService {
 
     public String getCharacterName(Long id) {
         try {
-            String json = get(BASE + "/characters/" + id, TTL_CHARACTER);
+            String json = get(base + "/characters/" + id, TTL_CHARACTER);
             if (json == null) return null;
             return extractChineseName(objectMapper.readTree(json));
         } catch (Exception e) {

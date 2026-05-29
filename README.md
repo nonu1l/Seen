@@ -39,6 +39,35 @@ a private cinema diary — 个人的影视记录工具
 | AI | Spring AI + DeepSeek V4 |
 
 
+## Bangumi API 访问说明
+
+自 **2026 年 5 月 25 日**起，中国大陆地区无法直接访问 Bangumi API（`api.bgm.tv`）和图片 CDN（`lain.bgm.tv`）。由于 Bangumi 在动画元数据方面有着无可替代的覆盖度和中文质量，项目提供了 Cloudflare Worker 反向代理方案。
+
+### 部署反向代理
+
+1. 注册 [Cloudflare](https://cloudflare.com) 账号
+
+2. 登录并部署：
+
+```bash
+cd cf-worker/bangumi-proxy
+npm install
+npx wrangler login
+npx wrangler deploy
+```
+
+3. 部署后会得到一个 `https://xxx.workers.dev` 地址。如果 `workers.dev` 在你所在地区也受限，可绑定**自定义域名**（Dashboard → Workers & Pages → Settings → Domains & Routes → Custom Domain）
+
+4. 配置项目：
+
+```yaml
+# application.yml
+seen:
+  bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
+```
+
+清空该配置则使用 Bangumi 直连。
+
 ## License
 
 MIT

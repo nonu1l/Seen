@@ -28,6 +28,7 @@ spring:
           temperature: 0.0
 
 seen:
+  bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
   sql:
     init:
       mode: always
