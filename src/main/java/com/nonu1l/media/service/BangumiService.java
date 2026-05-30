@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class BangumiService {
@@ -88,7 +89,13 @@ public class BangumiService {
 
     public DetailedWork getDetailed(String subjectId) {
         try {
-            String json = get(base + "/subjects/" + subjectId, 1800);
+            // 元数据与角色信息并行请求，互不阻塞
+            CompletableFuture<String> subjectFuture = CompletableFuture.supplyAsync(
+                    () -> get(base + "/subjects/" + subjectId, 1800));
+            CompletableFuture<String> charFuture = CompletableFuture.supplyAsync(
+                    () -> get(base + "/subjects/" + subjectId + "/characters", 3600));
+
+            String json = subjectFuture.join();
             if (json == null) return null;
             JsonNode item = objectMapper.readTree(json);
 
@@ -98,6 +105,10 @@ public class BangumiService {
             // 从 infobox 提取地区/国家信息
             List<String> regions = extractInfobox(item, "地区", "国家");
             d.setRegions(regions);
+
+            // 提取 imdb_id
+            List<String> imdbIds = extractInfobox(item, "imdb_id");
+            if (!imdbIds.isEmpty()) d.setImdbId(imdbIds.getFirst());
 
             // type=6 为电影，提取片长（分钟）；否则为 TV，提取总集数
             int st = item.has("type") ? item.get("type").asInt() : 0;
@@ -116,28 +127,10 @@ public class BangumiService {
 
             // 获取角色/声优信息（最多 12 条，不含中文名）
             try {
-                String charJson = get(base + "/subjects/" + subjectId + "/characters", 3600);
+                String charJson = charFuture.join();
                 if (charJson != null) {
-                    JsonNode chars = objectMapper.readTree(charJson);
-                    if (chars.isArray()) {
-                        int max = Math.min(chars.size(), 12);
-                        List<CastMember> cast = new ArrayList<>();
-                        for (int i = 0; i < max; i++) {
-                            JsonNode c = chars.get(i);
-                            CastMember m = new CastMember();
-                            m.setId(c.has("id") && !c.get("id").isNull() ? c.get("id").asLong() : null);
-                            m.setName(text(c, "name"));
-                            JsonNode images = c.get("images");
-                            //small 为小图片，保持比例 ;grid 会剪切为正方形
-                            if (images != null) m.setProfile(text(images, "small"));
-                            JsonNode actors = c.get("actors");
-                            if (actors != null && actors.isArray() && !actors.isEmpty()) {
-                                m.setCharacter("CV: " + text(actors.get(0), "name"));
-                            }
-                            cast.add(m);
-                        }
-                        d.setCast(cast);
-                    }
+                    List<CastMember> cast = parseCast(charJson, st);
+                    d.setCast(cast);
                 }
             } catch (Exception e) {
                 log.warn("Characters parse failed id={}: {}", subjectId, e.getMessage());
@@ -147,6 +140,68 @@ public class BangumiService {
             log.error("Bangumi getDetailed failed id={}", subjectId, e);
             return null;
         }
+    }
+
+    /**
+     * @param subjectType Bangumi 条目类型：2=动画, 6=真人
+     */
+    private List<CastMember> parseCast(String charJson, int subjectType) {
+        List<CastMember> cast = new ArrayList<>();
+        try {
+            JsonNode chars = objectMapper.readTree(charJson);
+            if (!chars.isArray()) return cast;
+            int max = Math.min(chars.size(), 12);
+
+            // 收集 JSON 节点并按 relation 排序，再构建 CastMember
+            List<JsonNode> nodes = new ArrayList<>();
+            for (int i = 0; i < max; i++) nodes.add(chars.get(i));
+            nodes.sort(Comparator.comparingInt(c -> relationOrder(text(c, "relation"))));
+
+            for (JsonNode c : nodes) {
+                CastMember m = new CastMember();
+                m.setId(c.has("id") && !c.get("id").isNull() ? c.get("id").asLong() : null);
+                m.setName(text(c, "name"));
+                JsonNode actors = c.get("actors");
+                String actorName = null;
+                String actorProfile = null;
+                JsonNode picked = null;
+                if (actors != null && actors.isArray() && !actors.isEmpty()) {
+                    picked = pickActorNode(actors);
+                    if (picked != null) {
+                        actorName = text(picked, "name");
+                        JsonNode actorImages = picked.get("images");
+                        if (actorImages != null) actorProfile = text(actorImages, "medium");
+                    }
+                }
+                if (actorName != null) {
+                    m.setCharacter(actorName);
+                    m.setActorId(picked.has("id") && !picked.get("id").isNull() ? picked.get("id").asLong() : null);
+                }
+
+                // 真人作品使用演员照片，动画使用角色图
+                if (subjectType == 6 && actorProfile != null) {
+                    m.setProfile(actorProfile);
+                } else {
+                    JsonNode images = c.get("images");
+                    if (images != null) m.setProfile(text(images, "small"));
+                }
+                cast.add(m);
+            }
+        } catch (Exception e) {
+            log.warn("parseCast failed: {}", e.getMessage());
+        }
+        return cast;
+    }
+
+    /** 角色重要度排序：主角=0, 配角=1, 客串=2, 其他=9 */
+    private static int relationOrder(String relation) {
+        if (relation == null) return 9;
+        return switch (relation) {
+            case "主角" -> 0;
+            case "配角" -> 1;
+            case "客串" -> 2;
+            default -> 9;
+        };
     }
 
     private List<Integer> getSearchTypes() {
@@ -172,7 +227,7 @@ public class BangumiService {
 
         JsonNode images = item.get("images");
         if (images != null) {
-            String cover = text(images, "small");
+            String cover = text(images, "medium");
             r.setCoverUrl(cover);
         }
 
@@ -250,6 +305,17 @@ public class BangumiService {
         }
     }
 
+    public String getPersonName(Long id) {
+        try {
+            String json = get(base + "/persons/" + id, TTL_CHARACTER);
+            if (json == null) return null;
+            return extractChineseName(objectMapper.readTree(json));
+        } catch (Exception e) {
+            log.debug("getPersonName failed id={}: {}", id, e.getMessage());
+            return null;
+        }
+    }
+
     private String extractChineseName(JsonNode item) {
         JsonNode infobox = item.get("infobox");
         if (infobox == null || !infobox.isArray()) return null;
@@ -290,5 +356,31 @@ public class BangumiService {
     private String text(JsonNode n, String field) {
         JsonNode v = n.get(field);
         return v != null && !v.isNull() ? v.asText() : null;
+    }
+
+    /**
+     * 从演员列表中选出真人演员（名字不含 CJK 字符），排除日语吹替声优。
+     * 若所有演员均为 CJK 名（动画作品），回退取第一个。
+     * @return 选中的演员 JsonNode，含 images/name 等信息
+     */
+    private JsonNode pickActorNode(JsonNode actors) {
+        for (JsonNode a : actors) {
+            String name = text(a, "name");
+            if (name != null && !containsCjk(name)) return a;
+        }
+        // 全是 CJK 名 → 动画，取第一个声优
+        return actors.get(0);
+    }
+
+    private boolean containsCjk(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                || Character.UnicodeBlock.of(c) == Character.UnicodeBlock.HIRAGANA
+                || Character.UnicodeBlock.of(c) == Character.UnicodeBlock.KATAKANA) {
+                return true;
+            }
+        }
+        return false;
     }
 }

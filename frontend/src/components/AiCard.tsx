@@ -11,7 +11,13 @@ interface Props {
 const STATUS_LABEL: Record<Status, string> = {
   wish: '想看', doing: '在看', collect: '看过', on_hold: '搁置', dropped: '抛弃',
 };
-const STATUSES: Status[] = ['wish', 'doing', 'collect', 'on_hold', 'dropped'];
+const STATUSES: { s: Status; label: string; dot: string }[] = [
+  { s: 'wish', label: '想看', dot: 'dot-amber' },
+  { s: 'doing', label: '在看', dot: 'dot-green' },
+  { s: 'collect', label: '看过', dot: 'dot-blue' },
+  { s: 'on_hold', label: '搁置', dot: 'dot-gray' },
+  { s: 'dropped', label: '抛弃', dot: 'dot-gray' },
+];
 
 export function AiCard({ card, onSave, onUndo }: Props) {
   const saved = card.cardState === 'SAVED';
@@ -50,7 +56,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
           与本地记录冲突
         </div>
         <div className="flex gap-3">
-          <div className="flex-shrink-0 self-start overflow-hidden rounded-md" style={{ width: 52, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
+          <div className="flex-shrink-0 self-start overflow-hidden rounded-md" style={{ width: 64, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
             <Cover src={card.coverUrl} alt={card.nameCn} />
           </div>
           <div className="flex-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
@@ -79,7 +85,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
         background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.7,
       }}>
         <div className="flex gap-3">
-          <div className="flex-shrink-0 self-start overflow-hidden rounded-md" style={{ width: 52, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
+          <div className="flex-shrink-0 self-start overflow-hidden rounded-md" style={{ width: 64, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
             <Cover src={card.coverUrl} alt={card.nameCn} />
           </div>
           <div className="flex-1 min-w-0 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
@@ -107,36 +113,65 @@ export function AiCard({ card, onSave, onUndo }: Props) {
     );
   }
 
-  // ── 普通 / 已保存 / 可编辑卡片 ──
+  // ── 普通 / 已保存 / 可编辑卡片（PENDING / EDITABLE / SAVED）──
   return (
-    <div className="flex gap-3 rounded-lg p-3" style={{
+    <div className="flex flex-col gap-3 rounded-lg p-3" style={{
       background: 'var(--bg-card)', border: '1px solid var(--border)',
     }}>
-      <div className="flex-shrink-0 self-start overflow-hidden rounded-md"
-        style={{ width: 68, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
-        <Cover src={card.coverUrl} alt={card.nameCn} />
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex items-baseline gap-2">
-          <h4 className="truncate text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</h4>
-          {card.year && <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{card.year}</span>}
-          {card.platform && <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{card.platform}</span>}
+      {/* ── 上区：元数据 ── */}
+      <div className="flex gap-3">
+        <div className="flex-shrink-0 self-start overflow-hidden rounded-md"
+          style={{ width: 88, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
+          <Cover src={card.coverUrl} alt={card.nameCn} />
         </div>
 
-        {/* 历史对比信息 — 上一次 vs 本次 */}
-        {hasHistory(card) && (
-          <div className="rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
-            style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>之前：</span>
-            <span style={{ color: 'var(--text-secondary)' }}>
-              {formatHistory(card)}
-            </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {/* 片名 + 年份 + platform */}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <h4 className="truncate text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</h4>
+            {card.year && <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{card.year}</span>}
+            {card.platform && <span className="flex-shrink-0 badge badge-outline">{card.platform}</span>}
           </div>
-        )}
 
-        {/* 评分 */}
-        <div className="inline-flex gap-0.5" role="group">
+          {/* 标签 */}
+          {card.tags && card.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {card.tags.slice(0, 4).map(t => <span key={t} className="badge badge-muted">{t}</span>)}
+            </div>
+          )}
+
+          {/* 简介 */}
+          {card.plot && (
+            <p className="line-clamp-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{card.plot}</p>
+          )}
+
+          {/* Bangumi 评分 */}
+          {card.score != null && (
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              Bangumi 评分：<span style={{ color: 'var(--amber)', fontWeight: 600 }}>★ {card.score.toFixed(1)}</span>
+            </span>
+          )}
+
+          {/* 历史对比信息 */}
+          {hasHistory(card) && (
+            <div className="rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
+              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>之前：</span>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {formatHistory(card)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 下区：我的标记 ── */}
+      <div className="flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+
+        {/* 我的评分 */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium text-[color:var(--text-muted)] flex-shrink-0">评分</span>
+          <span className="inline-flex gap-0.5" role="group">
           {[1, 2, 3, 4, 5].map(i => (
             <button key={i} type="button" disabled={readOnly}
               className={readOnly ? '' : 'cursor-pointer hover:scale-110 bg-transparent p-0 transition-colors'}
@@ -150,23 +185,30 @@ export function AiCard({ card, onSave, onUndo }: Props) {
               </svg>
             </button>
           ))}
+        </span>
         </div>
 
         {/* 状态 */}
-        <div className="flex flex-wrap gap-1">
-          {STATUSES.map(s => (
-            <button key={s} type="button" disabled={readOnly}
-              onClick={() => !readOnly && setStatus(prev => (prev === s ? null : s))}
-              className="rounded-full px-2.5 py-0.5 text-[11px] transition-colors"
-              style={{
-                background: status === s ? 'var(--accent)' : 'var(--bg-card)',
-                color: status === s ? '#fff' : 'var(--text-muted)',
-                border: status === s ? '1px solid var(--accent)' : '1px solid var(--border)',
-                opacity: readOnly ? 0.7 : 1,
-              }}>
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium text-[color:var(--text-muted)] flex-shrink-0">标记</span>
+          <span className="flex flex-wrap gap-1.5">
+          {STATUSES.map(({ s, label, dot: dd }) => {
+            const active = status === s;
+            return (
+              <button key={s} type="button" disabled={readOnly}
+                onClick={() => !readOnly && setStatus(prev => (prev === s ? null : s))}
+                className="flex items-center justify-center gap-1 rounded-lg border px-1.5 py-1 text-[11px] font-medium transition-all"
+                style={{
+                  borderColor: active ? 'var(--border-active)' : 'var(--border)',
+                  color: active ? 'var(--amber)' : 'var(--text-secondary)',
+                  background: active ? 'var(--amber-dim)' : 'transparent',
+                  opacity: readOnly ? 0.7 : 1,
+                }}>
+                <span className={`dot ${dd}`} />{label}
+              </button>
+            );
+          })}
+          </span>
         </div>
 
         {/* 影评 */}

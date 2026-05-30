@@ -70,4 +70,9 @@ public class BangumiTools {
         log.debug("Tool: searchWeb query='{}'", query);
         return webSearchService.search(query);
     }
+
+    public String fetchWeb(String url) {
+        log.debug("Tool: fetchWeb url='{}'", url);
+        return webSearchService.fetch(url);
+    }
 }

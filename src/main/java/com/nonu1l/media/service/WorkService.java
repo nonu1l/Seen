@@ -133,6 +133,7 @@ public class WorkService {
         d.setSeasonsCount(remote.getSeasonsCount());
         d.setRuntime(remote.getRuntime());
         d.setCast(remote.getCast());
+        d.setImdbId(remote.getImdbId());
 
         Long wid = parseId(subjectId);
         if (wid != null) {
@@ -256,6 +257,10 @@ public class WorkService {
         return bangumiService.getCharacterName(id);
     }
 
+    public String getActorName(Long id) {
+        return bangumiService.getPersonName(id);
+    }
+
     public Map<String, Object> getDict() {
         return Map.of(
                 "subjectTypes", subjectTypeRepo.findAll(),
@@ -334,7 +339,10 @@ public class WorkService {
         if (meta.getScore() != null) w.setScore(meta.getScore());
         if (meta.getTags() != null && !meta.getTags().isEmpty()) {
             try {
-                w.setTagsCache(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(meta.getTags()));
+                List<String> cleaned = ConversationService.cleanTags(meta.getTags(), meta.getPlatform());
+                if (!cleaned.isEmpty()) {
+                    w.setTagsCache(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cleaned));
+                }
             } catch (Exception e) {
                 log.debug("Failed to serialize tags: {}", e.getMessage());
             }

@@ -32,6 +32,7 @@ public class WorkDetail {
     private Integer seasonsCount;
     private Integer runtime;
     private List<CastMember> cast;
+    private String imdbId;
 
     /* ── 用户标记信息 ── */
     private String status;

@@ -1,7 +1,11 @@
 package com.nonu1l.media.service;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.IntentAnalysisResult;
 import com.nonu1l.media.model.dto.MatchedEntry;
 import org.slf4j.Logger;
@@ -34,8 +38,9 @@ public class IntentAnalysisService {
 
     public IntentAnalysisService(ChatClient.Builder chatClientBuilder,
                                   ObjectMapper objectMapper,
-                                  BangumiTools tools) {
-        this.chatClient = chatClientBuilder.build();
+                                  BangumiTools tools,
+                                  TokenUsageAdvisor tokenUsageAdvisor) {
+        this.chatClient = chatClientBuilder.defaultAdvisors(tokenUsageAdvisor).build();
         this.objectMapper = objectMapper;
         this.tools = tools;
         this.agentPrompt = loadPrompt("prompts/agent-system.st");
@@ -45,8 +50,10 @@ public class IntentAnalysisService {
      * 一次 @Tool ChatClient 调用完成意图分析。
      */
     public IntentAnalysisResult analyze(String userInput, String history) {
-        String system = agentPrompt.replace("{history}",
-                history != null && !history.isBlank() ? history : "（无历史）");
+        String system = agentPrompt
+                .replace("{today}", java.time.LocalDate.now().toString())
+                .replace("{history}",
+                        history != null && !history.isBlank() ? history : "（无历史）");
 
         log.debug("Agent call: userInput={}", userInput);
 
@@ -57,7 +64,8 @@ public class IntentAnalysisService {
                     .toolCallbacks(
                             searchBangumiCallback(),
                             searchLocalCallback(),
-                            searchWebCallback())
+                            searchWebCallback(),
+                            fetchWebCallback())
                     .call()
                     .content();
 
@@ -66,7 +74,7 @@ public class IntentAnalysisService {
             }
 
             String json = extractJsonObject(content);
-            AgentOutput output = objectMapper.readValue(json, new TypeReference<AgentOutput>() {});
+            AgentOutput output = parseAgentOutput(json);
 
             return new IntentAnalysisResult(
                     output.replyText(),
@@ -100,13 +108,22 @@ public class IntentAnalysisService {
     private ToolCallback searchWebCallback() {
         return FunctionToolCallback.builder("searchWeb",
                         (SearchReq req) -> tools.searchWeb(req.keyword()))
-                .description("DuckDuckGo 网页搜索。用于根据描述找片名或搜索推荐。")
+                .description("搜索引擎，返回标题+摘要+URL列表。用于根据描述找片名、推荐、热门排行等。")
                 .inputType(SearchReq.class)
+                .build();
+    }
+
+    private ToolCallback fetchWebCallback() {
+        return FunctionToolCallback.builder("fetchWeb",
+                        (FetchReq req) -> tools.fetchWeb(req.url()))
+                .description("抓取网页纯文本内容。当搜索结果摘要信息不足时，用此方法打开链接阅读详情以提取片名或信息。")
+                .inputType(FetchReq.class)
                 .build();
     }
 
     /** FunctionCallback 需要 POJO 输入类型 */
     public record SearchReq(String keyword) {}
+    public record FetchReq(String url) {}
 
     /** LLM 输出的 JSON 结构 */
     public record AgentOutput(String replyText, List<MatchedEntry> cards, List<Long> unmarkIds) {}
@@ -154,6 +171,80 @@ public class IntentAnalysisService {
             }
         }
         throw new IllegalArgumentException("Unbalanced JSON braces in: " + truncate(text));
+    }
+
+    /**
+     * 解析 AgentOutput JSON。首次失败后尝试修复未转义引号再重试。
+     * LLM 常见错误：replyText 中直接使用 " 做中文引号，导致 JSON 字符串提前闭合。
+     */
+    private AgentOutput parseAgentOutput(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<AgentOutput>() {});
+        } catch (Exception firstError) {
+            String repaired = repairUnescapedQuotesInJsonStrings(json);
+            if (!repaired.equals(json)) {
+                try {
+                    AgentOutput result = objectMapper.readValue(repaired, new TypeReference<AgentOutput>() {});
+                    log.warn("Agent JSON 存在未转义引号，已本地修复后解析成功");
+                    return result;
+                } catch (Exception e) {
+                    log.warn("修复后仍然无法解析 Agent JSON: {}", e.getMessage());
+                }
+            }
+            throw new RuntimeException("Failed to parse AgentOutput JSON", firstError);
+        }
+    }
+
+    /**
+     * 修复 JSON 字符串值内部未转义的双引号。
+     * 状态机遍历：当在字符串内遇到 " 时，向前看下一个非空白字符 —
+     * 若是 , } ] : 则认为是真正的 JSON 字符串终结符；
+     * 否则认为是未转义的内容引号，补上反斜杠。
+     */
+    static String repairUnescapedQuotesInJsonStrings(String content) {
+        if (content == null || content.isBlank()) return content;
+        StringBuilder out = new StringBuilder(content.length() + 16);
+        boolean inString = false;
+        boolean escaping = false;
+        for (int i = 0; i < content.length(); i++) {
+            char ch = content.charAt(i);
+            if (!inString) {
+                if (ch == '"') inString = true;
+                out.append(ch);
+                continue;
+            }
+            if (escaping) {
+                out.append(ch);
+                escaping = false;
+                continue;
+            }
+            if (ch == '\\') {
+                out.append(ch);
+                escaping = true;
+                continue;
+            }
+            if (ch == '"') {
+                if (isJsonStringTerminator(content, i + 1)) {
+                    inString = false;
+                    out.append(ch);
+                } else {
+                    out.append("\\\"");
+                }
+                continue;
+            }
+            out.append(ch);
+        }
+        return out.toString();
+    }
+
+    /** 向前跳过空白，判断下一个字符是否为 JSON 结构终止符 */
+    private static boolean isJsonStringTerminator(String content, int start) {
+        for (int i = start; i < content.length(); i++) {
+            char next = content.charAt(i);
+            if (Character.isWhitespace(next)) continue;
+            return next == ',' || next == '}' || next == ']' || next == ':';
+        }
+        return true; // 字符串结尾 — 认为该引号是终结符
     }
 
     private static String truncate(String s) {

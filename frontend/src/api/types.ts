@@ -22,6 +22,7 @@ export interface CastMember {
   name: string;
   character: string | null;
   profile: string | null;
+  actorId: number | null;
 }
 
 export interface WorkSearchResult {
@@ -75,6 +76,7 @@ export interface WorkDetail {
   seasonsCount: number | null;
   runtime: number | null;
   cast: CastMember[] | null;
+  imdbId: string | null;
   status: Status | null;
   myRating: number | null;
   myReview: string | null;
@@ -106,7 +108,10 @@ export interface ConversationCardVO {
   coverUrl: string | null;
   year: string | null;
   platform: string | null;
+  tags: string[] | null;
+  plot: string | null;
   rating: number | null;
+  score: number | null;
   review: string | null;
   status: Status | null;
   cardState: CardState;

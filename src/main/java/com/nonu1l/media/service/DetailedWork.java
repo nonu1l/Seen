@@ -13,4 +13,6 @@ public class DetailedWork {
     private Integer seasonsCount;
     private Integer runtime;
     private List<CastMember> cast;
+    /** Bangumi infobox 中的 imdb_id，用于直接跳转 IMDb */
+    private String imdbId;
 }

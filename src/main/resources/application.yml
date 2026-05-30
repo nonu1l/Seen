@@ -28,7 +28,10 @@ spring:
           temperature: 0.0
 
 seen:
+#  反向代理 cf-worker\bangumi-proxy
   bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
+#  自部署 SearXNG
+  search-url: ${SEARCH_URL:http://192.168.67.211:8888}
   sql:
     init:
       mode: always

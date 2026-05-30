@@ -134,6 +134,8 @@ public class ConversationService {
         // 保存卡片 + 自动保存
         List<ConversationCardVO> cardVOs = new ArrayList<>();
         if (result.entries() != null) {
+            // 1) 先创建所有卡片实体
+            List<ConversationCard> cards = new ArrayList<>();
             for (MatchedEntry entry : result.entries()) {
                 ConversationCard card = new ConversationCard();
                 card.setSessionId(session.getId());
@@ -144,7 +146,12 @@ public class ConversationService {
                 card.setReview(entry.comment());
                 card.setStatus(entry.status());
                 card.setCardState("PENDING");
-                enrichCardMeta(card);
+                cards.add(card);
+            }
+            // 2) 并行补充元数据（Bangumi API 调用互不阻塞）
+            cards.parallelStream().forEach(this::enrichCardMeta);
+            // 3) 保存并自动标记
+            for (ConversationCard card : cards) {
                 cardRepo.save(card);
                 cardVOs.add(autoSaveCard(card));
             }
@@ -255,7 +262,8 @@ public class ConversationService {
                 card.getId(), card.getMessageId(), card.getSubjectId(),
                 card.getNameCn(), card.getCoverUrl(), card.getYear(),
                 card.getPlatform(),
-                card.getRating(), card.getReview(), card.getStatus(), card.getCardState(),
+                card.getRating(), card.getScore(), card.getReview(), card.getStatus(), card.getCardState(),
+                deserializeTags(card.getTags()), card.getPlot(),
                 previous != null ? (previous.getRating() != null ? previous.getRating().intValue() : null) : null,
                 previous != null ? previous.getReview() : null,
                 previous != null ? previous.getStatus() : null
@@ -352,11 +360,12 @@ public class ConversationService {
                 card.getId(), card.getMessageId(), card.getSubjectId(),
                 card.getNameCn(), card.getCoverUrl(), card.getYear(),
                 card.getPlatform(),
-                card.getRating(), card.getReview(), card.getStatus(), card.getCardState()
+                card.getRating(), card.getScore(), card.getReview(), card.getStatus(), card.getCardState(),
+                deserializeTags(card.getTags()), card.getPlot()
         );
     }
 
-    /** 从 Bangumi 补充封面、年份、平台信息 */
+    /** 从 Bangumi 补充封面、年份、平台、标签、简介 */
     private void enrichCardMeta(ConversationCard card) {
         try {
             WorkSearchResult w = bangumiService.getById(String.valueOf(card.getSubjectId()));
@@ -364,10 +373,45 @@ public class ConversationService {
                 if (w.getCoverUrl() != null) card.setCoverUrl(w.getCoverUrl());
                 if (w.getYear() != null) card.setYear(w.getYear());
                 if (w.getPlatform() != null) card.setPlatform(w.getPlatform());
+                if (w.getTags() != null && !w.getTags().isEmpty()) {
+                    card.setTags(serializeTags(cleanTags(w.getTags(), w.getPlatform())));
+                }
+                if (w.getPlot() != null) card.setPlot(w.getPlot());
+                if (w.getScore() != null) card.setScore(w.getScore());
             }
         } catch (Exception e) {
             log.debug("Failed to enrich card meta subjectId={}: {}", card.getSubjectId(), e.getMessage());
         }
+    }
+
+    private String serializeTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) return null;
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(tags);
+        } catch (Exception e) {
+            return String.join(",", tags);
+        }
+    }
+
+    private List<String> deserializeTags(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, List.class);
+        } catch (Exception e) {
+            return List.of(json.split(","));
+        }
+    }
+
+    /** 去重 + 过滤空白 + 排除与 platform 相同的标签 */
+    static List<String> cleanTags(List<String> tags, String platform) {
+        if (tags == null || tags.isEmpty()) return List.of();
+        String plat = platform != null ? platform.trim() : "";
+        return tags.stream()
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .filter(t -> plat.isEmpty() || !t.equalsIgnoreCase(plat))
+                .distinct()
+                .toList();
     }
 
     /** 取消标记前快照：读取 work + 最新 record 数据，生成 UNMARK 卡片供撤回 */

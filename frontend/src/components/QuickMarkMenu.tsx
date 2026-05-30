@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { ReactNode } from 'react';
 import type { Status } from '../api/types';
 
 interface Props {
   current: Status | null;
   onSelect: (s: Status) => void;
+  trigger?: ReactNode;
 }
 
 const ITEMS: { s: Status; label: string; dot: string }[] = [
@@ -15,7 +17,7 @@ const ITEMS: { s: Status; label: string; dot: string }[] = [
   { s: 'dropped', label: '抛弃', dot: 'dot-gray' },
 ];
 
-export function QuickMarkMenu({ current, onSelect }: Props) {
+export function QuickMarkMenu({ current, onSelect, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
@@ -63,23 +65,25 @@ export function QuickMarkMenu({ current, onSelect }: Props) {
         ref={btnRef}
         type="button"
         onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
-        className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors hover:text-[color:var(--text-primary)]"
-        style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+        className={trigger ? '' : 'flex items-center gap-1 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors hover:text-[color:var(--text-primary)]'}
+        style={trigger ? { background:'none',border:'none',padding:0,font:'inherit',color:'inherit',cursor:'pointer' } : { borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       >
-        标记
-        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-        </svg>
+        {trigger ?? (
+          <>
+            标记
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+            </svg>
+          </>
+        )}
       </button>
 
       {open && createPortal(
         <div
           ref={menuRef}
-          className={`fixed z-[9999] rounded-lg border py-1 ${closing ? 'anim-out' : 'anim-in'}`}
+          className={`fixed z-[9999] dropdown-glass py-1.5 ${closing ? 'anim-out' : 'anim-in'}`}
           style={{
-            background: 'var(--bg-panel)',
-            borderColor: 'var(--border)',
-            minWidth: 112,
+            minWidth: 120,
             top: pos.top,
             right: pos.right,
           }}
@@ -91,7 +95,7 @@ export function QuickMarkMenu({ current, onSelect }: Props) {
               key={s}
               type="button"
               role="menuitem"
-              className="flex items-center gap-2 w-full px-3 py-2 text-[13px] font-medium transition-colors hover:bg-white/5"
+              className="flex items-center gap-2.5 w-full px-3.5 py-2 text-[13px] font-medium transition-all duration-150 hover:bg-white/[0.06]"
               style={{ color: current === s ? 'var(--accent)' : 'var(--text-secondary)' }}
               onClick={() => { setOpen(false); onSelect(s); }}
             >
