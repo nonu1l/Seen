@@ -12,7 +12,7 @@ export default function AiPage() {
   const { setOnReset } = useOutletContext<AppLayoutContext>();
   const ai = useAiMode();
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   // 向 AppLayout 注册 reset 回调
   useEffect(() => {
@@ -20,13 +20,13 @@ export default function AiPage() {
     return () => setOnReset(null);
   }, [ai.reset, setOnReset]);
 
-  // 自动滚动到底部
+  // 自动滚动到底部（等 DOM 布局稳定后再滚）
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = bottomRef.current;
     if (!el) return;
     setTimeout(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }, 300);
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 200);
   }, [ai.messages]);
 
   return (
@@ -35,7 +35,7 @@ export default function AiPage() {
       {/* 动画内容区 — 消息 + 输入 */}
       <div className="ai-content">
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 pb-24 space-y-4" style={{ scrollBehavior: 'smooth' }}>
+        <div className="flex-1 overflow-y-auto py-4 pb-24 space-y-4" style={{ scrollBehavior: 'smooth' }}>
           {ai.messages.map(msg => {
             const msgCards = msg.role === 'assistant'
               ? ai.cards.filter(c => c.messageId === msg.id)
@@ -78,6 +78,7 @@ export default function AiPage() {
               </span>
             </div>
           )}
+          <div ref={bottomRef} className="h-20" />
         </div>
 
       </div>
