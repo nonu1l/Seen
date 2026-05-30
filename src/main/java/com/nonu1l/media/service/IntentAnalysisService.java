@@ -65,7 +65,8 @@ public class IntentAnalysisService {
                             searchBangumiCallback(),
                             searchLocalCallback(),
                             searchWebCallback(),
-                            fetchWebCallback())
+                            fetchWebCallback(),
+                            trendingBangumiCallback())
                     .call()
                     .content();
 
@@ -121,9 +122,18 @@ public class IntentAnalysisService {
                 .build();
     }
 
+    private ToolCallback trendingBangumiCallback() {
+        return FunctionToolCallback.builder("trendingBangumi",
+                        (TrendingReq req) -> tools.trendingBangumi(req.type(), req.year()))
+                .description("获取 Bangumi 趋势热门排行。type=2 动画 / 6 真人，year 可选筛选年份。用户问当前热门/排行榜时优先用此工具。")
+                .inputType(TrendingReq.class)
+                .build();
+    }
+
     /** FunctionCallback 需要 POJO 输入类型 */
     public record SearchReq(String keyword) {}
     public record FetchReq(String url) {}
+    public record TrendingReq(int type, Integer year) {}
 
     /** LLM 输出的 JSON 结构 */
     public record AgentOutput(String replyText, List<MatchedEntry> cards, List<Long> unmarkIds) {}

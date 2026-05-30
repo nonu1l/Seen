@@ -141,7 +141,7 @@ export default function HomePage() {
       {filteredMarked.length > 0 && (
         <section className="mb-8">
           {showingSearch && <p className="mb-3 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>标记 · {filteredMarked.length}</p>}
-          <div className="grid gap-5 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {filteredMarked.map((w, i) => (
               <WorkCard key={`local-${w.id}`} data={w} index={i}
                 onOpen={() => setOpened({ id: w.id, platform: w.platform })}
@@ -155,7 +155,7 @@ export default function HomePage() {
       {showingSearch && merged.unmarked.length > 0 && (
         <section>
           <p className="mb-3 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>Bangumi · {merged.unmarked.length}</p>
-          <div className="grid gap-5 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {merged.unmarked.map((w, i) => (
               <WorkCard key={`bgm-${w.platform}-${w.id}`} data={w} unmarked index={merged.marked.length + i}
                 onOpen={() => setOpened({ id: w.id, platform: w.platform })}

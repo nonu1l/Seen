@@ -30,6 +30,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
   const [status, setStatus] = useState<Status | null>(card.status ?? null);
   const [review, setReview] = useState(card.review ?? '');
   const [saving, setSaving] = useState(false);
+  const [plotExpanded, setPlotExpanded] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -115,44 +116,53 @@ export function AiCard({ card, onSave, onUndo }: Props) {
 
   // ── 普通 / 已保存 / 可编辑卡片（PENDING / EDITABLE / SAVED）──
   return (
-    <div className="flex flex-col gap-3 rounded-lg p-3" style={{
+    <div className="flex flex-col gap-2 rounded-lg p-3" style={{
       background: 'var(--bg-card)', border: '1px solid var(--border)',
     }}>
-      {/* ── 上区：元数据 ── */}
+      {/* ── 卡片头：片名 + 年份 ── */}
+      <div className="flex items-baseline gap-2" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+        <h4 className="truncate text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</h4>
+        {card.year && <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{card.year}</span>}
+      </div>
+
+      {/* ── 上区：封面 + 元数据 ── */}
       <div className="flex gap-3">
-        <div className="flex-shrink-0 self-start overflow-hidden rounded-md"
-          style={{ width: 88, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
+        <div className="flex-shrink-0 self-start overflow-hidden rounded-md relative aspect-[2/3] cover-gradient-bottom"
+          style={{ width: 88, border: '1px solid rgba(255,255,255,0.08)' }}>
           <Cover src={card.coverUrl} alt={card.nameCn} />
+          {card.platform && <span className="cover-platform" style={{ fontSize: 10, padding: '0 5px', bottom: 6, right: 6 }}>{card.platform}</span>}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {/* 片名 + 年份 + platform */}
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <h4 className="truncate text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</h4>
-            {card.year && <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{card.year}</span>}
-            {card.platform && <span className="flex-shrink-0 badge badge-outline">{card.platform}</span>}
-          </div>
-
-          {/* 标签 */}
           {card.tags && card.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {card.tags.slice(0, 4).map(t => <span key={t} className="badge badge-muted">{t}</span>)}
             </div>
           )}
-
-          {/* 简介 */}
           {card.plot && (
-            <p className="line-clamp-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{card.plot}</p>
+            <div>
+              <p className={`text-[12px] leading-relaxed ${plotExpanded ? '' : 'line-clamp-3'}`}
+                style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>
+                {card.plot}
+              </p>
+              <button onClick={() => setPlotExpanded(!plotExpanded)}
+                className="text-[11px] hover:opacity-70"
+                style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                {plotExpanded ? '收起' : '展开'}
+              </button>
+            </div>
           )}
-
-          {/* Bangumi 评分 */}
-          {card.score != null && (
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              Bangumi 评分：<span style={{ color: 'var(--amber)', fontWeight: 600 }}>★ {card.score.toFixed(1)}</span>
-            </span>
-          )}
-
-          {/* 历史对比信息 */}
+          <div className="flex items-center justify-between text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            {card.score != null && (
+              <span>Bangumi 评分：<span style={{ color: 'var(--amber)', fontWeight: 600 }}>★ {card.score.toFixed(1)}</span></span>
+            )}
+            <a href={`https://bangumi.tv/subject/${card.subjectId}`}
+              target="_blank" rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-opacity hover:opacity-70 flex-shrink-0"
+              style={{ color: 'var(--text-muted)' }}>
+              Bangumi &gt;
+            </a>
+          </div>
           {hasHistory(card) && (
             <div className="rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
               style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
@@ -167,7 +177,6 @@ export function AiCard({ card, onSave, onUndo }: Props) {
 
       {/* ── 下区：我的标记 ── */}
       <div className="flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-
         {/* 我的评分 */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-[color:var(--text-muted)] flex-shrink-0">评分</span>
@@ -208,7 +217,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
               </button>
             );
           })}
-          </span>
+        </span>
         </div>
 
         {/* 影评 */}

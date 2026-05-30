@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+import { Masonry } from '@tuturuuu/masonry';
 import remarkGfm from 'remark-gfm';
 import { useAiMode } from '../hooks/useAiMode';
 import type { AppLayoutContext } from '../components/AppLayout';
@@ -11,7 +12,7 @@ export default function AiPage() {
   const { setOnReset } = useOutletContext<AppLayoutContext>();
   const ai = useAiMode();
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 向 AppLayout 注册 reset 回调
   useEffect(() => {
@@ -19,16 +20,14 @@ export default function AiPage() {
     return () => setOnReset(null);
   }, [ai.reset, setOnReset]);
 
-  // 自动滚动到底部（等 DOM 布局稳定后再滚）
+  // 自动滚动到底部
   useEffect(() => {
-    const el = bottomRef.current;
+    const el = scrollRef.current;
     if (!el) return;
-    // 先用 instant 滚到底，再 smooth 微调，避免动画期间位置不准
-    el.scrollIntoView({ behavior: 'instant', block: 'end' });
-    requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    });
-  }, [ai.messages, ai.loading]);
+    setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }, 300);
+  }, [ai.messages]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -36,7 +35,7 @@ export default function AiPage() {
       {/* 动画内容区 — 消息 + 输入 */}
       <div className="ai-content">
 
-        <div className="flex-1 overflow-y-auto py-4 space-y-4" style={{ scrollBehavior: 'smooth' }}>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 pb-24 space-y-4" style={{ scrollBehavior: 'smooth' }}>
           {ai.messages.map(msg => {
             const msgCards = msg.role === 'assistant'
               ? ai.cards.filter(c => c.messageId === msg.id)
@@ -58,10 +57,12 @@ export default function AiPage() {
                   </span>
                 </div>
                 {msgCards.length > 0 && (
-                  <div className="mt-2 grid gap-2 grid-cols-1 lg:grid-cols-2">
-                    {msgCards.map(card => (
-                      <AiCard key={card.id} card={card} onSave={ai.saveCard} onUndo={ai.undoCard} />
-                    ))}
+                  <div className="mt-2">
+                    <Masonry columns={3} gap={8} breakpoints={{ 0: 1, 768: 2, 1024: 3 }} strategy="count">
+                      {msgCards.map(card => (
+                        <AiCard key={card.id} card={card} onSave={ai.saveCard} onUndo={ai.undoCard} />
+                      ))}
+                    </Masonry>
                   </div>
                 )}
               </div>
@@ -77,10 +78,18 @@ export default function AiPage() {
               </span>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
 
-        <div className="flex-shrink-0">
+      </div>
+
+      {/* 悬浮输入框 — 固定在视口底部，磨砂玻璃 */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-2"
+        style={{
+          background: 'rgba(8,8,15,0.75)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}>
+        <div className="mx-auto w-full max-w-7xl">
           <AiInput onSend={ai.send} loading={ai.loading} />
         </div>
       </div>

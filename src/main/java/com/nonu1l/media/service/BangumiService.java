@@ -76,6 +76,35 @@ public class BangumiService {
         return results;
     }
 
+    /** 获取 Bangumi 趋势热门排行：type=2(动画)/6(真人)，year 可空 */
+    public List<WorkSearchResult> trending(int type, Integer year) {
+        List<WorkSearchResult> results = new ArrayList<>();
+        try {
+            var filter = new java.util.LinkedHashMap<String, Object>();
+            filter.put("type", java.util.List.of(type));
+            if (year != null) {
+                filter.put("air_date", java.util.List.of(String.valueOf(year)));
+            }
+            String body = objectMapper.writeValueAsString(
+                    java.util.Map.of(
+                            "keyword", "",
+                            "sort", "trends",
+                            "filter", filter));
+
+            String json = post(base + "/search/subjects?limit=15", body, 300);
+            if (json == null) return results;
+
+            JsonNode data = objectMapper.readTree(json).get("data");
+            if (data != null && data.isArray()) {
+                for (JsonNode item : data) results.add(mapSubject(item));
+            }
+            log.debug("Trending type={} year={}: {} results", type, year, results.size());
+        } catch (Exception e) {
+            log.error("Bangumi trending failed type={} year={}", type, year, e);
+        }
+        return results;
+    }
+
     public WorkSearchResult getById(String subjectId) {
         try {
             String json = get(base + "/subjects/" + subjectId, 1800);
