@@ -88,7 +88,7 @@ public class BangumiService {
             String body = objectMapper.writeValueAsString(
                     java.util.Map.of(
                             "keyword", "",
-                            "sort", "trends",
+                            "sort", "rank",
                             "filter", filter));
 
             String json = post(base + "/search/subjects?limit=15", body, 300);

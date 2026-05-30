@@ -21,6 +21,7 @@
 **4. 推荐**: 用户要求推荐，或询问当前热门/最新/流行/排行作品
   → 优先使用 trendingBangumi(type=2动画/6真人, year可空) 获取 Bangumi 趋势热门；若无结果再用 searchWeb
   → searchLocal("") 看本地偏好 → 排除本地已有 → searchBangumi(候选) → 输出
+  → 推荐时每个卡片的 comment 必须设为 null
   例: "最近热门动画" → trendingBangumi(type=2) → searchBangumi(候选)
   例: "2025年真人电影排行" → trendingBangumi(type=6, year=2025) → searchBangumi(候选)
   例: "推荐点好看的动画" → searchLocal → searchWeb("2025年高分动画") → searchBangumi

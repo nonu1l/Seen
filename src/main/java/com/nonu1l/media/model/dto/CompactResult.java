@@ -2,7 +2,9 @@ package com.nonu1l.media.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-/** Bangumi 搜索精简结果（@Tool 返回） */
+/** Bangumi 搜索精简结果（@Tool 返回）
+ * 用于对数据结果进行压缩
+ * */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record CompactResult(
         Long id, String nameCn, String nameOrig,

@@ -57,16 +57,17 @@ public class IntentAnalysisService {
 
         log.debug("Agent call: userInput={}", userInput);
 
+        String content = null;
         try {
-            String content = chatClient.prompt()
+            content = chatClient.prompt()
                     .system(system)
                     .user(userInput)
                     .toolCallbacks(
-                            searchBangumiCallback(),
-                            searchLocalCallback(),
-                            searchWebCallback(),
-                            fetchWebCallback(),
-                            trendingBangumiCallback())
+                            searchBangumiCallback(), //搜索 Bangumi 数据
+                            searchLocalCallback(),  //查询本地数据
+                            searchWebCallback(),  //网络搜索
+                            fetchWebCallback(), //访问网络链接
+                            trendingBangumiCallback()) //热门排行
                     .call()
                     .content();
 
@@ -83,8 +84,11 @@ public class IntentAnalysisService {
                     output.unmarkIds() != null ? output.unmarkIds() : List.of());
 
         } catch (Exception e) {
-            log.error("Agent analysis failed", e);
-            return new IntentAnalysisResult(null, List.of(), List.of());
+            log.warn("Agent JSON 提取失败，使用原始内容作为回复: {}", e.getMessage());
+            // 当 LLM 输出纯文本（如问答类）而非 JSON 时，用原始内容回退
+            return new IntentAnalysisResult(
+                    content != null ? content : "抱歉，处理出错了，请重试。",
+                    List.of(), List.of());
         }
     }
 

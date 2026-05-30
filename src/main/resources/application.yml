@@ -40,6 +40,9 @@ seen:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+    com.nonu1l.media.service.IntentAnalysisService: DEBUG
+    com.nonu1l.media.service.BangumiTools: DEBUG
+    com.nonu1l.media.service.WebSearchService: INFO
 #    org.hibernate.orm.jdbc.bind: TRACE
 #    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG
