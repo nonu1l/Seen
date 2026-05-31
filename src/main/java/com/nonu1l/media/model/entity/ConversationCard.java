@@ -39,11 +39,20 @@ public class ConversationCard {
 
     private Integer rating;
 
+    /** Bangumi 条目评分 */
+    private Double score;
+
     @Column(columnDefinition = "TEXT")
     private String review;
 
     @Column(length = 20)
     private String status;
+
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+
+    @Column(columnDefinition = "TEXT")
+    private String plot;
 
     @Column(name = "card_state", nullable = false, length = 20)
     private String cardState;

@@ -109,7 +109,7 @@ public class WorksController {
     }
 
     /**
-     * 获取中文角色（演员）名字
+     * 获取角色中文名字
      */
     @PostMapping("/character-names")
     public ResponseEntity<Map<Long, String>> characterNames(@RequestBody Map<String, Object> body) {
@@ -117,13 +117,31 @@ public class WorksController {
             @SuppressWarnings("unchecked")
             List<Integer> raw = (List<Integer>) body.get("ids");
             if (raw == null || raw.isEmpty()) return ResponseEntity.ok(Map.of());
-            Map<Long, String> result = new java.util.HashMap<>();
-            for (Long id : raw.stream().map(Number::longValue).toList()) {
+            Map<Long, String> result = new java.util.concurrent.ConcurrentHashMap<>();
+            raw.stream().map(Number::longValue).parallel().forEach(id -> {
                 String cn = workService.getCharacterName(id);
                 if (cn != null && !cn.isEmpty()) result.put(id, cn);
-            }
+            });
             return ResponseEntity.ok(result);
         } catch (Exception e) { log.error("characterNames failed", e); return ResponseEntity.internalServerError().build(); }
+    }
+
+    /**
+     * 获取演员中文名字
+     */
+    @PostMapping("/actor-names")
+    public ResponseEntity<Map<Long, String>> actorNames(@RequestBody Map<String, Object> body) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Integer> raw = (List<Integer>) body.get("ids");
+            if (raw == null || raw.isEmpty()) return ResponseEntity.ok(Map.of());
+            Map<Long, String> result = new java.util.concurrent.ConcurrentHashMap<>();
+            raw.stream().map(Number::longValue).parallel().forEach(id -> {
+                String cn = workService.getActorName(id);
+                if (cn != null && !cn.isEmpty()) result.put(id, cn);
+            });
+            return ResponseEntity.ok(result);
+        } catch (Exception e) { log.error("actorNames failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
     /**

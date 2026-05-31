@@ -70,4 +70,19 @@ public class BangumiTools {
         log.debug("Tool: searchWeb query='{}'", query);
         return webSearchService.search(query);
     }
+
+    public String fetchWeb(String url) {
+        log.debug("Tool: fetchWeb url='{}'", url);
+        return webSearchService.fetch(url);
+    }
+
+    public List<CompactResult> trendingBangumi(int type, Integer year) {
+        log.debug("Tool: trendingBangumi type={} year={}", type, year);
+        return bangumiService.trending(type, year).stream()
+                .map(r -> new CompactResult(
+                        r.getId(), r.getNameCn(), r.getNameOrig(),
+                        r.getPlatform(), r.getAirDate(),
+                        r.getEpsCount(), r.getScore(), r.getRank()))
+                .toList();
+    }
 }

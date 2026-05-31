@@ -1,0 +1,150 @@
+package com.nonu1l.media.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonu1l.media.model.dto.WebSearchItem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Serper.dev Google 搜索 API
+ *
+ * 官方参考请求格式
+ *
+ * OkHttpClient client = new OkHttpClient().newBuilder()
+ *   .build();
+ * MediaType mediaType = MediaType.parse("application/json");
+ * RequestBody body = RequestBody.create(mediaType, "{\"q\":\"2026年热门欧美剧推荐\",\"gl\":\"cn\",\"hl\":\"zh-cn\"}");
+ * Request request = new Request.Builder()
+ *   .url("https://google.serper.dev/search")
+ *   .method("POST", body)
+ *   .addHeader("X-API-KEY", "cc593ebb32ad5a57d1bd91ee33368faf52fecc02")
+ *   .addHeader("Content-Type", "application/json")
+ *   .build();
+ * Response response = client.newCall(request).execute();
+ *
+ *
+ * 数据返回
+ *
+ *
+ * {
+ *     "searchParameters": {
+ *         "q": "2026年热门欧美剧推荐",
+ *         "gl": "cn",
+ *         "hl": "zh-cn",
+ *         "type": "search",
+ *         "engine": "google"
+ *     },
+ *     "organic": [
+ *         {
+ *             "title": "剧荒救星！2026开年热门美剧大盘点，每一部都值得熬夜追 - 搜狐",
+ *             "link": "https://www.sohu.com/a/981853751_122559664",
+ *             "snippet": "最后推荐一部爱情剧，《柏捷顿家族:名门韵事》第四季，2026年1月15日在Netflix上线，延续了前几季的精致与浪漫，改编自茱莉亚昆恩的摄政浪漫史小说。",
+ *             "date": "2026年1月30日",
+ *             "position": 1
+ *         }
+ *     ],
+ *     "credits": 1
+ * }
+ *
+ *
+ */
+@Service
+public class SerperSearchService implements SearchProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(SerperSearchService.class);
+    private static final int MAX_RESULTS = 10;
+
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final String apiKey;
+
+    public SerperSearchService(RestTemplateBuilder builder,
+                                ObjectMapper objectMapper,
+                                @Value("${seen.search.serper-api-key:}") String apiKey) {
+        this.restTemplate = builder
+                .connectTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(10))
+                .build();
+        this.objectMapper = objectMapper;
+        this.apiKey = apiKey;
+        if (apiKey.isBlank()) {
+            log.warn("Serper API key not configured, service will be unavailable");
+        }
+    }
+
+    public boolean isAvailable() {
+        return !apiKey.isBlank();
+    }
+
+    @Override
+    public List<WebSearchItem> search(String query) {
+        List<WebSearchItem> results = new ArrayList<>();
+        if (apiKey.isBlank()) {
+            log.warn("Serper search skipped: no API key");
+            return results;
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-API-KEY", apiKey);
+
+            String body = objectMapper.writeValueAsString(Map.of("q", query, "gl", "cn", "hl", "zh-cn"));
+            HttpEntity<String> request = new HttpEntity<>(body, headers);
+
+            String json = restTemplate.postForObject(
+                    "https://google.serper.dev/search", request, String.class);
+            if (json == null) return results;
+
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode organic = root.get("organic");
+            if (organic == null || !organic.isArray()) return results;
+
+            for (JsonNode r : organic) {
+                String title = r.has("title") ? r.get("title").asText() : null;
+                String snippet = r.has("snippet") ? r.get("snippet").asText() : "";
+                String link = r.has("link") ? r.get("link").asText() : null;
+                if (title != null && link != null) {
+                    results.add(new WebSearchItem(title, snippet, link));
+                    if (results.size() >= MAX_RESULTS) break;
+                }
+            }
+            log.info("Serper '{}' returned {} results", query, results.size());
+            log.debug("Serper results:\n{}", results.stream()
+                .map(r -> String.format("  [%s] %s", r.title(), r.url()))
+                .reduce("", (a, b) -> a + b + "\n"));
+        } catch (Exception e) {
+            log.warn("Serper search failed '{}': {}", query, e.getMessage());
+        }
+        return results;
+    }
+
+    @Override
+    public String fetch(String url) {
+        try {
+            String html = restTemplate.getForObject(url, String.class);
+            if (html == null) return null;
+            String text = html
+                    .replaceAll("(?s)<script[^>]*>.*?</script>", " ")
+                    .replaceAll("(?s)<style[^>]*>.*?</style>", " ")
+                    .replaceAll("<[^>]+>", " ")
+                    .replaceAll("&[a-z]+;", " ")
+                    .replaceAll("\\s+", " ").trim();
+            log.info("SerperFetch {} chars from {}", text.length(), url);
+            return text.length() <= 3000 ? text : text.substring(0, 3000);
+        } catch (Exception e) {
+            log.warn("SerperFetch failed '{}': {}", url, e.getMessage());
+            return null;
+        }
+    }
+}

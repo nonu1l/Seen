@@ -24,7 +24,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-dvh flex flex-col px-3 pb-5 sm:pb-20 sm:px-8">
-      <div className="mx-auto w-full max-w-4xl flex flex-col flex-1 min-h-0">
+      <div className="mx-auto w-full max-w-7xl flex flex-col flex-1 min-h-0">
 
         <div className="app-header -mx-3 px-3 sm:-mx-8 sm:px-8 flex-shrink-0">
           <div className="app-header-row">

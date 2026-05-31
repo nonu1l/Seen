@@ -12,3 +12,5 @@ dist/
 *.log
 .env
 /src/main/resources/static/
+.gitignore
+/docs

@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import type { Status, WorkDetail } from '../api/types';
 import { Cover } from './Cover';
 import { StarRating } from './StarRating';
-import { BangumiFrame } from './BangumiFrame';
 
 interface Props { id: number; platform: string; onClose: (changed: boolean) => void; }
 
@@ -25,8 +24,8 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
   const [changed, setChanged] = useState(false);
   const [cnNames, setCnNames] = useState<Record<number, string>>({});
   const [cnLoading, setCnLoading] = useState<Set<number>>(new Set());
+  const [actorNames, setActorNames] = useState<Record<number, string>>({});
   const [plotExpanded, setPlotExpanded] = useState(false);
-  const [bangumiOpen, setBangumiOpen] = useState(false);
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   useEffect(() => {
@@ -39,6 +38,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     setError(null);
     setCnNames({});
     setCnLoading(new Set());
+    setActorNames({});
     setPlotExpanded(false);
     try { const r = await api.getDetail(String(id), platform); setD(r); setRating(r.myRating); setReview(r.myReview ?? ''); }
     catch (e: any) { setError(e?.message || '加载失败'); }
@@ -65,14 +65,28 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     }).catch(() => {
       setCnLoading(new Set());
     });
-  }, [d, id]);
+  }, [d?.cast, id]);
+
+  // 批量获取演员中文名
+  useLayoutEffect(() => {
+    if (!d?.cast?.length) return;
+    const actors = d.cast.filter(c => c.actorId != null);
+    if (!actors.length) return;
+    const ids = [...new Set(actors.map(c => c.actorId!))];
+    api.getActorNames(ids).then(map => {
+      setActorNames(prev => ({ ...prev, ...map }));
+    }).catch(() => {});
+  }, [d?.cast, id]);
 
   const mark = async (status: Status) => {
     if (!d) return;
     try {
-      await api.mark({ id: String(d.id ?? id), platform: d.platform ?? platform, status,
+      const updated = await api.mark({ id: String(d.id ?? id), platform: d.platform ?? platform, status,
         meta: d.id == null ? { id, platform, nameCn: d.nameCn, nameOrig: d.nameOrig, coverUrl: d.coverUrl, year: d.year, tags: d.tags, plot: d.plot, score: d.score, source: 'bangumi' } : undefined });
-      setChanged(true); await refresh();
+      setChanged(true);
+      // 仅更新标记相关状态，避免 refresh() 导致角色信息重新获取
+      setD(prev => prev ? { ...prev, status, id: prev.id ?? updated.id } : prev);
+      setRating(updated.myRating);
     } catch (e: any) { setError(e?.message || '标记失败'); }
   };
 
@@ -136,11 +150,12 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                   {d.runtime != null && <span className="badge badge-muted">{d.runtime} 分钟</span>}
                   {d.score != null && d.score > 0 && <span className="badge badge-accent">{d.score.toFixed(1)}</span>}
                 </div>
-                <button onClick={() => setBangumiOpen(true)}
-                  className="text-[11px] mt-1 underline underline-offset-2 transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                  在 Bangumi 查看详情
-                </button>
+                <a href={d.imdbId ? `https://www.imdb.com/title/${d.imdbId}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(d.nameOrig || d.nameCn)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-block text-[11px] mt-1 underline underline-offset-2 transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--text-muted)' }}>
+                  在 IMDb 查看
+                </a>
                 {d.plot && (
                   <div className="hidden sm:block text-[13px] text-[color:var(--text-secondary)] leading-relaxed">
                     <div className={!plotExpanded ? 'line-clamp-3' : ''}>{d.plot}</div>
@@ -184,10 +199,16 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                         <div className="w-[68px] h-[92px] rounded-lg overflow-hidden mb-1 cover-placeholder [&_img]:object-top">
                           <Cover src={c.profile} alt={c.name} />
                         </div>
-                        <p className="text-[11px] truncate font-medium text-[color:var(--text-primary)]">
+                        <p className="text-[11px] truncate font-medium text-[color:var(--text-primary)]"
+                          title={c.id != null && cnNames[c.id] ? cnNames[c.id] : c.name}>
                           {c.id != null && cnNames[c.id] ? cnNames[c.id] : c.name}
                         </p>
-                        {c.character && <p className="text-[10px] truncate text-[color:var(--text-muted)]">{c.character}</p>}
+                        {c.character && (
+                          <p className="text-[10px] truncate text-[color:var(--text-muted)]"
+                            title={c.actorId != null && actorNames[c.actorId] ? actorNames[c.actorId] : c.character}>
+                            {c.actorId != null && actorNames[c.actorId] ? actorNames[c.actorId] : c.character}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -209,7 +230,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
 
             {/* Mark section */}
             <div className="space-y-3 pt-3" style={{borderTop:'1px solid var(--border)'}}>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">我的标记</p>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">标记</p>
 
               <div className="grid grid-cols-5 gap-1.5">
                 {STATUSES.map(({ s, label, dot: dd }) => {
@@ -262,7 +283,6 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
           </>)}
         </div>
       </div>
-      {d && <BangumiFrame subjectId={d.id ?? id} open={bangumiOpen} onClose={() => setBangumiOpen(false)} />}
     </div>
   );
 }

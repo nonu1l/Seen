@@ -1,5 +1,9 @@
 {
   "name": "bangumi-proxy",
   "main": "src/index.ts",
-  "compatibility_date": "2026-05-28"
+  "compatibility_date": "2026-05-28",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "none"
+  }
 }

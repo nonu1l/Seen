@@ -40,6 +40,9 @@ export const api = {
   getCharacterNames: (ids: number[]) =>
     request<Record<number, string>>('/works/character-names', { method: 'POST', body: JSON.stringify({ ids }) }),
 
+  getActorNames: (ids: number[]) =>
+    request<Record<number, string>>('/works/actor-names', { method: 'POST', body: JSON.stringify({ ids }) }),
+
   // ── Conversation ──
 
   getConversationState: () =>

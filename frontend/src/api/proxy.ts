@@ -14,7 +14,7 @@ export function rewriteBangumiUrl(src: string | null | undefined): string | unde
   if (!src) return undefined;
   const proxy = getBangumiProxy();
   if (proxy && src.includes('lain.bgm.tv')) {
-    return src.replace('lain.bgm.tv', proxy);
+    return src.replace('https://lain.bgm.tv', proxy.endsWith('/') ? proxy.slice(0, -1) : proxy);
   }
   return src;
 }

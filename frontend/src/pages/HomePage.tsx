@@ -10,9 +10,19 @@ import { RobotLogo } from '../components/RobotLogo';
 
 interface OpenedWork { id: number; platform: string; }
 
+const FILTERS: { key: Status | 'all'; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'collect', label: '看过' },
+  { key: 'doing', label: '在看' },
+  { key: 'wish', label: '想看' },
+  { key: 'on_hold', label: '搁置' },
+  { key: 'dropped', label: '抛弃' },
+];
+
 export default function HomePage() {
   const { query, setQuery, marked, search, loading, error, refresh, refreshSearch } = useHomeList();
   const [opened, setOpened] = useState<OpenedWork | null>(null);
+  const [filter, setFilter] = useState<Status | 'all'>('all');
   const showingSearch = query.trim().length > 0;
 
   useEffect(() => {
@@ -24,6 +34,17 @@ export default function HomePage() {
     const keys = new Set(search.local.map(w => `${w.platform}:${w.id}`));
     return { marked: search.local, unmarked: search.works.filter(w => !keys.has(`${w.platform}:${w.id}`)) };
   }, [showingSearch, search, marked]);
+
+  const filteredMarked = useMemo(() => {
+    if (!showingSearch && filter !== 'all') return merged.marked.filter(w => (w as WorkListItem).status === filter);
+    return merged.marked;
+  }, [merged.marked, filter, showingSearch]);
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const w of merged.marked) { const s = (w as WorkListItem).status; if (s) c[s] = (c[s] || 0) + 1; }
+    return c;
+  }, [merged.marked]);
 
   const handleMark = async (item: WorkListItem | WorkSearchResult, status: Status, unmarked: boolean) => {
     try {
@@ -63,9 +84,33 @@ export default function HomePage() {
       </div>
 
       {/* Hint */}
-      <p className="mb-5 mt-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-        {showingSearch ? '本地 + Bangumi 搜索' : '输入片名开始搜索'}
-      </p>
+      {!showingSearch && merged.marked.length > 0 && (
+        <p className="mb-5 mt-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>输入片名开始搜索</p>
+      )}
+
+      {/* Filter tabs — only when not searching */}
+      {!showingSearch && merged.marked.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-none">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200"
+              style={{
+                background: filter === f.key ? 'var(--accent-dim)' : 'transparent',
+                color: filter === f.key ? 'var(--accent)' : 'var(--text-muted)',
+                border: `1px solid ${filter === f.key ? 'rgba(200,147,59,0.25)' : 'var(--border)'}`,
+              }}
+            >
+              {f.label}{f.key === 'all' ? ` (${merged.marked.length})` : counts[f.key] ? ` (${counts[f.key]})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showingSearch && (
+        <p className="mb-5 mt-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>本地 + Bangumi 搜索</p>
+      )}
 
       {/* Loading */}
       {loading && (
@@ -93,11 +138,11 @@ export default function HomePage() {
       )}
 
       {/* Marked */}
-      {merged.marked.length > 0 && (
+      {filteredMarked.length > 0 && (
         <section className="mb-8">
-          {showingSearch && <p className="mb-3 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>我的标记 · {merged.marked.length}</p>}
-          <div className="grid gap-1.5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {merged.marked.map((w, i) => (
+          {showingSearch && <p className="mb-3 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>标记 · {filteredMarked.length}</p>}
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+            {filteredMarked.map((w, i) => (
               <WorkCard key={`local-${w.id}`} data={w} index={i}
                 onOpen={() => setOpened({ id: w.id, platform: w.platform })}
                 onQuickMark={s => handleMark(w, s, false)} />
@@ -110,7 +155,7 @@ export default function HomePage() {
       {showingSearch && merged.unmarked.length > 0 && (
         <section>
           <p className="mb-3 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>Bangumi · {merged.unmarked.length}</p>
-          <div className="grid gap-1.5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
             {merged.unmarked.map((w, i) => (
               <WorkCard key={`bgm-${w.platform}-${w.id}`} data={w} unmarked index={merged.marked.length + i}
                 onOpen={() => setOpened({ id: w.id, platform: w.platform })}

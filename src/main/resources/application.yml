@@ -20,15 +20,28 @@ spring:
               LOG_QUERIES_SLOWER_THAN_MS: 0
   ai:
     openai:
-      api-key: ${LLM_API_KEY:sk-1234}
-      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
+#      api-key: ${LLM_API_KEY:sk-1234}
+#      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
+#      chat:
+#        options:
+#          model: ${LLM_MODEL:deepseek-v4-flash}
+#          temperature: 0.0
+      api-key: 713ed1b36cde49a5b52d0130fce37b82.zrLG91g65eGysb5q
+      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
       chat:
+        completions-path: /v4/chat/completions
         options:
-          model: ${LLM_MODEL:deepseek-v4-flash}
+          model: ${LLM_MODEL:GLM-4.7-FlashX}
           temperature: 0.0
-
 seen:
+#  反向代理 cf-worker\bangumi-proxy
   bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
+  search:
+    provider: ${SEARCH_PROVIDER:serper} # serper|ddg
+    serper-api-key: ${SERPER_API_KEY:cc593}
+  detail:
+    #  详情页面是否展示演员 / 角色(当前的Bangumi对三次元演员即角色数据不够全)
+    cast-enabled: ${DETAIL_CAST_ENABLED:true}
   sql:
     init:
       mode: always
@@ -37,6 +50,13 @@ seen:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+    com.nonu1l.media.service.BangumiTools: DEBUG
+    com.nonu1l.media.service.WebSearchService: DEBUG
+    com.nonu1l.media.service.SerperSearchService: DEBUG
+    com.nonu1l.media.service.DDGSearchService: DEBUG
+    com.nonu1l.media.agent.AgentService: DEBUG
+    com.nonu1l.media.config.TokenUsageAdvisor: DEBUG
+    com.nonu1l.media.config.DeepSeekThinkingDisableInterceptor: DEBUG
 #    org.hibernate.orm.jdbc.bind: TRACE
 #    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG

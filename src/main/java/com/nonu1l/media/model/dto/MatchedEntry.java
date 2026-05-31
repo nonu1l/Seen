@@ -1,6 +1,7 @@
 package com.nonu1l.media.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.io.Serializable;
 
 /**
  * LLM Phase 2 输出 — 匹配到的单个条目。
@@ -19,4 +20,4 @@ public record MatchedEntry(
         String status,
         /** 匹配置信度 0-1 */
         Double confidence
-) {}
+) implements Serializable {}

@@ -1,14 +1,17 @@
 package com.nonu1l.media.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.io.Serializable;
 
-/** Bangumi 搜索精简结果（@Tool 返回） */
+/** Bangumi 搜索精简结果（@Tool 返回）
+ * 用于对数据结果进行压缩
+ * */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record CompactResult(
         Long id, String nameCn, String nameOrig,
         String category, String airDate,
         Integer epsCount, Double score, Integer rank
-) {
+) implements Serializable {
     public static CompactResult from(CompactSubject s) {
         return new CompactResult(s.id(), s.nameCn(), null,
                 s.category(), s.airDate(), s.epsCount(), s.score(), s.rank());

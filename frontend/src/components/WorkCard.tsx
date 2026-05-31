@@ -11,59 +11,65 @@ interface Props {
 }
 
 const LABEL: Record<Status, string> = { wish: '想看', doing: '在看', collect: '看过', on_hold: '搁置', dropped: '抛弃' };
+const STATUS_COLOR: Record<Status, string> = {
+  wish: 'var(--amber)',
+  doing: 'var(--green)',
+  collect: 'var(--blue)',
+  on_hold: 'var(--gray-text)',
+  dropped: 'var(--gray-text)',
+};
 
 export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Props) {
   const status: Status | null = unmarked ? null : ((data as WorkListItem).status ?? null);
-{/* FIXME: 保留 const rewatched = !unmarked && (data as WorkListItem).rewatched; */}
+  const score = data.score != null && data.score > 0 ? data.score.toFixed(1) : null;
 
   return (
     <div
-      className="anim-in group flex gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-[var(--bg-card-hover)]"
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid ' + (status ? 'var(--border-active)' : 'var(--border)'),
-        animationDelay: `${index * 0.04}s`,
-      }}
+      className="anim-in group cursor-pointer"
+      style={{ animationDelay: `${index * 0.04}s` }}
       onClick={onOpen}
       role="button" tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter') onOpen(); }}
     >
-      <div className="flex-shrink-0 self-start w-[72px] sm:w-[76px] aspect-[2/3] rounded-md overflow-hidden" style={{background:'var(--bg-card)'}}>
+      {/* Cover */}
+      <div className="relative aspect-[2/3] rounded-[6px] overflow-hidden cover-gradient-bottom"
+        style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
         <Cover src={data.coverUrl} alt={data.nameCn} />
+        {score && <span className="cover-score">{score}</span>}
+        {data.platform && <span className="cover-platform">{data.platform}</span>}
       </div>
 
-      <div className="min-w-0 flex-1 flex flex-col gap-1">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <h3 className="truncate text-[14px] font-semibold leading-snug text-[color:var(--text-primary)]">
-            {data.nameCn}
-          </h3>
-          {data.year && <span className="text-[11px] text-[color:var(--text-muted)] flex-shrink-0">{data.year}</span>}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1">
-          {data.platform && <span className="text-[11px] text-[color:var(--text-muted)]">{data.platform}</span>}
-          {data.score != null && data.score > 0 && <span className="badge badge-accent">{data.score.toFixed(1)}</span>}
-          {data.tags?.slice(0, 2).map(t => <span key={t} className="badge badge-muted">{t}</span>)}
-        </div>
-
-        {data.plot && (
-          <p className="line-clamp-2 text-[12px] text-[color:var(--text-secondary)] leading-relaxed">{data.plot}</p>
-        )}
-
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-1.5">
-            {status && (
-              <span className={`status-badge ${status === 'wish' ? 'badge-amber' : status === 'doing' ? 'badge-green' : status === 'collect' ? 'badge-blue' : 'badge-gray'}`}>
-                <span className={`dot ${status === 'wish' ? 'dot-amber' : status === 'doing' ? 'dot-green' : status === 'collect' ? 'dot-blue' : 'dot-gray'}`} />
-                {LABEL[status]}
-              </span>
-            )}
-{/* FIXME: 保留 {rewatched && <span className="rewatch-pill">多刷</span>} */}
-          </div>
-
-          <div onClick={e => e.stopPropagation()}>
-            <QuickMarkMenu current={status} onSelect={onQuickMark} />
-          </div>
+      {/* Info */}
+      <div className="mt-2">
+        <h3 className="truncate text-[13px] font-medium leading-snug tracking-[-0.01em] text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors duration-200">
+          {data.nameCn}
+        </h3>
+        <div className="flex items-baseline justify-between mt-0.5">
+          <span className="text-[11px] text-[color:var(--text-muted)] flex-shrink-0 tracking-[0.01em]">
+            {data.year ?? ''}
+          </span>
+          <span onClick={e => e.stopPropagation()} className="flex-shrink-0">
+            <QuickMarkMenu
+              current={status}
+              onSelect={onQuickMark}
+              trigger={
+                status ? (
+                  <span
+                    className="text-[11px] leading-snug cursor-pointer select-none transition-all duration-150 hover:opacity-80"
+                    style={{ color: STATUS_COLOR[status] }}
+                  >
+                    {LABEL[status]}
+                  </span>
+                ) : (
+                  <span className="unmarked-dots cursor-pointer select-none">
+                    <span className="inline-block w-[3px] h-[3px] rounded-full bg-current align-middle" />
+                    <span className="inline-block w-[3px] h-[3px] rounded-full bg-current align-middle ml-[3px]" />
+                    <span className="inline-block w-[3px] h-[3px] rounded-full bg-current align-middle ml-[3px]" />
+                  </span>
+                )
+              }
+            />
+          </span>
         </div>
       </div>
     </div>
