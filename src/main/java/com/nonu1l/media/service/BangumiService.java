@@ -58,6 +58,11 @@ public class BangumiService {
             String json = post(base + "/search/subjects?limit=20", body, 300);
             if (json == null) return results;
 
+
+            if (query.contains("黑袍纠察队")||query.contains("怪奇物语")){
+                System.out.println("1123");
+            }
+
             JsonNode data = objectMapper
                     .readTree(json)
                     .get("data");

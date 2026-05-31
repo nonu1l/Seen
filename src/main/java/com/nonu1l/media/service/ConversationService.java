@@ -116,7 +116,9 @@ public class ConversationService {
                 replyText = "正在处理你的请求...";
             }
             var cards = agentState.<MatchedEntry>cards();
-            return new IntentAnalysisResult(replyText, cards.isEmpty() ? null : cards, List.of());
+            var unmarkIds = agentState.<Long>unmarkIds();
+            return new IntentAnalysisResult(replyText, cards.isEmpty() ? null : cards,
+                    unmarkIds.isEmpty() ? null : unmarkIds);
         } catch (Exception e) {
             log.error("Agent invoke failed", e);
             return new IntentAnalysisResult("抱歉，处理出错了，请重试。", List.of(), List.of());

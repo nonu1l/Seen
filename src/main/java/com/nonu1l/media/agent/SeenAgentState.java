@@ -21,7 +21,8 @@ public class SeenAgentState extends AgentState {
         "trendingResults",  Channels.base(ArrayList::new),
         "cards",            Channels.base(ArrayList::new),
         "replyText",        Channels.base(() -> ""),
-        "retryCount",       Channels.base(() -> 0)
+        "retryCount",       Channels.base(() -> 0),
+        "unmarkIds",        Channels.base(ArrayList::new)
     );
 
     public SeenAgentState(Map<String, Object> data) {
@@ -42,4 +43,7 @@ public class SeenAgentState extends AgentState {
 
     @SuppressWarnings("unchecked")
     public <T> List<T> cards()           { return (List<T>) this.value("cards").orElse(List.of()); }
+
+    @SuppressWarnings("unchecked")
+    public <T> List<T> unmarkIds()       { return (List<T>) this.value("unmarkIds").orElse(List.of()); }
 }

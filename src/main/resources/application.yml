@@ -20,19 +20,19 @@ spring:
               LOG_QUERIES_SLOWER_THAN_MS: 0
   ai:
     openai:
-#      api-key: ${LLM_API_KEY:sk-1234}
-#      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
-#      chat:
-#        options:
-#          model: ${LLM_MODEL:deepseek-v4-flash}
-#          temperature: 0.0
-      api-key: 713ed1b36cde49a5b52d0130fce37b82.zrLG91g65eGysb5q
-      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
+      api-key: ${LLM_API_KEY:sk-1234}
+      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
       chat:
-        completions-path: /v4/chat/completions
         options:
-          model: ${LLM_MODEL:GLM-4.7-FlashX}
+          model: ${LLM_MODEL:deepseek-v4-flash}
           temperature: 0.0
+#      api-key:
+#      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
+#      chat:
+#        completions-path: /v4/chat/completions
+#        options:
+#          model: ${LLM_MODEL:GLM-4.7-FlashX}
+#          temperature: 0.0
 seen:
 #  反向代理 cf-worker\bangumi-proxy
   bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}

@@ -19,10 +19,10 @@ public class SearchResultPreprocessor {
     private static final Logger log = LoggerFactory.getLogger(SearchResultPreprocessor.class);
 
     /**
-     * 对搜索结果进行过滤、分类、排序。
+     * 对搜索结果进行过滤、分类
      *
      * @param rawResults Bangumi 原始搜索结果
-     * @param keyword    用户搜索关键词（用于噪音过滤）
+     * @param keyword    用户搜索关键词
      * @return 预处理后的精简条目列表
      */
     public List<CompactSubject> preprocess(List<WorkSearchResult> rawResults, String keyword) {
@@ -47,14 +47,20 @@ public class SearchResultPreprocessor {
             ));
         }
 
-        // 按 rank 升序（高排名优先），无排名排最后；同 rank 按日期升序
-        subjects.sort(Comparator
-                .comparing(CompactSubject::rank, Comparator.nullsLast(
-                        Comparator.naturalOrder()))
-                .thenComparing(CompactSubject::airDate, Comparator.nullsLast(
-                        Comparator.naturalOrder()))
-                .thenComparing(CompactSubject::id));
 
+        /**
+         * 暂时去除排序，后续应该使用llm来分析识别出最新一季，未上映那一部等操作
+         *
+         */
+
+//        // 按 rank 升序（高排名优先），无排名排最后；同 rank 按日期升序
+//        subjects.sort(Comparator
+//                .comparing(CompactSubject::rank, Comparator.nullsLast(
+//                        Comparator.naturalOrder()))
+//                .thenComparing(CompactSubject::airDate, Comparator.nullsLast(
+//                        Comparator.naturalOrder()))
+//                .thenComparing(CompactSubject::id));
+//
         return subjects;
     }
 

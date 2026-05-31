@@ -41,9 +41,17 @@ public class BangumiTools {
         this.webSearchService = webSearchService;
     }
 
+    /**
+     * 搜索 Bangumi
+     *
+     * @param keyword 关键词
+     * @return {@link List }<{@link CompactResult }>
+     */
     public List<CompactResult> searchBangumi(String keyword) {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
         List<WorkSearchResult> raw = bangumiService.search(keyword);
+
+        //对结果进行按照RANK排序
         List<CompactSubject> compact = preprocessor.preprocess(raw, keyword);
         return compact.stream().map(CompactResult::from).toList();
     }
