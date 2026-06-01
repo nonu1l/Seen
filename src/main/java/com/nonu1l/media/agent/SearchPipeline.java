@@ -6,7 +6,10 @@ import com.nonu1l.media.service.BangumiTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,10 +33,26 @@ public class SearchPipeline {
     private final BangumiTools tools;
     private final static int maxCards = 5;
     private final static int maxPages = 10;
+    private final String promptKeywords;
+    private final String promptTitles;
+    private final String promptValidate;
+    private final String promptFail;
 
     public SearchPipeline(ChatClient chatClient, BangumiTools tools) {
         this.chatClient = chatClient;
         this.tools = tools;
+        this.promptKeywords = load("prompts/pipeline-keywords.st");
+        this.promptTitles = load("prompts/pipeline-titles.st");
+        this.promptValidate = load("prompts/pipeline-validate.st");
+        this.promptFail = load("prompts/pipeline-fail.st");
+    }
+
+    private static String load(String path) {
+        try {
+            return new String(new ClassPathResource(path).getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load prompt: " + path, e);
+        }
     }
 
     public record PipelineResult(List<MatchedEntry> cards, String failReason) {}
@@ -74,10 +93,20 @@ public class SearchPipeline {
             if (titles.isEmpty()) continue;
 
             // 2d. 多线程 Bangumi 匹配，取第一条（并发时 API 可能返回空，重试 3 次）
+            // // 片名去重 → 匹配 → subjectId 去重
             List<MatchedEntry> cards = titles.stream()
+                    .parallel()
+                    .distinct()
                     .map(t -> searchBangumiWithRetry(t, 3))
                     .filter(Objects::nonNull)
-                    .toList();
+                    .collect(Collectors.toCollection(ArrayList::new));
+            var seen = new java.util.HashSet<Long>();
+            cards.removeIf(c -> !seen.add(c.subjectId()));
+
+            // 校验匹配结果：LLM 判断 Bangumi 匹配是否与原片名一致（最多一次 LLM 调用）
+            if (!cards.isEmpty()) {
+                cards = validateMatches(cards, titles, context);
+            }
 
             allCards.addAll(cards);
             log.info("Pipeline: keyword '{}' → {} cards", kw, cards.size());
@@ -95,10 +124,10 @@ public class SearchPipeline {
     MatchedEntry searchBangumiWithRetry(String keyword, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             try {
-                var br = tools.searchBangumi(keyword);
-                if (!br.isEmpty()) {
-                    var first = br.getFirst();
-                    return new MatchedEntry(first.id(), first.nameCn(), null, null, null, null);
+                var first = tools.searchBangumiOneResult(keyword);
+                if (first != null) {
+                    return new MatchedEntry(first.id(), first.nameCn(), null, null, null, null,
+                            first.airDate());
                 }
             } catch (Exception e) {
                 log.warn("searchBangumi '{}' failed (attempt {}/{}): {}", keyword, i + 1, maxRetries, e.getMessage());
@@ -110,11 +139,31 @@ public class SearchPipeline {
         return null;
     }
 
+    /** 用 LLM 校验 Bangumi 匹配结果与原片名是否为同一作品，过滤掉不匹配的 */
+    List<MatchedEntry> validateMatches(List<MatchedEntry> cards, List<String> titles, String context) {
+        if (cards.isEmpty() || titles.isEmpty()) return cards;
+        StringBuilder pairs = new StringBuilder();
+        var cardList = new ArrayList<>(cards);
+        for (int i = 0; i < Math.min(cardList.size(), titles.size()); i++) {
+            var c = cardList.get(i);
+            pairs.append(titles.get(i)).append(" → ").append(c.nameCn())
+                 .append(" (id=").append(c.subjectId())
+                 .append(c.airDate() != null ? ", 日期=" + c.airDate() : "")
+                 .append(")\n");
+        }
+        String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
+                .replace("{context}", context);
+        String result = chatClient.prompt().system(prompt).user(pairs.toString()).call().content();
+        if (result == null || result.isBlank()) return cards;
+        var validIds = result.lines().map(String::trim).filter(l -> l.matches("\\d+"))
+                .map(Long::parseLong).collect(java.util.stream.Collectors.toSet());
+        return cardList.stream().filter(c -> validIds.contains(c.subjectId())).toList();
+    }
+
     // ── 内部方法 ──
 
     List<String> generateKeywords(String userInput) {
-        String prompt = ("今日日期: {today}\n根据用户查询生成3个搜索关键词（每行一个，只输出关键词，不要编号）")
-                .replace("{today}", LocalDate.now().toString());
+        String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
         String result = chatClient.prompt().system(prompt).user(userInput).call().content();
         if (result == null || result.isBlank()) return List.of(userInput);
         return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
@@ -122,15 +171,15 @@ public class SearchPipeline {
 
     List<String> extractTitles(String text, String userInput) {
         if (text.length() > 8000) text = text.substring(0, 8000);
-        String prompt = ("今日日期: {today}\n从以下网页内容中提取影视片名（每行一个，只输出片名，不要编号）。查询意图：" + userInput)
-                .replace("{today}", LocalDate.now().toString());
+        String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
+                .replace("{context}", userInput);
         String result = chatClient.prompt().system(prompt).user(text).call().content();
         if (result == null || result.isBlank()) return List.of();
         return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
     }
 
     String failMessage(String userInput, String reason) {
-        String prompt = "用户查询未找到匹配影视作品。原因：" + reason + "。请简短友好地告知用户并给出搜索建议。";
+        String prompt = promptFail.replace("{reason}", reason);
         String result = chatClient.prompt().system(prompt).user(userInput).call().content();
         return result != null && !result.isBlank() ? result : "抱歉，未找到相关影视作品。";
     }

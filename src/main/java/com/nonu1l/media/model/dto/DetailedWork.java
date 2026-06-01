@@ -1,6 +1,5 @@
-package com.nonu1l.media.service;
+package com.nonu1l.media.model.dto;
 
-import com.nonu1l.media.model.dto.WorkSearchResult;
 import lombok.Data;
 
 import java.util.List;

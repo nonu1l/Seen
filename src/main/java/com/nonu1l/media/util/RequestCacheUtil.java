@@ -1,4 +1,4 @@
-package com.nonu1l.media.service;
+package com.nonu1l.media.util;
 
 import com.nonu1l.media.model.entity.RequestCache;
 import com.nonu1l.media.repository.RequestCacheRepository;

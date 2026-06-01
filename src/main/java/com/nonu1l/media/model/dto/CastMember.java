@@ -1,4 +1,4 @@
-package com.nonu1l.media.service;
+package com.nonu1l.media.model.dto;
 
 import lombok.Data;
 

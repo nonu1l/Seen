@@ -1,13 +1,10 @@
 package com.nonu1l.media.agent;
 
-import com.nonu1l.media.model.dto.CompactResult;
 import com.nonu1l.media.model.dto.MatchedEntry;
-import com.nonu1l.media.model.dto.WebSearchItem;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.service.BangumiTools;
 import com.nonu1l.media.service.IntentAnalysisService;
-import org.bsc.langgraph4j.GraphRepresentation;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
 import org.slf4j.Logger;
@@ -23,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
 import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
@@ -94,6 +90,12 @@ public class AgentService {
 
     // ── 节点 ──
 
+    /**
+     * 由LLM意图分析 -> 使用哪个节点
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> classifyIntent(SeenAgentState s) {
         log.debug("Node[classify] enter: {}", s.userInput().length() > 100 ? s.userInput().substring(0, 100) + "..." : s.userInput());
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
@@ -106,6 +108,12 @@ public class AgentService {
         return Map.of("intent", intent);
     }
 
+    /**
+     * 标记
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleMark(SeenAgentState s) {
         log.debug("Node[mark] enter");
         // 使用完整 agent prompt + 工具回调来处理标记类请求（提取片名 + 搜索匹配）
@@ -146,6 +154,11 @@ public class AgentService {
         return Map.of("replyText", "未能识别你要标记的作品，请说清楚片名和状态。");
     }
 
+    /**
+     * 取消标记
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleUnmark(SeenAgentState s) {
         log.debug("Node[unmark] enter");
         String system = loadPrompt("prompts/agent-system.st")
@@ -174,6 +187,12 @@ public class AgentService {
         return Map.of("replyText", "未能识别你要取消的作品，请说清楚片名。");
     }
 
+    /**
+     * 推荐
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleRecommend(SeenAgentState s) {
         log.debug("Node[recommend] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
         var result = searchPipeline.execute(s.userInput(), s.history());
@@ -184,6 +203,12 @@ public class AgentService {
         return Map.of("replyText", result.failReason() != null ? result.failReason() : "抱歉，未找到相关作品。");
     }
 
+    /**
+     * 搜索
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleSearch(SeenAgentState s) {
         log.debug("Node[search] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
         var result = searchPipeline.execute(s.userInput(), s.history());
@@ -194,14 +219,26 @@ public class AgentService {
         return Map.of("replyText", result.failReason() != null ? result.failReason() : "抱歉，未找到相关作品。");
     }
 
+    /**
+     * 回答分析
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleAnalyze(SeenAgentState s) {
         log.debug("Node[analyze] enter");
         String reply = chatClient.prompt()
-            .system("你是影视助手。根据用户问题简要回答。").user(s.userInput()).call().content();
+            .system(loadPrompt("prompts/agent-analyze.st")).user(s.userInput()).call().content();
         log.debug("Node[analyze] exit: reply={}", reply != null ? reply.substring(0, Math.min(100, reply.length())) : "null");
         return Map.of("replyText", reply != null ? reply : "抱歉，无法回答。");
     }
 
+    /**
+     * 处理输出
+     *
+     * @param s s
+     * @return {@link Map }<{@link String }, {@link Object }>
+     */
     Map<String, Object> handleOutput(SeenAgentState s) {
         log.debug("Node[output] enter: intent={}", s.intent());
         // 如果前面节点已经生成了 replyText（如 pipeline 失败），直接透传
@@ -219,7 +256,7 @@ public class AgentService {
                 cardInfo.append(String.format("[%d] %s (subjectId=%d)\n", i + 1, c.nameCn(), c.subjectId()));
             }
             String reply = chatClient.prompt()
-                .system("你是影视助手。根据以下卡片列表生成推荐回复文案，语气友好简洁。")
+                .system(loadPrompt("prompts/agent-output-reply.st"))
                 .user(s.userInput() + "\n\n卡片列表：\n" + cardInfo)
                 .call().content();
             log.debug("Node[output] generated reply for {} cards", existingCards.size());

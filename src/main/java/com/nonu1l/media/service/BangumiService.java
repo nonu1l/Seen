@@ -2,9 +2,12 @@ package com.nonu1l.media.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonu1l.media.model.dto.CastMember;
+import com.nonu1l.media.model.dto.DetailedWork;
 import com.nonu1l.media.model.dto.WorkSearchResult;
 import com.nonu1l.media.model.entity.SubjectType;
 import com.nonu1l.media.repository.SubjectTypeRepository;
+import com.nonu1l.media.util.RequestCacheUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +46,21 @@ public class BangumiService {
         }
     }
 
+    /** 搜索 bangumi 默认查询20条结果
+     * @param query 查询
+     * @return {@link List }<{@link WorkSearchResult }>
+     */
     public List<WorkSearchResult> search(String query) {
+        return  search(query,20);
+    }
+
+
+    /** 搜索 bangumi
+     * @param query 查询
+     * @param limit 条数
+     * @return {@link List }<{@link WorkSearchResult }>
+     */
+    public List<WorkSearchResult> search(String query, int limit) {
         List<WorkSearchResult> results = new ArrayList<>();
         List<Integer> types = getSearchTypes();
         if (types.isEmpty()) return results;
@@ -55,14 +72,8 @@ public class BangumiService {
                             "sort", "match",
                             "filter", java.util.Map.of("type", types)));
 
-            String json = post(base + "/search/subjects?limit=20", body, 300);
+            String json = post(base + "/search/subjects?limit=" + limit, body, 300);
             if (json == null) return results;
-
-
-            if (query.contains("黑袍纠察队")||query.contains("怪奇物语")){
-                System.out.println("1123");
-            }
-
             JsonNode data = objectMapper
                     .readTree(json)
                     .get("data");
@@ -85,6 +96,7 @@ public class BangumiService {
     }
 
     /** 获取 Bangumi 趋势热门排行：type=2(动画)/6(真人)，year 可空 */
+    @Deprecated
     public List<WorkSearchResult> trending(int type, Integer year) {
         List<WorkSearchResult> results = new ArrayList<>();
         try {
@@ -252,6 +264,12 @@ public class BangumiService {
     }
 
 
+    /**
+     * 字段映射
+     *
+     * @param item 结果项
+     * @return {@link WorkSearchResult }
+     */
     private WorkSearchResult mapSubject(JsonNode item) {
         WorkSearchResult r = new WorkSearchResult();
         r.setId(Long.parseLong(String.valueOf(item.get("id"))));

@@ -67,6 +67,7 @@ public class SearchResultPreprocessor {
     /**
      * 将 CompactSubject 列表格式化为 LLM 友好的紧凑文本。
      */
+    @Deprecated
     public String toCompactText(List<CompactSubject> subjects, String keyword, StructuredIntent intent) {
         StringBuilder sb = new StringBuilder();
         sb.append("搜索关键词：").append(keyword).append("\n");

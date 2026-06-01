@@ -51,9 +51,27 @@ public class BangumiTools {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
         List<WorkSearchResult> raw = bangumiService.search(keyword);
 
-        //对结果进行按照RANK排序
         List<CompactSubject> compact = preprocessor.preprocess(raw, keyword);
         return compact.stream().map(CompactResult::from).toList();
+    }
+
+    /**
+     * 搜索 Bangumi 一个结果
+     *
+     * @param keyword 关键词
+     * @return {@link CompactResult }
+     */
+    public CompactResult searchBangumiOneResult(String keyword) {
+        log.debug("Tool: searchBangumiOneResult keyword='{}'", keyword);
+        List<WorkSearchResult> raw = bangumiService.search(keyword, 1);
+        if (raw.isEmpty()) {
+            return null;
+        }
+        List<CompactSubject> compact = preprocessor.preprocess(raw, keyword);
+        if (compact.isEmpty()) {
+            return null;
+        }
+        return compact.stream().map(CompactResult::from).toList().getFirst();
     }
 
     public List<LocalRecord> searchLocal(String keyword) {
@@ -84,6 +102,7 @@ public class BangumiTools {
         return webSearchService.fetch(url);
     }
 
+    @Deprecated
     public List<CompactResult> trendingBangumi(int type, Integer year) {
         log.debug("Tool: trendingBangumi type={} year={}", type, year);
         return bangumiService.trending(type, year).stream()

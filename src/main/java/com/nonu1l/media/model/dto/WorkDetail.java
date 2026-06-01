@@ -1,7 +1,6 @@
 package com.nonu1l.media.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.nonu1l.media.service.CastMember;
 import lombok.Data;
 
 import java.util.List;

@@ -77,7 +77,10 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
     private static boolean isDeepSeekChatCompletion(HttpRequest request) {
         String host = request.getURI().getHost();
         String path = request.getURI().getPath();
-        return host != null && (host.contains("deepseek.com") || host.contains("bigmodel.cn"))
+        return host != null && (host.contains("deepseek.com")
+                || host.contains("bigmodel.cn")
+                || host.contains("localhost")
+                || host.contains("192.168.67.124"))
                 && path != null && (path.endsWith("/chat/completions"));
     }
 }

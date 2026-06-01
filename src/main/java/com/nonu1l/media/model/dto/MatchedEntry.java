@@ -19,5 +19,12 @@ public record MatchedEntry(
         /** 状态标记 */
         String status,
         /** 匹配置信度 0-1 */
-        Double confidence
-) implements Serializable {}
+        Double confidence,
+        /** 播出/上映日期 */
+        String airDate
+) implements Serializable {
+    public MatchedEntry(Long subjectId, String nameCn, Integer rating, String comment,
+                        String status, Double confidence) {
+        this(subjectId, nameCn, rating, comment, status, confidence, null);
+    }
+}
