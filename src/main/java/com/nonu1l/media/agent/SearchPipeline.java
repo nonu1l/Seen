@@ -11,10 +11,8 @@ import org.springframework.core.io.ClassPathResource;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -92,24 +90,30 @@ public class SearchPipeline {
             List<String> titles = extractTitles(String.join("\n---\n", pageTexts), context);
             if (titles.isEmpty()) continue;
 
-            // 2d. 多线程 Bangumi 匹配，取第一条（并发时 API 可能返回空，重试 3 次）
-            // // 片名去重 → 匹配 → subjectId 去重
-            List<MatchedEntry> cards = titles.stream()
-                    .parallel()
-                    .distinct()
-                    .map(t -> searchBangumiWithRetry(t, 3))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toCollection(ArrayList::new));
-            var seen = new java.util.HashSet<Long>();
-            cards.removeIf(c -> !seen.add(c.subjectId()));
+            // 2d. 并发搜索→title→card映射，剔除空匹配和重复 subjectId
+            // 使用原 .parallel() 对Map结果映射同时进行去重，过滤空值
+            // 可能会与 LangGraph4j（共用ForkJoinPool.commonPool） 冲突引发 NullPointerException 问题
 
-            // 校验匹配结果：LLM 判断 Bangumi 匹配是否与原片名一致（最多一次 LLM 调用）
-            if (!cards.isEmpty()) {
-                cards = validateMatches(cards, titles, context);
+            var futures = titles.stream().distinct()
+                    .collect(Collectors.toMap(
+                            t -> t, t -> CompletableFuture.supplyAsync(() ->
+                                    searchBangumiWithRetry(t, 3))));
+
+            CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
+            var cardMap = new java.util.LinkedHashMap<String, MatchedEntry>();
+            futures.forEach((t, f) -> { var c = f.join(); if (c != null) cardMap.put(t, c); });
+            cardMap.values().removeIf(Objects::isNull);
+            var seen = new HashSet<Long>();
+            cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
+
+            // 校验匹配结果
+            if (!cardMap.isEmpty()) {
+                var validIds = validateMatchIds(cardMap, context);
+                cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
             }
 
-            allCards.addAll(cards);
-            log.info("Pipeline: keyword '{}' → {} cards", kw, cards.size());
+            allCards.addAll(cardMap.values());
+            log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
 
             if (allCards.size() >= maxCards) break;
         }
@@ -139,25 +143,22 @@ public class SearchPipeline {
         return null;
     }
 
-    /** 用 LLM 校验 Bangumi 匹配结果与原片名是否为同一作品，过滤掉不匹配的 */
-    List<MatchedEntry> validateMatches(List<MatchedEntry> cards, List<String> titles, String context) {
-        if (cards.isEmpty() || titles.isEmpty()) return cards;
-        StringBuilder pairs = new StringBuilder();
-        var cardList = new ArrayList<>(cards);
-        for (int i = 0; i < Math.min(cardList.size(), titles.size()); i++) {
-            var c = cardList.get(i);
-            pairs.append(titles.get(i)).append(" → ").append(c.nameCn())
-                 .append(" (id=").append(c.subjectId())
-                 .append(c.airDate() != null ? ", 日期=" + c.airDate() : "")
-                 .append(")\n");
-        }
+    /** 用 LLM 校验 title→card 映射，返回通过校验的 subjectId 集合 */
+    java.util.Set<Long> validateMatchIds(Map<String, MatchedEntry> cardMap, String context) {
+        if (cardMap.isEmpty()) return java.util.Set.of();
+        StringBuilder sb = new StringBuilder();
+        cardMap.forEach((title, c) -> sb.append(title).append(" → ").append(c.nameCn())
+            .append(" (id=").append(c.subjectId())
+            .append(c.airDate() != null ? ", 日期=" + c.airDate() : "")
+            .append(")\n"));
         String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", context);
-        String result = chatClient.prompt().system(prompt).user(pairs.toString()).call().content();
-        if (result == null || result.isBlank()) return cards;
-        var validIds = result.lines().map(String::trim).filter(l -> l.matches("\\d+"))
-                .map(Long::parseLong).collect(java.util.stream.Collectors.toSet());
-        return cardList.stream().filter(c -> validIds.contains(c.subjectId())).toList();
+        String result = chatClient.prompt().system(prompt).user(sb.toString()).call().content();
+        if (result == null || result.isBlank()) {
+            return new java.util.HashSet<>(cardMap.values().stream().map(MatchedEntry::subjectId).collect(Collectors.toSet()));
+        }
+        return result.lines().map(String::trim).filter(l -> l.matches("\\d+"))
+                .map(Long::parseLong).collect(Collectors.toSet());
     }
 
     // ── 内部方法 ──
