@@ -14,3 +14,10 @@ dist/
 /src/main/resources/static/
 .gitignore
 /docs
+.env*
+application-*
+CLAUDE.md
+.playwright-mcp/
+*-screenshot.png
+*-snapshot.txt
+

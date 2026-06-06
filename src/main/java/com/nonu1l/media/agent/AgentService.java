@@ -99,6 +99,7 @@ public class AgentService {
     Map<String, Object> classifyIntent(SeenAgentState s) {
         log.debug("Node[classify] enter: {}", s.userInput().length() > 100 ? s.userInput().substring(0, 100) + "..." : s.userInput());
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
+        TokenUsageAdvisor.setCurrentNode("classify");
         String intent = chatClient.prompt().system(system).user(s.userInput()).call().content();
         if (intent != null) intent = intent.trim().toLowerCase();
         if (intent == null || !List.of("mark", "unmark", "recommend", "search", "analyze").contains(intent)) {
@@ -116,6 +117,7 @@ public class AgentService {
      */
     Map<String, Object> handleMark(SeenAgentState s) {
         log.debug("Node[mark] enter");
+        TokenUsageAdvisor.setCurrentNode("mark");
         // 使用完整 agent prompt + 工具回调来处理标记类请求（提取片名 + 搜索匹配）
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
@@ -161,6 +163,7 @@ public class AgentService {
      */
     Map<String, Object> handleUnmark(SeenAgentState s) {
         log.debug("Node[unmark] enter");
+        TokenUsageAdvisor.setCurrentNode("unmark");
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
@@ -195,6 +198,7 @@ public class AgentService {
      */
     Map<String, Object> handleRecommend(SeenAgentState s) {
         log.debug("Node[recommend] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
+        TokenUsageAdvisor.setCurrentNode("recommend");
         var result = searchPipeline.execute(s.userInput(), s.history());
         log.debug("Node[recommend] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
@@ -211,6 +215,7 @@ public class AgentService {
      */
     Map<String, Object> handleSearch(SeenAgentState s) {
         log.debug("Node[search] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
+        TokenUsageAdvisor.setCurrentNode("search");
         var result = searchPipeline.execute(s.userInput(), s.history());
         log.debug("Node[search] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
@@ -227,8 +232,11 @@ public class AgentService {
      */
     Map<String, Object> handleAnalyze(SeenAgentState s) {
         log.debug("Node[analyze] enter");
+        TokenUsageAdvisor.setCurrentNode("analyze");
+        String system = loadPrompt("prompts/agent-analyze.st")
+                .replace("{history}", s.history());
         String reply = chatClient.prompt()
-            .system(loadPrompt("prompts/agent-analyze.st")).user(s.userInput()).call().content();
+            .system(system).user(s.userInput()).call().content();
         log.debug("Node[analyze] exit: reply={}", reply != null ? reply.substring(0, Math.min(100, reply.length())) : "null");
         return Map.of("replyText", reply != null ? reply : "抱歉，无法回答。");
     }
@@ -241,6 +249,7 @@ public class AgentService {
      */
     Map<String, Object> handleOutput(SeenAgentState s) {
         log.debug("Node[output] enter: intent={}", s.intent());
+        TokenUsageAdvisor.setCurrentNode("output");
         // 如果前面节点已经生成了 replyText（如 pipeline 失败），直接透传
         String preReply = s.replyText();
         if (preReply != null && !preReply.isBlank()) {
@@ -253,7 +262,7 @@ public class AgentService {
             StringBuilder cardInfo = new StringBuilder();
             for (int i = 0; i < existingCards.size(); i++) {
                 var c = existingCards.get(i);
-                cardInfo.append(String.format("[%d] %s (subjectId=%d)\n", i + 1, c.nameCn(), c.subjectId()));
+                cardInfo.append(String.format("[%d] %s\n", i + 1, c.nameCn()));
             }
             String reply = chatClient.prompt()
                 .system(loadPrompt("prompts/agent-output-reply.st"))

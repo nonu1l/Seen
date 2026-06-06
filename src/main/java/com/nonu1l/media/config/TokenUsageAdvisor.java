@@ -17,6 +17,8 @@ public class TokenUsageAdvisor implements CallAdvisor {
 
     private static final Logger log = LoggerFactory.getLogger(TokenUsageAdvisor.class);
     private static final ThreadLocal<Long> currentSession = new ThreadLocal<>();
+    private static final ThreadLocal<String> currentNode = new ThreadLocal<>();
+    private static final ThreadLocal<Integer> currentTurn = new ThreadLocal<>();
 
     private final TokenUsageRepository repo;
 
@@ -34,6 +36,16 @@ public class TokenUsageAdvisor implements CallAdvisor {
         currentSession.remove();
     }
 
+    /** 设置当前 LLM 调用所属的 Agent 节点 */
+    public static void setCurrentNode(String node) {
+        currentNode.set(node);
+    }
+
+    /** 设置当前对话轮次 */
+    public static void setCurrentTurn(Integer turn) {
+        currentTurn.set(turn);
+    }
+
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
         String inputText = request.prompt().getContents();
@@ -49,6 +61,8 @@ public class TokenUsageAdvisor implements CallAdvisor {
                 try {
                     TokenUsage tu = new TokenUsage();
                     tu.setSessionId(currentSession.get());
+                    tu.setNodeName(currentNode.get());
+                    tu.setTurn(currentTurn.get());
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
@@ -56,8 +70,9 @@ public class TokenUsageAdvisor implements CallAdvisor {
                     tu.setInputText(inputText);
                     tu.setOutputText(outputText);
                     repo.save(tu);
-                    log.debug("Token: model={} prompt={} completion={} total={}",
-                            tu.getModelName(), tu.getPromptTokens(), tu.getCompletionTokens(), tu.getTotalTokens());
+                    log.debug("Token: node={} turn={} model={} prompt={} completion={} total={}",
+                            tu.getNodeName(), tu.getTurn(), tu.getModelName(),
+                            tu.getPromptTokens(), tu.getCompletionTokens(), tu.getTotalTokens());
                     if (outputText != null) {
                         log.debug("LLM output (first 500 chars): {}",
                             outputText.length() > 500 ? outputText.substring(0, 500) : outputText);

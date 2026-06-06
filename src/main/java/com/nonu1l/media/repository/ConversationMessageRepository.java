@@ -11,5 +11,7 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
 
     List<ConversationMessage> findAllBySessionIdOrderByIdAsc(Long sessionId);
 
+    long countBySessionIdAndRole(Long sessionId, String role);
+
     void deleteAllBySessionId(Long sessionId);
 }

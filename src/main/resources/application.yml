@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=
 server:
-  port: 8080
+  port: 8081
 
 spring:
   datasource:
@@ -26,7 +26,7 @@ spring:
         options:
           model: ${LLM_MODEL:deepseek-v4-flash}
           temperature: 0.0
-#      api-key:
+#      api-key: 02911c73733e4118ad256d5f7bd1a145.e1gWig8oEI4RWA6j
 #      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
 #      chat:
 #        completions-path: /v4/chat/completions

@@ -21,7 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ConversationService {
@@ -108,7 +110,9 @@ public class ConversationService {
     }
 
     private IntentAnalysisResult invokeAgent(String userInput, String history) {
-        TokenUsageAdvisor.setSession(getOrCreateSession().getId());
+        Long sessionId = getOrCreateSession().getId();
+        TokenUsageAdvisor.setSession(sessionId);
+        TokenUsageAdvisor.setCurrentTurn((int) messageRepo.countBySessionIdAndRole(sessionId, "user"));
         try {
             var agentState = agentService.invoke(userInput, history);
             String replyText = agentState.replyText();
@@ -357,18 +361,41 @@ public class ConversationService {
 
     // ── helper ──────────────────────────────────────────────
 
-    /** 將最近几轮对话拼接为历史文本，供 LLM 理解上下文 */
+    /** 將最近几轮对话拼接为历史文本，附卡片结构化信息供 LLM 解析指代 */
     private String buildHistory(Long sessionId) {
         List<ConversationMessage> msgs = messageRepo.findAllBySessionIdOrderByIdAsc(sessionId);
         if (msgs.isEmpty()) return "";
+
+        // 加载本轮会话所有卡片，按消息 ID 分组
+        List<ConversationCard> allCards = cardRepo.findAllBySessionIdAndCardStateInOrderByIdAsc(
+                sessionId, List.of("PENDING", "EDITABLE", "CONFLICT", "SAVED", "UNMARKED", "RESTORED"));
+        Map<Long, List<ConversationCard>> cardsByMsgId = new HashMap<>();
+        for (var c : allCards) {
+            cardsByMsgId.computeIfAbsent(c.getMessageId(), k -> new ArrayList<>()).add(c);
+        }
+
         StringBuilder sb = new StringBuilder();
-        // 最多取最近 6 条
         int start = Math.max(0, msgs.size() - 6);
         for (int i = start; i < msgs.size(); i++) {
             ConversationMessage m = msgs.get(i);
             sb.append(m.getRole().equals("user") ? "用户：" : "助手：");
             sb.append(m.getContent());
             sb.append("\n");
+
+            // 为助手消息附加卡片结构化信息，便于 LLM 解析"第一个/第二个"等指代
+            if ("assistant".equals(m.getRole())) {
+                var cards = cardsByMsgId.get(m.getId());
+                if (cards != null && !cards.isEmpty()) {
+                    sb.append("[可标记条目: ");
+                    for (int j = 0; j < cards.size(); j++) {
+                        var c = cards.get(j);
+                        if (j > 0) sb.append(", ");
+                        sb.append(j + 1).append(".《").append(c.getNameCn())
+                                .append("》(id=").append(c.getSubjectId()).append(")");
+                    }
+                    sb.append("]\n");
+                }
+            }
         }
         return sb.toString().trim();
     }

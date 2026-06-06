@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token Usage</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --border: #e5e5ea;
+    --text: #1d1d1f;
+    --muted: #8e8e93;
+    --accent: #0071e3;
+    --accent-dim: #d6e4f5;
+    --green: #248a3d;
+    --orange: #c46b08;
+    --purple: #7d3c98;
+    --cyan: #0077b6;
+    --red: #d93d3d;
+    --hover: rgba(0,0,0,.04);
+    --active: rgba(0,113,227,.08);
+    --heading: #1d1d1f;
+    --btn-hover-bg: #e5e5ea;
+    --btn-hover-text: #1d1d1f;
+    --code-text: #3a3a40;
+    --node-session: #1d1d1f;
+    --node-turn: #4a4a52;
+    --node-leaf: #8e8e93;
+  }
+  [data-theme="dark"] {
+    --bg: #0b0b10;
+    --surface: #13131c;
+    --border: #1e1e2e;
+    --text: #c4c4d0;
+    --muted: #6b6b7b;
+    --accent: #7aa2f7;
+    --accent-dim: #3b4268;
+    --green: #9ece6a;
+    --orange: #e0af68;
+    --purple: #bb9af7;
+    --cyan: #7dcfff;
+    --red: #f7768e;
+    --hover: rgba(255,255,255,.03);
+    --active: rgba(122,162,247,.08);
+    --heading: #ffffff;
+    --btn-hover-bg: #2a2a3e;
+    --btn-hover-text: #ffffff;
+    --code-text: #bbb;
+    --node-session: #e0e0f0;
+    --node-turn: #c0c0d0;
+    --node-leaf: #6b6b7b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+    --purple: #bb9af7;
+    --cyan: #7dcfff;
+    --red: #f7768e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font:13px/1.5 "SF Mono", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+    background: var(--bg); color: var(--text);
+    display:flex; height:100vh; overflow:hidden;
+  }
+
+  /* ── left panel ── */
+  .left {
+    width: 380px; min-width: 320px; flex-shrink:0;
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; background:var(--surface);
+  }
+  .left-header {
+    padding:16px 18px 12px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .left-header h1 { font-size:14px; font-weight:600; color:var(--heading); letter-spacing:.5px; }
+  .left-header .btn {
+    background:var(--border); border:none; color:var(--text); padding:4px 12px;
+    border-radius:4px; cursor:pointer; font:inherit; font-size:12px;
+  }
+  .left-header .btn:hover { background:var(--btn-hover-bg); color:var(--btn-hover-text); }
+  .stats-bar { padding:8px 18px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--border); }
+  .tree-wrap { flex:1; overflow-y:auto; padding:8px 0 16px; }
+  .tree-wrap::-webkit-scrollbar { width:4px; }
+  .tree-wrap::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  /* ── tree nodes ── */
+  .node { user-select:none; }
+  .node-row {
+    display:flex; align-items:center; gap:6px; padding:3px 18px; cursor:pointer;
+    transition:background .1s; border-left:2px solid transparent; position:relative;
+  }
+  .node-row:hover { background:var(--hover); }
+  .node-row.active { background:var(--active); border-left-color:var(--accent); }
+  .node-row .arrow { width:14px; font-size:10px; color:var(--muted); text-align:center; flex-shrink:0; transition:transform .15s; }
+  .node-row .arrow.open { transform:rotate(90deg); }
+  .node-row .arrow.spacer { visibility:hidden; }
+  .node-row .ico { font-size:12px; width:16px; text-align:center; flex-shrink:0; }
+  .node-row .name { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:1; }
+  .node-row .meta { margin-left:auto; display:flex; gap:10px; font-size:11px; color:var(--muted); flex-shrink:0; }
+  .node-row .meta span { white-space:nowrap; }
+  .node-children { display:none; }
+  .node-children.open { display:block; }
+  .node-children .node-row { padding-left:36px; }
+  .node-children .node-children .node-row { padding-left:54px; }
+
+  /* tree depth colors */
+  .depth-session .name { color:var(--node-session); }
+  .depth-turn .name { color:var(--node-turn); }
+  .depth-node .name { color:var(--node-leaf); }
+
+  /* clickable leaf indicator */
+  .depth-node .node-row { cursor:pointer; }
+
+  /* ── right panel ── */
+  .right { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .right-empty { flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px; }
+  .right-content { flex:1; overflow-y:auto; padding:20px 24px; display:none; }
+  .right-content.visible { display:block; }
+  .right-content::-webkit-scrollbar { width:4px; }
+  .right-content::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .detail-header {
+    border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:20px;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .detail-header .dh-node { font-size:14px; font-weight:600; color:var(--heading); }
+  .detail-header .dh-meta { font-size:11px; color:var(--muted); }
+
+  /* call card */
+  .call-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    margin-bottom:14px; overflow:hidden;
+  }
+  .call-card-head {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px; border-bottom:1px solid var(--border); font-size:12px;
+  }
+  .call-card-head .cc-index { color:var(--accent); font-weight:600; }
+  .call-card-head .cc-model { color:var(--muted); }
+  .call-card-head .cc-tokens { color:var(--green); }
+  .call-card-body { padding:0; }
+  .call-card-body .section { border-bottom:1px solid var(--border); }
+  .call-card-body .section:last-child { border-bottom:none; }
+  .call-card-body .section-label {
+    font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px;
+    padding:8px 14px 0; color:var(--muted);
+  }
+  .call-card-body .section-text {
+    padding:8px 14px 10px; font:12px/1.55 "SF Mono", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+    color:var(--code-text); white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto;
+  }
+  .call-card-body .section-text::-webkit-scrollbar { width:4px; }
+  .call-card-body .section-text::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .call-card-body .section-text.empty { color:var(--muted); font-style:italic; }
+</style>
+</head>
+<body>
+
+<!-- left panel -->
+<div class="left">
+  <div class="left-header">
+    <h1>Token Usage</h1>
+    <span style="display:flex;gap:6px">
+      <button class="btn" id="theme-btn" onclick="toggleTheme()">Light</button>
+      <button class="btn" onclick="fetchTree()">Refresh</button>
+    </span>
+  </div>
+  <div class="stats-bar" id="stats"></div>
+  <div class="tree-wrap" id="tree"></div>
+</div>
+
+<!-- right panel -->
+<div class="right" id="right">
+  <div class="right-empty" id="right-empty">Select a node to view detail</div>
+  <div class="right-content" id="right-content"></div>
+</div>
+
+<script>
+// ── fetch & render tree ──
+async function fetchTree() {
+  document.getElementById('tree').innerHTML = '<div class="node-row"><span class="name" style="color:var(--muted)">Loading...</span></div>';
+  try {
+    const res = await fetch('/api/admin/token-usage/tree');
+    const data = await res.json();
+    renderTree(data);
+  } catch(e) {
+    document.getElementById('tree').innerHTML = '<div class="node-row"><span class="name" style="color:var(--red)">Error: '+esc(e.message)+'</span></div>';
+  }
+}
+
+function renderTree(sessions) {
+  const el = document.getElementById('tree');
+  if (!sessions.length) { el.innerHTML = '<div class="node-row"><span class="name" style="color:var(--muted)">No data</span></div>'; return; }
+  let grandTotal=0, grandCalls=0;
+  for (const s of sessions) { grandTotal+=s.totalTokens; grandCalls+=s.callCount; }
+  document.getElementById('stats').textContent =
+    `${sessions.length} session · ${grandTotal.toLocaleString()} tokens · ${grandCalls} calls`;
+
+  let html = '';
+  for (const s of sessions) html += nodeHTML(s, 'session');
+  el.innerHTML = html;
+}
+
+function nodeHTML(n, kind) {
+  const hasKids = n.children && n.children.length > 0;
+  const arrow = hasKids ? `<span class="arrow">▶</span>` : `<span class="arrow spacer">▶</span>`;
+  const ico = kind==='session'?'📁': kind==='turn'?'📂': n.label.startsWith('pipeline-')?'⚙':'○';
+  const meta = `<span class="meta"><span>${n.totalTokens.toLocaleString()}t</span><span>×${n.callCount}</span></span>`;
+
+  let dataAttrs = '';
+  if (kind === 'node') {
+    const parts = n.key.split('/');
+    if (parts.length >= 4) dataAttrs = ` data-sid="${parts[1]}" data-turn="${parts[2]}" data-node="${parts.slice(3).join('/')}"`;
+  }
+
+  let html = `<div class="node depth-${kind}">`;
+  html += `<div class="node-row" onclick="onNodeClick(this, event)" data-kind="${kind}"${dataAttrs}>`;
+  html += `${arrow}<span class="ico">${ico}</span><span class="name">${esc(n.label)}</span>${meta}</div>`;
+
+  if (hasKids) {
+    html += '<div class="node-children">';
+    if (n.subtitle) html += `<div style="color:var(--muted);font-size:11px;padding:2px 18px 2px 36px">${esc(n.subtitle)}</div>`;
+    const childKind = kind==='session'?'turn':'node';
+    for (const c of n.children) html += nodeHTML(c, childKind);
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── node click: expand/collapse or select leaf ──
+function onNodeClick(row, event) {
+  const kind = row.dataset.kind;
+  const hasKids = row.nextElementSibling && row.nextElementSibling.classList.contains('node-children');
+
+  // expand/collapse for non-leaf
+  if (hasKids) {
+    const children = row.nextElementSibling;
+    const arrow = row.querySelector('.arrow');
+    children.classList.toggle('open');
+    arrow.classList.toggle('open');
+  }
+
+  // select leaf node → load detail
+  if (kind === 'node') {
+    // highlight
+    document.querySelectorAll('.node-row.active').forEach(r => r.classList.remove('active'));
+    row.classList.add('active');
+
+    const sid = row.dataset.sid, turn = row.dataset.turn, node = row.dataset.node;
+    loadDetail(sid, turn, node, row.querySelector('.name').textContent);
+  }
+
+  event.stopPropagation();
+}
+
+// ── load detail panel ──
+async function loadDetail(sid, turn, node, label) {
+  const empty = document.getElementById('right-empty');
+  const content = document.getElementById('right-content');
+  content.innerHTML = '<span style="color:var(--muted)">Loading...</span>';
+  empty.style.display = 'none';
+  content.classList.add('visible');
+
+  try {
+    const url = `/api/admin/token-usage/detail?sessionId=${sid}&turn=${turn}&node=${encodeURIComponent(node)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    let html = `<div class="detail-header">`;
+    html += `<span class="dh-node">${esc(label)}</span>`;
+    html += `<span class="dh-meta">${data.length} call${data.length>1?'s':''} · Session #${sid} · Turn ${turn}</span>`;
+    html += `</div>`;
+
+    for (let i=0; i<data.length; i++) {
+      const c = data[i];
+      html += `<div class="call-card">`;
+      html += `<div class="call-card-head">`;
+      html += `<span class="cc-index">#${i+1}</span>`;
+      html += `<span class="cc-model">${esc(c.modelName||'unknown')}</span>`;
+      html += `<span class="cc-tokens">${(c.totalTokens||0).toLocaleString()} tokens</span>`;
+      html += `</div>`;
+      html += `<div class="call-card-body">`;
+      html += `<div class="section">`;
+      html += `<div class="section-label">Input</div>`;
+      html += `<div class="section-text${c.inputText?'':' empty'}">${c.inputText?esc(c.inputText):'(empty)'}</div>`;
+      html += `</div>`;
+      html += `<div class="section">`;
+      html += `<div class="section-label">Output</div>`;
+      html += `<div class="section-text${c.outputText?'':' empty'}">${c.outputText?esc(c.outputText):'(empty)'}</div>`;
+      html += `</div>`;
+      html += `</div></div>`;
+    }
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = '<span style="color:var(--red)">Failed to load: '+esc(e.message)+'</span>';
+  }
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── theme ──
+function getTheme() { return document.documentElement.getAttribute('data-theme')||'light'; }
+function setTheme(t) {
+  const btn = document.getElementById('theme-btn');
+  if (t === 'dark') {
+    document.documentElement.setAttribute('data-theme','dark');
+    btn.textContent = 'Dark';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    btn.textContent = 'Light';
+  }
+  localStorage.setItem('token-usage-theme', t);
+}
+function toggleTheme() { setTheme(getTheme()==='dark'?'light':'dark'); }
+setTheme(localStorage.getItem('token-usage-theme')||'light');
+
+// ── init ──
+document.addEventListener('DOMContentLoaded', () => {
+  fetchTree();
+  // auto-expand session + turn levels after render
+  const obs = new MutationObserver(() => {
+    document.querySelectorAll('.node-children').forEach(el => {
+      let d=0, p=el.parentElement;
+      while(p){ if(p.classList.contains('node-children')) d++; p=p.parentElement; }
+      if(d<=1){ el.classList.add('open'); el.previousElementSibling?.querySelector('.arrow')?.classList.add('open'); }
+    });
+    obs.disconnect();
+  });
+  obs.observe(document.getElementById('tree'), { childList:true, subtree:true });
+});
+</script>
+</body>
+</html>

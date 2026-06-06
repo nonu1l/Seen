@@ -1,5 +1,6 @@
 package com.nonu1l.media.agent;
 
+import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.MatchedEntry;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import com.nonu1l.media.service.BangumiTools;
@@ -69,6 +70,7 @@ public class SearchPipeline {
         }
 
         List<MatchedEntry> allCards = new ArrayList<>();
+        var seenSubjectIds = new HashSet<Long>();
         int tried = 0;
 
         for (String kw : keywords) {
@@ -105,6 +107,8 @@ public class SearchPipeline {
             cardMap.values().removeIf(Objects::isNull);
             var seen = new HashSet<Long>();
             cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
+            // 跨关键词去重
+            cardMap.values().removeIf(c -> !seenSubjectIds.add(c.subjectId()));
 
             // 校验匹配结果
             if (!cardMap.isEmpty()) {
@@ -145,6 +149,7 @@ public class SearchPipeline {
 
     /** 用 LLM 校验 title→card 映射，返回通过校验的 subjectId 集合 */
     java.util.Set<Long> validateMatchIds(Map<String, MatchedEntry> cardMap, String context) {
+        TokenUsageAdvisor.setCurrentNode("pipeline-validateMatch");
         if (cardMap.isEmpty()) return java.util.Set.of();
         StringBuilder sb = new StringBuilder();
         cardMap.forEach((title, c) -> sb.append(title).append(" → ").append(c.nameCn())
@@ -164,6 +169,7 @@ public class SearchPipeline {
     // ── 内部方法 ──
 
     List<String> generateKeywords(String userInput) {
+        TokenUsageAdvisor.setCurrentNode("pipeline-generateKeywords");
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
         String result = chatClient.prompt().system(prompt).user(userInput).call().content();
         if (result == null || result.isBlank()) return List.of(userInput);
@@ -171,6 +177,7 @@ public class SearchPipeline {
     }
 
     List<String> extractTitles(String text, String userInput) {
+        TokenUsageAdvisor.setCurrentNode("pipeline-extractTitles");
         if (text.length() > 8000) text = text.substring(0, 8000);
         String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", userInput);
@@ -180,6 +187,7 @@ public class SearchPipeline {
     }
 
     String failMessage(String userInput, String reason) {
+        TokenUsageAdvisor.setCurrentNode("pipeline-failMessage");
         String prompt = promptFail.replace("{reason}", reason);
         String result = chatClient.prompt().system(prompt).user(userInput).call().content();
         return result != null && !result.isBlank() ? result : "抱歉，未找到相关影视作品。";

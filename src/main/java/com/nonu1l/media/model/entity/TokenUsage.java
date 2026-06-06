@@ -34,6 +34,14 @@ public class TokenUsage {
     @Column(name = "session_id")
     private Long sessionId;
 
+    /** Agent 节点名称（classify/mark/search/recommend/analyze/output/pipeline-*） */
+    @Column(name = "node_name", length = 30)
+    private String nodeName;
+
+    /** 对话轮次，从 1 开始 */
+    @Column(name = "turn")
+    private Integer turn;
+
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
 
