@@ -62,4 +62,7 @@ export const api = {
 
   resetConversation: () =>
     request<{ ok: boolean }>('/conversation/reset', { method: 'POST' }),
+
+  getAppConfig: () =>
+    request<{ aiEnabled: boolean }>('/app-config'),
 };

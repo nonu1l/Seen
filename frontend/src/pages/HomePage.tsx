@@ -23,10 +23,12 @@ export default function HomePage() {
   const { query, setQuery, marked, search, loading, error, refresh, refreshSearch } = useHomeList();
   const [opened, setOpened] = useState<OpenedWork | null>(null);
   const [filter, setFilter] = useState<Status | 'all'>('all');
+  const [aiEnabled, setAiEnabled] = useState(true);
   const showingSearch = query.trim().length > 0;
 
   useEffect(() => {
     api.getDict().then(d => setBangumiProxy(d.bangumiProxy));
+    api.getAppConfig().then(c => setAiEnabled(c.aiEnabled)).catch(() => {});
   }, []);
 
   const merged = useMemo(() => {
@@ -168,7 +170,7 @@ export default function HomePage() {
       {opened && <WorkDetailModal id={opened.id} platform={opened.platform} onClose={handleClose} />}
 
       {/* AI 机器人入口 */}
-      {!opened && (
+      {!opened && aiEnabled && (
         <Link to="/ai" className="robot-fab-link">
           <RobotLogo />
         </Link>

@@ -36,6 +36,9 @@ spring:
 seen:
 #  反向代理 cf-worker\bangumi-proxy
   bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
+  ai:
+    #  是否开启 AI 助手功能。关闭后页面隐藏 AI 机器人入口
+    enabled: ${AI_ENABLED:true}
   search:
     provider: ${SEARCH_PROVIDER:serper} # serper|ddg
     serper-api-key: ${SERPER_API_KEY:cc593}
