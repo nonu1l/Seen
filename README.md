@@ -79,28 +79,13 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统
 
 ### LLM 降级兜底链
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. HTTP 层                                                  │
-│    DeepSeekThinkingDisableInterceptor → thinking disabled   │
-├─────────────────────────────────────────────────────────────┤
-│ 2. JSON 解析层                                              │
-│    extractJsonObject 失败 → repairUnescapedQuotes 修复引号  │
-│    → 仍失败 → 原始内容当纯文本 replyText                     │
-├─────────────────────────────────────────────────────────────┤
-│ 3. 意图分类层                                               │
-│    classifyIntent 返回非法 intent → 兜底 "analyze"          │
-├─────────────────────────────────────────────────────────────┤
-│ 4. 终端输出层（handleOutput）                                │
-│    ① replyText 已存在 → 直接透传                            │
-│    ② cards 已存在 → LLM 只生成推荐文案（不给工具）           │
-│    ③ 以上皆无 → 旧 LLM 全工具流程（agent-system.st）        │
-│    ④ LLM 也失败 → "抱歉，无法处理你的请求。"                  │
-├─────────────────────────────────────────────────────────────┤
-│ 5. 对话层                                                   │
-│    AgentService 异常 → "抱歉，处理出错了，请重试。"           │
-└─────────────────────────────────────────────────────────────┘
-```
+| 层 | 兜底逻辑 |
+|---|---|
+| 1. HTTP 层 | `DeepSeekThinkingDisableInterceptor` 注入 `thinking disabled` |
+| 2. JSON 解析层 | `extractJsonObject` 失败 → `repairUnescapedQuotes` 修复引号 → 仍失败 → 原始内容当纯文本 `replyText` |
+| 3. 意图分类层 | `classifyIntent` 返回非法 intent → 兜底 `"analyze"` |
+| 4. 终端输出层（`handleOutput`） | **a.** `replyText` 已存在 → 直接透传 ｜ **b.** `cards` 已存在 → LLM 只生成推荐文案（不给工具） ｜ **c.** 以上皆无 → 旧 LLM 全工具流程（`agent-system.st`） ｜ **d.** LLM 也失败 → "抱歉，无法处理你的请求。" |
+| 5. 对话层 | `AgentService` 异常 → "抱歉，处理出错了，请重试。" |
 
 ## 快速开始
 
