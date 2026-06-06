@@ -82,12 +82,11 @@ public class BangumiService {
                 for (JsonNode item : data) results.add(mapSubject(item));
             }
 
-            // 搜索完成后异步预热详情缓存（跳过已缓存的） [正在开发LLM功能，暂时注释预缓存]
-//            List<Long> ids = results.stream()
-//                    .map(WorkSearchResult::getId)
-//                    .filter(Objects::nonNull)
-//                    .toList();
-//            if (!ids.isEmpty()) preCacheService.preCache(ids);
+            List<Long> ids = results.stream()
+                    .map(WorkSearchResult::getId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            if (!ids.isEmpty()) preCacheService.preCache(ids);
 
         } catch (Exception e) {
             log.error("Bangumi search failed query={}", query, e);

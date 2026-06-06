@@ -4,7 +4,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:sqlite:data/media.db
+    url: jdbc:sqlite:data/media.db?journal_mode=WAL&busy_timeout=3000
     driver-class-name: org.sqlite.JDBC
   jpa:
     hibernate:

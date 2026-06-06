@@ -1,35 +1,26 @@
 # Seen - 个人的影视记录工具
 
-Seen 是一个轻量、自部署的影视 / 番剧记录系统。它使用 SQLite 保存数据，使用 Bangumi 作为作品数据源，可以快速记录自己看了哪些厕纸、番剧、电影、综艺和电视剧，也可以评分、写评价、标记观看状态。
+Seen 是一个轻量、自部署的影视 / 番剧记录系统
+
+可以快速标记自己看了哪些番剧(~~厕纸~~)、电影、综艺和电视剧，也可以打评分、写影评
+
+配置 LLM 模型和搜索模块所需的 Api-Key 之后，还可以使用以下功能:
+- 基于对话形式，让 AI 帮你批量标记整季电视 / 整个系列电影的观影状态
+- 根据本地看过的影视，让 AI 帮你搜索类似的影视
+- 基于 AI 来搜索热门影视，并返回推荐列表
+
+<p>
+  <img src="screenShot/ScreenShot_2026-06-06_201604_871.png" alt="Seen 首页"  />
+</p>
+<p>
+  <img src="screenShot/ScreenShot_2026-06-06_202122_524.png" alt="Seen AI 助手"  />
+</p>
+
+---
 
 如果你只是想要一个可以自己部署的影视记录工具，直接看 [普通用户部署指南](docs/普通用户部署指南.md)。
 
 如果你有 Java Spring 基础，想学习 Java AI / Agent 开发，可以看 [Java AI / Agent 开发者指南](docs/Java-AI-Agent-开发者指南.md)。
-
-## 这个项目可以做什么
-
-### 面向普通使用者
-
-如果你需要一个轻量、自部署的影视 / 番剧系统，那么 Seen 更适合你。它使用 SQLite + Docker 部署方式，不需要单独维护复杂数据库；使用 Bangumi 数据源，覆盖大多数番剧，也能记录绝大多数电影、综艺、电视剧。
-
-Bangumi 在中国大陆可能无法直接访问，所以项目提供 Cloudflare Worker 反向代理方案。AI 助手是可选功能：不开 AI 时，它就是一个普通的影视记录系统；开启 AI 后，可以用自然语言搜索、推荐、批量标记作品。
-
-部署方式见：[普通用户部署指南](docs/普通用户部署指南.md)。
-
-### 面向 Java AI / Agent 初学者
-
-如果你已经熟悉 Java Spring，想找一个真实一点的 Java AI Agent 项目练手，Seen 可以帮你学习：
-
-- Spring AI `ChatClient` 的使用方式
-- Tool Calling：把 Java 方法注册成模型可调用工具
-- LangGraph4j：用图结构编排 Agent 流程
-- Prompt 工程：分类、工具调用、JSON 输出、推荐文案
-- RAG-like 搜索链路：网页搜索、页面抓取、LLM 提取、业务数据库匹配
-- LLM 输出降级：JSON 修复、意图兜底、输出兜底
-- Token 用量追踪：记录每轮 Agent 节点的 token 消耗
-- AI 结果如何落到真实业务数据，而不是只停留在聊天文本
-
-开发说明见：[Java AI / Agent 开发者指南](docs/Java-AI-Agent-开发者指南.md)。
 
 ## Features
 
@@ -86,7 +77,7 @@ Bangumi 在中国大陆可能无法直接访问，所以项目提供 Cloudflare 
   └─ 8. 聚合 ≥3条停止 / 不够换下一组关键词 / 全空LLM生成失败原因
 ```
 
-## LLM 降级兜底链
+### LLM 降级兜底链
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -156,26 +147,6 @@ http://localhost:8081
 
 完整部署步骤见：[普通用户部署指南](docs/普通用户部署指南.md)。
 
-### 本地开发环境要求
-
-- Java 21+
-- Node.js 20+
-- Maven 3.8+
-- Docker（可选，用于运行发布镜像）
-
-### 后端启动
-
-```bash
-mvn spring-boot:run
-```
-
-### 前端启动
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## Tech Stack
 
