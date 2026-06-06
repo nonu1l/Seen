@@ -74,6 +74,11 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
         }
     }
 
+    /**
+     * 匹配请求的url，如果使用以下配置的模型外，需要再配置
+     * @param request
+     * @return
+     */
     private static boolean isDeepSeekChatCompletion(HttpRequest request) {
         String host = request.getURI().getHost();
         String path = request.getURI().getPath();

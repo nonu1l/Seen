@@ -26,6 +26,7 @@ spring:
         options:
           model: ${LLM_MODEL:deepseek-v4-flash}
           temperature: 0.0
+#          如果使用 GLM 或其他非标准openai请求格式的模型，可以参考以下设置
 #      api-key: 02911c73733e4118ad256d5f7bd1a145.e1gWig8oEI4RWA6j
 #      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
 #      chat:

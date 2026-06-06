@@ -13,7 +13,6 @@ dist/
 .env
 /src/main/resources/static/
 .gitignore
-/docs
 .env*
 application-*
 CLAUDE.md
