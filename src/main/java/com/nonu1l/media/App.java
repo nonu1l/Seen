@@ -2,6 +2,9 @@ package com.nonu1l.media;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 /**
  * 应用启动入口，加载 Spring Boot 上下文并开启异步与定时任务能力。
  */

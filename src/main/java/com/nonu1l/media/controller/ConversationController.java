@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * 会话相关的 HTTP 接口，负责查询会话状态、发送消息、卡片操作及会话重置。
  */
