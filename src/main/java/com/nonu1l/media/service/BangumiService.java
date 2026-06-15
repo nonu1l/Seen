@@ -10,7 +10,6 @@ import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.util.RequestCacheUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -25,13 +24,11 @@ public class BangumiService {
     private static final Logger log = LoggerFactory.getLogger(BangumiService.class);
     private static final long TTL_CHARACTER = 1209600; // 14 days
 
-    private final String base;
     private final ObjectMapper objectMapper;
     private final SubjectTypeRepository subjectTypeRepository;
     private final RequestCacheUtil cache;
     private final PreCacheService preCacheService;
-    @Value("${seen.detail.cast-enabled:true}")
-    private boolean castEnabled;
+    private final SettingsService settingsService;
 
     private volatile List<Integer> cachedSubjectTypes;
 
@@ -40,20 +37,16 @@ public class BangumiService {
      * @param subjectTypeRepository 条目类型配置仓储
      * @param cache 请求缓存工具
      * @param preCacheService 预缓存服务
-     * @param bangumiProxy Bangumi 代理地址（可空）
+     * @param settingsService 设置读取服务
      */
     public BangumiService(ObjectMapper objectMapper, SubjectTypeRepository subjectTypeRepository,
                           RequestCacheUtil cache, PreCacheService preCacheService,
-                          @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
+                          SettingsService settingsService) {
         this.objectMapper = objectMapper;
         this.subjectTypeRepository = subjectTypeRepository;
         this.cache = cache;
         this.preCacheService = preCacheService;
-        if (!bangumiProxy.isBlank()) {
-            this.base = bangumiProxy + "/api";
-        } else {
-            this.base = "https://api.bgm.tv/v0";
-        }
+        this.settingsService = settingsService;
     }
 
     /** 搜索 bangumi，默认返回 20 条结果。
@@ -79,6 +72,7 @@ public class BangumiService {
         List<WorkSearchResult> results = new ArrayList<>();
         List<Integer> types = getSearchTypes();
         if (types.isEmpty()) return results;
+        String base = settingsService.bangumiApiBase();
 
         try {
             String body = objectMapper.writeValueAsString(
@@ -119,6 +113,7 @@ public class BangumiService {
     @Deprecated
     public List<WorkSearchResult> trending(int type, Integer year) {
         List<WorkSearchResult> results = new ArrayList<>();
+        String base = settingsService.bangumiApiBase();
         try {
             var filter = new java.util.LinkedHashMap<String, Object>();
             filter.put("type", java.util.List.of(type));
@@ -152,6 +147,7 @@ public class BangumiService {
      * @return 条目基础字段映射结果，异常或未命中返回 {@code null}
      */
     public WorkSearchResult getById(String subjectId) {
+        String base = settingsService.bangumiApiBase();
         try {
             String json = get(base + "/subjects/" + subjectId, 1800);
             if (json == null) return null;
@@ -171,12 +167,15 @@ public class BangumiService {
      * @return 组合后的 {@link DetailedWork}，无数据返回 {@code null}
      */
     public DetailedWork getDetailed(String subjectId) {
+        String base = settingsService.bangumiApiBase();
+        boolean castEnabled = settingsService.getBoolean(SettingsService.DETAIL_CAST_ENABLED);
         try {
             // 元数据与角色信息并行请求，互不阻塞
             CompletableFuture<String> subjectFuture = CompletableFuture.supplyAsync(
                     () -> get(base + "/subjects/" + subjectId, 1800));
-            CompletableFuture<String> charFuture = CompletableFuture.supplyAsync(
-                    () -> get(base + "/subjects/" + subjectId + "/characters", 3600));
+            CompletableFuture<String> charFuture = castEnabled
+                    ? CompletableFuture.supplyAsync(() -> get(base + "/subjects/" + subjectId + "/characters", 3600))
+                    : null;
 
             String json = subjectFuture.join();
             if (json == null) return null;
@@ -398,6 +397,7 @@ public class BangumiService {
      * @return 角色中文名，未命中返回 {@code null}
      */
     public String getCharacterName(Long id) {
+        String base = settingsService.bangumiApiBase();
         try {
             String json = get(base + "/characters/" + id, TTL_CHARACTER);
             if (json == null) return null;
@@ -417,6 +417,7 @@ public class BangumiService {
      * @return 人物中文名，未命中返回 {@code null}
      */
     public String getPersonName(Long id) {
+        String base = settingsService.bangumiApiBase();
         try {
             String json = get(base + "/persons/" + id, TTL_CHARACTER);
             if (json == null) return null;

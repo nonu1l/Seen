@@ -1,5 +1,6 @@
 package com.nonu1l.media.config;
 
+import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import org.slf4j.Logger;
@@ -21,14 +22,17 @@ public class TokenUsageAdvisor implements CallAdvisor {
     private static final ThreadLocal<Integer> currentTurn = new ThreadLocal<>();
 
     private final TokenUsageRepository repo;
+    private final SettingsService settingsService;
 
     /**
      * 通过仓储初始化 advisor。
      *
      * @param repo token 用量仓储。
+     * @param settingsService 设置读取服务。
      */
-    public TokenUsageAdvisor(TokenUsageRepository repo) {
+    public TokenUsageAdvisor(TokenUsageRepository repo, SettingsService settingsService) {
         this.repo = repo;
+        this.settingsService = settingsService;
     }
 
     /**
@@ -77,6 +81,9 @@ public class TokenUsageAdvisor implements CallAdvisor {
         String inputText = request.prompt().getContents();
 
         ChatClientResponse response = chain.nextCall(request);
+        if (!settingsService.getBoolean(SettingsService.AI_TOKEN_USAGE_ENABLED)) {
+            return response;
+        }
 
         var chatResponse = response.chatResponse();
         if (chatResponse != null && chatResponse.getMetadata() != null) {

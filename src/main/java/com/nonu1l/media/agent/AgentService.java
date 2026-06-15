@@ -3,6 +3,7 @@ package com.nonu1l.media.agent;
 import com.nonu1l.media.model.dto.MatchedEntry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.config.TokenUsageAdvisor;
+import com.nonu1l.media.service.AiChatClientFactory;
 import com.nonu1l.media.service.BangumiTools;
 import com.nonu1l.media.service.IntentAnalysisService;
 import org.bsc.langgraph4j.GraphStateException;
@@ -33,25 +34,24 @@ public class AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
 
-    private final ChatClient chatClient;
+    private final AiChatClientFactory chatClientFactory;
     private final BangumiTools tools;
     private final ObjectMapper objectMapper;
     private final String classifyPrompt;
     private final SearchPipeline searchPipeline;
 
     /**
-     * @param chatClientBuilder Spring AI 对话客户端构造器（注入统一 Token 监控 advisor）
+     * @param chatClientFactory 运行时 AI 客户端工厂
      * @param tools Bangumi/本地/网络搜索与抓取工具集合
      * @param objectMapper JSON 解析器
-     * @param tokenAdvisor 令牌统计 advisor
      */
-    public AgentService(ChatClient.Builder chatClientBuilder, BangumiTools tools,
-                         ObjectMapper objectMapper, TokenUsageAdvisor tokenAdvisor) {
-        this.chatClient = chatClientBuilder.defaultAdvisors(tokenAdvisor).build();
+    public AgentService(AiChatClientFactory chatClientFactory, BangumiTools tools,
+                         ObjectMapper objectMapper) {
+        this.chatClientFactory = chatClientFactory;
         this.tools = tools;
         this.objectMapper = objectMapper;
         this.classifyPrompt = loadPrompt("prompts/classify-system.st");
-        this.searchPipeline = new SearchPipeline(this.chatClient, tools);
+        this.searchPipeline = new SearchPipeline(this::chatClient, tools);
     }
 
     /**
@@ -114,7 +114,7 @@ public class AgentService {
         log.debug("Node[classify] enter: {}", s.userInput().length() > 100 ? s.userInput().substring(0, 100) + "..." : s.userInput());
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
         TokenUsageAdvisor.setCurrentNode("classify");
-        String intent = chatClient.prompt().system(system).user(s.userInput()).call().content();
+        String intent = chatClient().prompt().system(system).user(s.userInput()).call().content();
         if (intent != null) intent = intent.trim().toLowerCase();
         if (intent == null || !List.of("mark", "unmark", "recommend", "search", "analyze").contains(intent)) {
             intent = "analyze";
@@ -136,7 +136,7 @@ public class AgentService {
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
-        String content = chatClient.prompt()
+        String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolsAsCallbacks()).call().content();
         if (content != null && !content.isBlank()) {
@@ -182,7 +182,7 @@ public class AgentService {
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
-        String content = chatClient.prompt()
+        String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolsAsCallbacks()).call().content();
         if (content != null && !content.isBlank()) {
@@ -250,7 +250,7 @@ public class AgentService {
         TokenUsageAdvisor.setCurrentNode("analyze");
         String system = loadPrompt("prompts/agent-analyze.st")
                 .replace("{history}", s.history());
-        String reply = chatClient.prompt()
+        String reply = chatClient().prompt()
             .system(system).user(s.userInput()).call().content();
         log.debug("Node[analyze] exit: reply={}", reply != null ? reply.substring(0, Math.min(100, reply.length())) : "null");
         return Map.of("replyText", reply != null ? reply : "抱歉，无法回答。");
@@ -279,7 +279,7 @@ public class AgentService {
                 var c = existingCards.get(i);
                 cardInfo.append(String.format("[%d] %s\n", i + 1, c.nameCn()));
             }
-            String reply = chatClient.prompt()
+            String reply = chatClient().prompt()
                 .system(loadPrompt("prompts/agent-output-reply.st"))
                 .user(s.userInput() + "\n\n卡片列表：\n" + cardInfo)
                 .call().content();
@@ -291,7 +291,7 @@ public class AgentService {
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
-        String content = chatClient.prompt()
+        String content = chatClient().prompt()
                 .system(system)
                 .user(s.userInput())
                 .toolCallbacks(toolsAsCallbacks())
@@ -353,6 +353,10 @@ public class AgentService {
 
     record SearchReq(String keyword) {}
     record FetchReq(String url) {}
+
+    private ChatClient chatClient() {
+        return chatClientFactory.currentClient();
+    }
 
     /**
      * 从 classpath 读取提示词模板。

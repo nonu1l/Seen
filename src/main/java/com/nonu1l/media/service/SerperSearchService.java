@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,7 @@ import java.util.Map;
  * Request request = new Request.Builder()
  *   .url("https://google.serper.dev/search")
  *   .method("POST", body)
- *   .addHeader("X-API-KEY", "cc593ebb32ad5a57d1bd91ee33368faf52fecc02")
+ *   .addHeader("X-API-KEY", "your-api-key")
  *   .addHeader("Content-Type", "application/json")
  *   .build();
  * Response response = client.newCall(request).execute();
@@ -67,34 +66,31 @@ public class SerperSearchService implements SearchProvider {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final String apiKey;
+    private final SettingsService settingsService;
 
     /**
      * 构造 Serper 搜索服务。
      *
      * @param builder RestTemplate 构造器
      * @param objectMapper JSON 映射工具
-     * @param apiKey Serper API key
+     * @param settingsService 设置读取服务
      */
     public SerperSearchService(RestTemplateBuilder builder,
                                 ObjectMapper objectMapper,
-                                @Value("${seen.search.serper-api-key:}") String apiKey) {
+                                SettingsService settingsService) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = objectMapper;
-        this.apiKey = apiKey;
-        if (apiKey.isBlank()) {
-            log.warn("Serper API key not configured, service will be unavailable");
-        }
+        this.settingsService = settingsService;
     }
 
     /**
      * @return API Key 已配置则返回 true，可用于 provider 路由判断
      */
     public boolean isAvailable() {
-        return !apiKey.isBlank();
+        return settingsService.hasText(SettingsService.SERPER_API_KEY);
     }
 
     /**
@@ -106,6 +102,7 @@ public class SerperSearchService implements SearchProvider {
     @Override
     public List<WebSearchItem> search(String query) {
         List<WebSearchItem> results = new ArrayList<>();
+        String apiKey = settingsService.getString(SettingsService.SERPER_API_KEY);
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
             return results;

@@ -9,7 +9,6 @@ import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -34,7 +33,7 @@ public class WorkService {
     private final RecordStatusRepository    recordStatusRepo;
     private final BangumiService            bangumiService;
     private final TransactionTemplate       transactionTemplate;
-    private final String                    bangumiProxy;
+    private final SettingsService           settingsService;
 
     /**
      * 构造服务实例。
@@ -45,20 +44,20 @@ public class WorkService {
      * @param recordStatusRepo 进度状态仓储
      * @param bangumiService Bangumi API 服务
      * @param transactionTemplate 事务模板，用于把远程请求和数据库写入分离
-     * @param bangumiProxy Bangumi 代理地址（可空）
+     * @param settingsService 设置读取服务
      */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
                        BangumiService bangumiService,
                        TransactionTemplate transactionTemplate,
-                       @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
+                       SettingsService settingsService) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
         this.subjectTypeRepo   = subjectTypeRepo;
         this.recordStatusRepo  = recordStatusRepo;
         this.bangumiService    = bangumiService;
         this.transactionTemplate = transactionTemplate;
-        this.bangumiProxy      = bangumiProxy;
+        this.settingsService   = settingsService;
     }
 
     /**
@@ -386,7 +385,7 @@ public class WorkService {
         return Map.of(
                 "subjectTypes", subjectTypeRepo.findAll(),
                 "recordStatuses", recordStatusRepo.findAll(),
-                "bangumiProxy", bangumiProxy
+                "bangumiProxy", settingsService.getString(SettingsService.BANGUMI_PROXY)
         );
     }
 

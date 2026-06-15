@@ -1,6 +1,6 @@
 package com.nonu1l.media.controller;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.nonu1l.media.service.SettingsService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -12,15 +12,15 @@ import java.util.Map;
 @RestController
 public class AppConfigController {
 
-    private final boolean aiEnabled;
+    private final SettingsService settingsService;
 
     /**
-     * 创建控制器并注入 AI 功能开关。
+     * 创建控制器并注入设置服务。
      *
-     * @param aiEnabled 是否允许启用 AI 相关接口，来自配置项 {@code seen.ai.enabled}。
+     * @param settingsService 设置读取服务。
      */
-    public AppConfigController(@Value("${seen.ai.enabled:true}") boolean aiEnabled) {
-        this.aiEnabled = aiEnabled;
+    public AppConfigController(SettingsService settingsService) {
+        this.settingsService = settingsService;
     }
 
     /**
@@ -30,6 +30,6 @@ public class AppConfigController {
      */
     @GetMapping("/api/app-config")
     public Map<String, Object> getConfig() {
-        return Map.of("aiEnabled", aiEnabled);
+        return Map.of("aiEnabled", settingsService.getBoolean(SettingsService.AI_ENABLED));
     }
 }

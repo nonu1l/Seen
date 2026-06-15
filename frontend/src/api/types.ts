@@ -134,3 +134,40 @@ export interface ConversationState {
   messages: ConversationMessageVO[];
   cards: ConversationCardVO[];
 }
+
+// ── Settings ──
+
+export type SettingType = 'string' | 'boolean' | 'number' | 'select' | 'password';
+
+export type SettingValue = string | number | boolean | null;
+
+export interface SettingItem {
+  key: string;
+  label: string;
+  value: SettingValue;
+  type: SettingType;
+  sensitive: boolean;
+  effectiveSource: 'database' | 'environment' | 'default' | string;
+}
+
+export interface SettingGroup {
+  key: string;
+  label: string;
+  settings: SettingItem[];
+}
+
+export interface SettingsResponse {
+  groups: SettingGroup[];
+  applied?: boolean;
+}
+
+export interface UpdateSettingsRequest {
+  settings: Record<string, string | number | boolean>;
+}
+
+export interface SettingsTestResult {
+  ok: boolean;
+  message: string;
+  elapsedMs?: number;
+  details?: Record<string, unknown>;
+}

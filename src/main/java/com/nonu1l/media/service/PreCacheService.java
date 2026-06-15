@@ -4,7 +4,6 @@ import com.nonu1l.media.util.RequestCacheUtil;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,23 +24,19 @@ public class PreCacheService {
     private static final long TTL_SUBJECT = 600;
     private static final long TTL_CHARS = 600;
 
-    private final String base;
     private final RequestCacheUtil cache;
+    private final SettingsService settingsService;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final AtomicLong batchCounter = new AtomicLong(0);
 
     /**
      * @param cache 请求缓存工具
-     * @param bangumiProxy Bangumi 代理地址（可空）
+     * @param settingsService 设置读取服务
      */
     public PreCacheService(RequestCacheUtil cache,
-                           @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
+                           SettingsService settingsService) {
         this.cache = cache;
-        if (!bangumiProxy.isBlank()) {
-            this.base = bangumiProxy + "/api";
-        } else {
-            this.base = "https://api.bgm.tv/v0";
-        }
+        this.settingsService = settingsService;
     }
 
     /**
@@ -54,6 +49,7 @@ public class PreCacheService {
     public void preCache(List<Long> ids) {
         long batchId = batchCounter.incrementAndGet();
         long t0 = System.nanoTime();
+        String base = settingsService.bangumiApiBase();
         List<CompletableFuture<Void>> futures = ids.stream()
             .map(id -> CompletableFuture.runAsync(() -> {
                 if (batchId != batchCounter.get()) return;

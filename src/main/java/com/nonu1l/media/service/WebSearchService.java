@@ -3,7 +3,6 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
@@ -19,24 +18,22 @@ public class WebSearchService implements SearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(WebSearchService.class);
 
-    private final SearchProvider delegate;
+    private final DDGSearchService ddg;
+    private final SerperSearchService serper;
+    private final SettingsService settingsService;
 
     /**
-     * 按配置选择底层搜索实现并固定为单一 delegate。
+     * 注入底层搜索实现，实际请求时按当前设置动态选择。
      *
      * @param ddg DDG 备选实现
      * @param serper Serper 实现
-     * @param provider 配置值，支持 ddg / serper
+     * @param settingsService 设置读取服务
      */
     public WebSearchService(DDGSearchService ddg, SerperSearchService serper,
-                            @Value("${seen.search.provider:ddg}") String provider) {
-        if ("serper".equalsIgnoreCase(provider) && serper.isAvailable()) {
-            this.delegate = serper;
-            log.info("Search provider: Serper.dev");
-        } else {
-            this.delegate = ddg;
-            log.info("Search provider: DuckDuckGo (via proxy)");
-        }
+                            SettingsService settingsService) {
+        this.ddg = ddg;
+        this.serper = serper;
+        this.settingsService = settingsService;
     }
 
     /**
@@ -47,7 +44,7 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItem> search(String query) {
-        return delegate.search(query);
+        return delegate().search(query);
     }
 
     /**
@@ -58,8 +55,19 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public String fetch(String url) {
-        String raw = delegate.fetch(url);
+        String raw = delegate().fetch(url);
         return cleanFetchedText(raw);
+    }
+
+    private SearchProvider delegate() {
+        String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
+        if ("serper".equalsIgnoreCase(provider)) {
+            if (serper.isAvailable()) {
+                return serper;
+            }
+            log.warn("Search provider is serper but API key is missing, falling back to DuckDuckGo");
+        }
+        return ddg;
     }
 
     // ── 抓取文本清洗 ──

@@ -1,4 +1,16 @@
-import type { WorkListItem, SearchResponse, WorkDetail, MarkRequest, DictResponse, ConversationState, AiChatResponse, ConversationCardVO } from './types';
+import type {
+  WorkListItem,
+  SearchResponse,
+  WorkDetail,
+  MarkRequest,
+  DictResponse,
+  ConversationState,
+  AiChatResponse,
+  ConversationCardVO,
+  SettingsResponse,
+  UpdateSettingsRequest,
+  SettingsTestResult,
+} from './types';
 
 const BASE = '/api';
 
@@ -24,6 +36,9 @@ export const api = {
 
   mark: (req: MarkRequest) =>
     request<WorkListItem>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
+
+  rewatch: (workId: number) =>
+    request<WorkListItem>('/works/rewatch', { method: 'POST', body: JSON.stringify({ workId }) }),
 
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),
@@ -62,4 +77,21 @@ export const api = {
 
   getAppConfig: () =>
     request<{ aiEnabled: boolean }>('/app-config'),
+
+  // ── Settings ──
+
+  getSettings: () =>
+    request<SettingsResponse>('/settings'),
+
+  updateSettings: (req: UpdateSettingsRequest) =>
+    request<SettingsResponse>('/settings', { method: 'PUT', body: JSON.stringify(req) }),
+
+  testAiSettings: (req: Record<string, unknown>) =>
+    request<SettingsTestResult>('/settings/test-ai', { method: 'POST', body: JSON.stringify(req) }),
+
+  testSearchSettings: (req: Record<string, unknown>) =>
+    request<SettingsTestResult>('/settings/test-search', { method: 'POST', body: JSON.stringify(req) }),
+
+  testBangumiSettings: (req: Record<string, unknown>) =>
+    request<SettingsTestResult>('/settings/test-bangumi', { method: 'POST', body: JSON.stringify(req) }),
 };

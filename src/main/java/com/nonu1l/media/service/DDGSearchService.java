@@ -3,11 +3,12 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,21 +29,19 @@ public class DDGSearchService implements SearchProvider {
         "class=['\"]result-snippet['\"][^>]*>(.+?)</td>", Pattern.DOTALL);
 
     private final RestTemplate restTemplate;
-    private final String searchUrl;
+    private final SettingsService settingsService;
 
     /**
      * @param builder RestTemplate 构造器
-     * @param proxy DDG 代理地址（可空）
+     * @param settingsService 设置读取服务
      */
     public DDGSearchService(RestTemplateBuilder builder,
-                            @Value("${seen.bangumi-proxy:}") String proxy) {
+                            SettingsService settingsService) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(10))
                 .build();
-        this.searchUrl = !proxy.isBlank()
-                ? proxy + "/search?q="
-                : "https://lite.duckduckgo.com/lite/?q=";
+        this.settingsService = settingsService;
     }
 
     /**
@@ -59,7 +58,9 @@ public class DDGSearchService implements SearchProvider {
         try {
             int searchCount = 0;
             while (results.isEmpty() && searchCount < 3) {
-                String html = restTemplate.getForObject(searchUrl + query, String.class);
+                String searchUrl = SettingsService.ddgSearchUrl(settingsService.getString(SettingsService.BANGUMI_PROXY));
+                String html = restTemplate.getForObject(
+                        searchUrl + URLEncoder.encode(query, StandardCharsets.UTF_8), String.class);
                 if (html == null) break;
 
                 String[] rows = html.split("<tr[ >]");
