@@ -68,7 +68,7 @@ seen.detail.cast-enabled
 默认值来源：
 
 ```text
-数据库设置 > Spring Environment(application.yml / 环境变量) > 代码默认值
+数据库设置；缺失时由 SettingsService 使用代码默认值补齐
 ```
 
 ## 数据模型
@@ -108,8 +108,7 @@ AppSetting
           "label": "AI 助手",
           "value": true,
           "type": "boolean",
-          "sensitive": false,
-          "effectiveSource": "database"
+          "sensitive": false
         }
       ]
     }
@@ -161,7 +160,7 @@ AppSetting
 - 负责保存设置。
 - 负责保存后刷新内存快照。
 - 提供 `getBoolean(key)`、`getString(key)`、`getDouble(key)` 等读取方法。
-- `@Value` 或 `Environment` 只作为默认值来源，不作为运行期唯一值。
+- 可变配置不再从 `@Value` 或 `Environment` 读取。
 
 建议内部维护不可变快照：
 

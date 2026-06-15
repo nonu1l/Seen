@@ -15,8 +15,7 @@ public record SettingsResponse(List<SettingsGroup> groups, boolean applied) {
             String label,
             Object value,
             String type,
-            boolean sensitive,
-            String effectiveSource
+            boolean sensitive
     ) {
     }
 }

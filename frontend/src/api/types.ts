@@ -147,7 +147,6 @@ export interface SettingItem {
   value: SettingValue;
   type: SettingType;
   sensitive: boolean;
-  effectiveSource: 'database' | 'environment' | 'default' | string;
 }
 
 export interface SettingGroup {

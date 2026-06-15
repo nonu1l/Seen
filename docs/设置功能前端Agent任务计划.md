@@ -60,8 +60,7 @@ GET /api/settings
           "label": "AI 助手",
           "value": true,
           "type": "boolean",
-          "sensitive": false,
-          "effectiveSource": "database"
+          "sensitive": false
         }
       ]
     }

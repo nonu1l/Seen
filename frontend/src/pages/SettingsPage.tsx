@@ -329,19 +329,13 @@ export default function SettingsPage() {
 
   const renderField = (def: FieldDef) => {
     const item = itemMap[def.key];
-    const source = item?.effectiveSource;
     const value = values[def.key];
-    const sourceLabel = source === 'database' ? '已保存'
-      : source === 'environment' ? '环境'
-        : source === 'default' ? '默认'
-          : source;
 
     return (
       <div className="settings-row" key={def.key}>
         <div className="settings-row-meta">
           <div className="settings-row-title">
             <span>{item?.label ?? def.label}</span>
-            {sourceLabel && <span className="settings-source">{sourceLabel}</span>}
           </div>
           {def.help && <p>{def.help}</p>}
         </div>

@@ -4,7 +4,6 @@ import com.nonu1l.media.model.dto.SettingsResponse;
 import com.nonu1l.media.model.entity.AppSetting;
 import com.nonu1l.media.repository.AppSettingRepository;
 import jakarta.annotation.PostConstruct;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 应用运行时设置服务，统一处理读取优先级、保存、类型转换和敏感值脱敏。
+ * 应用运行时设置服务，统一处理数据库持久化、保存、类型转换和敏感值脱敏。
  */
 @Service
 public class SettingsService {
@@ -28,24 +27,20 @@ public class SettingsService {
     public static final String BANGUMI_PROXY = "seen.bangumi-proxy";
     public static final String DETAIL_CAST_ENABLED = "seen.detail.cast-enabled";
 
-    private static final String SOURCE_DATABASE = "database";
-    private static final String SOURCE_ENVIRONMENT = "environment";
-    private static final String SOURCE_DEFAULT = "default";
     private static final String MASKED_VALUE = "********";
 
     private final AppSettingRepository repository;
-    private final Environment environment;
     private final AtomicReference<Map<String, StoredSetting>> snapshot = new AtomicReference<>(Map.of());
 
     private final Map<String, SettingDefinition> definitions = buildDefinitions();
 
-    public SettingsService(AppSettingRepository repository, Environment environment) {
+    public SettingsService(AppSettingRepository repository) {
         this.repository = repository;
-        this.environment = environment;
     }
 
     @PostConstruct
     void init() {
+        seedMissingSettings();
         refreshSnapshot();
     }
 
@@ -96,16 +91,16 @@ public class SettingsService {
     }
 
     public boolean getBoolean(String key) {
-        return Boolean.parseBoolean(String.valueOf(effectiveValue(key).value()));
+        return Boolean.parseBoolean(String.valueOf(effectiveValue(key)));
     }
 
     public String getString(String key) {
-        Object value = effectiveValue(key).value();
+        Object value = effectiveValue(key);
         return value == null ? "" : String.valueOf(value);
     }
 
     public double getDouble(String key) {
-        Object value = effectiveValue(key).value();
+        Object value = effectiveValue(key);
         if (value instanceof Number number) return number.doubleValue();
         try {
             return Double.parseDouble(String.valueOf(value));
@@ -157,21 +152,20 @@ public class SettingsService {
 
     private SettingsResponse.SettingItem item(String key) {
         SettingDefinition definition = definitions.get(key);
-        EffectiveSetting effective = effectiveValue(key);
-        Object value = definition.sensitive() && !String.valueOf(effective.value()).isBlank()
+        Object effective = effectiveValue(key);
+        Object value = definition.sensitive() && !String.valueOf(effective).isBlank()
                 ? MASKED_VALUE
-                : effective.value();
+                : effective;
         return new SettingsResponse.SettingItem(
                 key,
                 definition.label(),
                 value,
                 definition.type(),
-                definition.sensitive(),
-                effective.source()
+                definition.sensitive()
         );
     }
 
-    private EffectiveSetting effectiveValue(String key) {
+    private Object effectiveValue(String key) {
         SettingDefinition definition = definitions.get(key);
         if (definition == null) {
             throw new IllegalArgumentException("Unsupported setting key: " + key);
@@ -179,14 +173,24 @@ public class SettingsService {
 
         StoredSetting stored = snapshot.get().get(key);
         if (stored != null) {
-            return new EffectiveSetting(convert(definition, stored.value()), SOURCE_DATABASE);
+            return convert(definition, stored.value());
         }
 
-        String envValue = environment.getProperty(key);
-        if (envValue != null) {
-            return new EffectiveSetting(convert(definition, envValue), SOURCE_ENVIRONMENT);
+        return definition.defaultValue();
+    }
+
+    private void seedMissingSettings() {
+        for (SettingDefinition definition : definitions.values()) {
+            if (repository.findBySettingKey(definition.key()).isPresent()) {
+                continue;
+            }
+            AppSetting setting = new AppSetting();
+            setting.setSettingKey(definition.key());
+            setting.setSettingValue(normalizeValue(definition, definition.defaultValue()));
+            setting.setValueType(definition.type());
+            setting.setSensitive(definition.sensitive());
+            repository.save(setting);
         }
-        return new EffectiveSetting(definition.defaultValue(), SOURCE_DEFAULT);
     }
 
     private void refreshSnapshot() {
@@ -266,9 +270,6 @@ public class SettingsService {
     }
 
     private record StoredSetting(String value) {
-    }
-
-    private record EffectiveSetting(Object value, String source) {
     }
 
     public record AiRuntimeSettings(String baseUrl, String apiKey, String model, double temperature) {

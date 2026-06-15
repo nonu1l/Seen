@@ -790,18 +790,6 @@ body {
   line-height: 1.55;
 }
 
-.settings-source {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.04);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-}
-
 .settings-row-control {
   min-width: 0;
   display: flex;

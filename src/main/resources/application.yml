@@ -19,33 +19,9 @@ spring:
             log:
               LOG_QUERIES_SLOWER_THAN_MS: 0
   ai:
-    openai:
-      api-key: ${LLM_API_KEY:sk-1234}
-      base-url: ${LLM_BASE_URL:https://api.deepseek.com}
-      chat:
-        options:
-          model: ${LLM_MODEL:deepseek-v4-flash}
-          temperature: 0.0
-#          如果使用 GLM 或其他非标准openai请求格式的模型，可以参考以下设置
-#      api-key: 02911c73733e4118ad256d5f7bd1a145.e1gWig8oEI4RWA6j
-#      base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas}
-#      chat:
-#        completions-path: /v4/chat/completions
-#        options:
-#          model: ${LLM_MODEL:GLM-4.7-FlashX}
-#          temperature: 0.0
+    model:
+      chat: none
 seen:
-#  反向代理 cf-worker\bangumi-proxy
-  bangumi-proxy: ${BANGUMI_PROXY:https://seen.proxy.com}
-  ai:
-    #  是否开启 AI 助手功能。关闭后页面隐藏 AI 机器人入口
-    enabled: ${AI_ENABLED:true}
-  search:
-    provider: ${SEARCH_PROVIDER:serper} # serper|ddg
-    serper-api-key: ${SERPER_API_KEY:cc593}
-  detail:
-    #  详情页面是否展示演员 / 角色(当前的Bangumi对三次元演员即角色数据不够全)
-    cast-enabled: ${DETAIL_CAST_ENABLED:true}
   sql:
     init:
       mode: always
