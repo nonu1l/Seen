@@ -1,16 +1,18 @@
 package com.nonu1l.media.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonu1l.media.model.dto.AiProviderSettingRequest;
+import com.nonu1l.media.model.dto.AiProviderSettingResponse;
 import com.nonu1l.media.model.dto.SettingsResponse;
 import com.nonu1l.media.model.dto.SettingsTestRequests;
 import com.nonu1l.media.model.dto.SettingsTestResponse;
 import com.nonu1l.media.model.dto.UpdateSettingsRequest;
 import com.nonu1l.media.service.SettingsService;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +20,7 @@ import java.time.Duration;
 import java.util.*;
 
 /**
- * 设置页后端接口，负责读取、保存和连接测试。
+ * 设置页后端接口，负责读取、保存 AI 接入配置和连接测试。
  */
 @RestController
 @RequestMapping("/api/settings")
@@ -51,39 +53,50 @@ public class SettingsController {
         return settingsService.updateSettings(request != null ? request.settings() : Map.of());
     }
 
-    @PostMapping("/test-ai")
-    public SettingsTestResponse testAi(@RequestBody SettingsTestRequests.AiTestRequest request) {
+    @PutMapping("/ai-profile")
+    public AiProviderSettingResponse updateAiProfile(@RequestBody AiProviderSettingRequest request) {
+        return settingsService.updateAiProviderSetting(request);
+    }
+
+    @PostMapping("/ai-profile/test")
+    public SettingsTestResponse testAiProfile(@RequestBody SettingsTestRequests.AiTestRequest request) {
         long start = System.nanoTime();
-        String apiKey = valueOrCurrent(request != null ? request.apiKey() : null, SettingsService.OPENAI_API_KEY);
-        String baseUrl = valueOrCurrent(request != null ? request.baseUrl() : null, SettingsService.OPENAI_BASE_URL);
-        String completionsPath = valueOrCurrent(request != null ? request.completionsPath() : null, SettingsService.OPENAI_COMPLETIONS_PATH);
-        String model = valueOrCurrent(request != null ? request.model() : null, SettingsService.OPENAI_MODEL);
-        Double temperature = request != null && request.temperature() != null ? request.temperature() : 0.0d;
-        if (baseUrl.isBlank() || apiKey.isBlank() || model.isBlank()) {
-            return response(false, "baseUrl、apiKey、model 不能为空", start, Map.of("model", model));
+        SettingsService.AiRuntimeSetting setting = resolveTestSetting(request);
+        if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
+            return response(false, "baseUrl、apiKey、model 不能为空", start,
+                    Map.of("provider", setting.providerKind(), "model", setting.model()));
         }
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+            headers.setBearerAuth(setting.apiKey());
 
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", model);
-            body.put("temperature", Math.max(0.0d, Math.min(2.0d, temperature)));
+            body.put("model", setting.model());
+            body.put("temperature", Math.max(0.0d, Math.min(2.0d, setting.temperature())));
             body.put("max_tokens", 8);
             body.put("messages", List.of(Map.of("role", "user", "content", "ping")));
+            if (usesThinkingToggle(setting.providerKind())) {
+                body.put("thinking", Map.of("type", "disabled"));
+            }
 
             ResponseEntity<String> resp = restTemplate.exchange(
-                    trimTrailingSlash(baseUrl) + normalizePath(completionsPath),
+                    chatCompletionsUrl(setting.baseUrl()),
                     HttpMethod.POST,
                     new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
                     String.class
             );
             boolean ok = resp.getStatusCode().is2xxSuccessful();
-            return response(ok, ok ? "连接正常" : "连接失败", start, Map.of("model", model, "path", normalizePath(completionsPath)));
+            return response(ok, ok ? "连接正常" : "连接失败", start, Map.of(
+                    "provider", setting.providerKind(),
+                    "model", setting.model()
+            ));
         } catch (Exception e) {
-            return response(false, sanitize(e.getMessage(), apiKey), start, Map.of("model", model, "path", normalizePath(completionsPath)));
+            return response(false, sanitize(e.getMessage(), setting.apiKey()), start, Map.of(
+                    "provider", setting.providerKind(),
+                    "model", setting.model()
+            ));
         }
     }
 
@@ -132,6 +145,16 @@ public class SettingsController {
         } catch (Exception e) {
             return response(false, sanitize(e.getMessage(), ""), start, Map.of());
         }
+    }
+
+    private SettingsService.AiRuntimeSetting resolveTestSetting(SettingsTestRequests.AiTestRequest request) {
+        return settingsService.runtimeFromDraft(new AiProviderSettingRequest(
+                request != null ? request.baseUrl() : null,
+                request != null ? request.model() : null,
+                request != null ? request.temperature() : null,
+                request != null ? request.apiKey() : null,
+                request != null ? request.clearApiKey() : false
+        ));
     }
 
     private List<String> testSerperSearch(String query, String apiKey) throws Exception {
@@ -187,6 +210,14 @@ public class SettingsController {
                 .replaceAll("(?i)(X-API-KEY[:= ]+)[^,\\s]+", "$1********");
     }
 
+    private static boolean usesThinkingToggle(String providerKind) {
+        return "deepseek".equalsIgnoreCase(providerKind) || "glm".equalsIgnoreCase(providerKind);
+    }
+
+    private static String chatCompletionsUrl(String baseUrl) {
+        return trimTrailingSlash(baseUrl) + "/chat/completions";
+    }
+
     private static String blankToEmpty(String value) {
         return value == null ? "" : value.trim();
     }
@@ -197,16 +228,11 @@ public class SettingsController {
     }
 
     private static String trimTrailingSlash(String value) {
-        String result = value.trim();
+        String result = value == null ? "" : value.trim();
         while (result.endsWith("/")) {
             result = result.substring(0, result.length() - 1);
         }
         return result;
-    }
-
-    private static String normalizePath(String value) {
-        String result = value == null || value.isBlank() ? "/v1/chat/completions" : value.trim();
-        return result.startsWith("/") ? result : "/" + result;
     }
 
     private static String unescape(String s) {

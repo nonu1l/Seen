@@ -89,21 +89,3 @@ export function useHomeList() {
     refreshSearch
   };
 }
-
-export function useToast() {
-  const [message, setMessage] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  const showToast = useCallback((msg: string) => {
-    setMessage(msg);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setMessage(null), 3000);
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    setMessage(null);
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-
-  return { message, showToast, dismissToast };
-}

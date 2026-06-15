@@ -10,6 +10,8 @@ import type {
   SettingsResponse,
   UpdateSettingsRequest,
   SettingsTestResult,
+  AiProviderSetting,
+  AiProviderSettingRequest,
 } from './types';
 
 const BASE = '/api';
@@ -86,8 +88,11 @@ export const api = {
   updateSettings: (req: UpdateSettingsRequest) =>
     request<SettingsResponse>('/settings', { method: 'PUT', body: JSON.stringify(req) }),
 
-  testAiSettings: (req: Record<string, unknown>) =>
-    request<SettingsTestResult>('/settings/test-ai', { method: 'POST', body: JSON.stringify(req) }),
+  updateAiProfile: (req: AiProviderSettingRequest) =>
+    request<AiProviderSetting>('/settings/ai-profile', { method: 'PUT', body: JSON.stringify(req) }),
+
+  testAiProfile: (req: Record<string, unknown>) =>
+    request<SettingsTestResult>('/settings/ai-profile/test', { method: 'POST', body: JSON.stringify(req) }),
 
   testSearchSettings: (req: Record<string, unknown>) =>
     request<SettingsTestResult>('/settings/test-search', { method: 'POST', body: JSON.stringify(req) }),

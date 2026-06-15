@@ -1,7 +1,6 @@
 package com.nonu1l.media.agent;
 
 import com.nonu1l.media.model.dto.MatchedEntry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.service.AiChatClientFactory;
 import com.nonu1l.media.service.BangumiTools;
@@ -15,6 +14,7 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

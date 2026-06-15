@@ -1,11 +1,11 @@
 package com.nonu1l.media.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
-import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.boot.restclient.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * AI 基础设施配置：定制 HTTP 客户端与注册 Token 用量统计 Advisor。
@@ -33,7 +33,8 @@ public class AiConfig {
      * @return token 用量 Advisor 实例。
      */
     @Bean
-    public TokenUsageAdvisor tokenUsageAdvisor(TokenUsageRepository repo, SettingsService settingsService) {
+    public TokenUsageAdvisor tokenUsageAdvisor(TokenUsageRepository repo,
+                                               SettingsService settingsService) {
         return new TokenUsageAdvisor(repo, settingsService);
     }
 }

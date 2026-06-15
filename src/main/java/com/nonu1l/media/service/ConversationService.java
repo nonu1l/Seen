@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class ConversationService {
     private final RecordRepository recordRepo;
     private final WorkRepository workRepo;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * @param sessionRepo 会话数据仓储
@@ -53,6 +55,7 @@ public class ConversationService {
      * @param recordRepo 作品记录仓储
      * @param workRepo 作品仓储
      * @param transactionTemplate 事务模板，用于分段提交与避免长事务
+     * @param objectMapper JSON 映射工具
      */
     public ConversationService(ConversationSessionRepository sessionRepo,
                                 ConversationMessageRepository messageRepo,
@@ -62,7 +65,8 @@ public class ConversationService {
                                 BangumiService bangumiService,
                                 RecordRepository recordRepo,
                                 WorkRepository workRepo,
-                                TransactionTemplate transactionTemplate) {
+                                TransactionTemplate transactionTemplate,
+                                ObjectMapper objectMapper) {
         this.sessionRepo = sessionRepo;
         this.messageRepo = messageRepo;
         this.cardRepo = cardRepo;
@@ -72,6 +76,7 @@ public class ConversationService {
         this.recordRepo = recordRepo;
         this.workRepo = workRepo;
         this.transactionTemplate = transactionTemplate;
+        this.objectMapper = objectMapper;
     }
 
     // ── 会话管理 ─────────────────────────────────────────────
@@ -543,7 +548,7 @@ public class ConversationService {
     private String serializeTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) return null;
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(tags);
+            return objectMapper.writeValueAsString(tags);
         } catch (Exception e) {
             return String.join(",", tags);
         }
@@ -552,7 +557,7 @@ public class ConversationService {
     private List<String> deserializeTags(String json) {
         if (json == null || json.isBlank()) return null;
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, List.class);
+            return objectMapper.readValue(json, List.class);
         } catch (Exception e) {
             return List.of(json.split(","));
         }

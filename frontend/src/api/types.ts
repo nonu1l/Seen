@@ -137,27 +137,35 @@ export interface ConversationState {
 
 // ── Settings ──
 
-export type SettingType = 'string' | 'boolean' | 'number' | 'select' | 'password';
-
-export type SettingValue = string | number | boolean | null;
-
-export interface SettingItem {
-  key: string;
-  label: string;
-  value: SettingValue;
-  type: SettingType;
-  sensitive: boolean;
-}
-
-export interface SettingGroup {
-  key: string;
-  label: string;
-  settings: SettingItem[];
-}
-
 export interface SettingsResponse {
-  groups: SettingGroup[];
-  applied?: boolean;
+  aiEnabled: boolean;
+  tokenUsageEnabled: boolean;
+  aiProfile: AiProviderSetting;
+  sources: SourceSettings;
+}
+
+export interface AiProviderSetting {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  apiKeySet: boolean;
+  apiKey: string;
+}
+
+export interface AiProviderSettingRequest {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  apiKey?: string;
+  clearApiKey?: boolean;
+}
+
+export interface SourceSettings {
+  searchProvider: 'serper' | 'ddg';
+  serperApiKeySet: boolean;
+  serperApiKey: string;
+  bangumiProxy: string;
+  detailCastEnabled: boolean;
 }
 
 export interface UpdateSettingsRequest {

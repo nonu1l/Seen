@@ -1,7 +1,5 @@
 package com.nonu1l.media.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.model.dto.CastMember;
 import com.nonu1l.media.model.dto.DetailedWork;
 import com.nonu1l.media.model.dto.WorkSearchResult;
@@ -14,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 统一封装 Bangumi API 调用与结果映射。

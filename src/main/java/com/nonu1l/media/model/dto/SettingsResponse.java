@@ -1,21 +1,21 @@
 package com.nonu1l.media.model.dto;
 
-import java.util.List;
-
 /**
- * 设置页读取/保存后的响应。
+ * 设置页读取/保存后的结构化响应。
  */
-public record SettingsResponse(List<SettingsGroup> groups, boolean applied) {
+public record SettingsResponse(
+        boolean aiEnabled,
+        boolean tokenUsageEnabled,
+        AiProviderSettingResponse aiProfile,
+        SourceSettings sources
+) {
 
-    public record SettingsGroup(String key, String label, List<SettingItem> settings) {
-    }
-
-    public record SettingItem(
-            String key,
-            String label,
-            Object value,
-            String type,
-            boolean sensitive
+    public record SourceSettings(
+            String searchProvider,
+            boolean serperApiKeySet,
+            String serperApiKey,
+            String bangumiProxy,
+            boolean detailCastEnabled
     ) {
     }
 }

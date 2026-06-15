@@ -1,8 +1,8 @@
 package com.nonu1l.media.config;
 
-import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
+import com.nonu1l.media.service.SettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -10,6 +10,8 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.metadata.Usage;
+
+import java.util.function.Supplier;
 
 /**
  * Spring AI 调用拦截器：记录每次 LLM 调用产生的 token 用量到数据库，并提供会话级上下文注入能力。
@@ -23,6 +25,7 @@ public class TokenUsageAdvisor implements CallAdvisor {
 
     private final TokenUsageRepository repo;
     private final SettingsService settingsService;
+    private final Supplier<SettingsService.AiRuntimeSetting> settingSupplier;
 
     /**
      * 通过仓储初始化 advisor。
@@ -30,9 +33,29 @@ public class TokenUsageAdvisor implements CallAdvisor {
      * @param repo token 用量仓储。
      * @param settingsService 设置读取服务。
      */
-    public TokenUsageAdvisor(TokenUsageRepository repo, SettingsService settingsService) {
+    public TokenUsageAdvisor(TokenUsageRepository repo,
+                             SettingsService settingsService) {
         this.repo = repo;
         this.settingsService = settingsService;
+        this.settingSupplier = settingsService::currentRuntimeSetting;
+    }
+
+    private TokenUsageAdvisor(TokenUsageRepository repo,
+                              SettingsService settingsService,
+                              Supplier<SettingsService.AiRuntimeSetting> settingSupplier) {
+        this.repo = repo;
+        this.settingsService = settingsService;
+        this.settingSupplier = settingSupplier;
+    }
+
+    /**
+     * 为动态创建的 ChatClient 绑定其实际使用的 AI 配置，避免运行中保存配置时记账串号。
+     *
+     * @param setting ChatClient 构建时使用的运行时配置。
+     * @return 绑定指定配置的 Advisor。
+     */
+    public TokenUsageAdvisor withSetting(SettingsService.AiRuntimeSetting setting) {
+        return new TokenUsageAdvisor(repo, settingsService, () -> setting);
     }
 
     /**
@@ -92,10 +115,13 @@ public class TokenUsageAdvisor implements CallAdvisor {
                 String model = chatResponse.getMetadata().getModel();
                 String outputText = chatResponse.getResult().getOutput().getText();
                 try {
+                    SettingsService.AiRuntimeSetting setting = settingSupplier.get();
                     TokenUsage tu = new TokenUsage();
                     tu.setSessionId(currentSession.get());
                     tu.setNodeName(currentNode.get());
                     tu.setTurn(currentTurn.get());
+                    tu.setProfileId(setting.id());
+                    tu.setProfileName(setting.providerKind());
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
@@ -103,8 +129,8 @@ public class TokenUsageAdvisor implements CallAdvisor {
                     tu.setInputText(inputText);
                     tu.setOutputText(outputText);
                     repo.save(tu);
-                    log.debug("Token: node={} turn={} model={} prompt={} completion={} total={}",
-                            tu.getNodeName(), tu.getTurn(), tu.getModelName(),
+                    log.debug("Token: profile={} node={} turn={} model={} prompt={} completion={} total={}",
+                            tu.getProfileName(), tu.getNodeName(), tu.getTurn(), tu.getModelName(),
                             tu.getPromptTokens(), tu.getCompletionTokens(), tu.getTotalTokens());
                     if (outputText != null) {
                         log.debug("LLM output (first 500 chars): {}",
@@ -118,13 +144,8 @@ public class TokenUsageAdvisor implements CallAdvisor {
         return response;
     }
 
-    private static String truncate(String s, int max) {
-        if (s == null) return null;
-        return s.length() <= max ? s : s.substring(0, max) + "...";
-    }
-
     /**
-     * 说明执行顺序，数字越小越先执行。
+     * 说明执行顺序。0 会位于默认 ToolCallingAdvisor 之后，从而记录工具循环中的每次模型调用。
      *
      * @return 优先级顺序。
      */

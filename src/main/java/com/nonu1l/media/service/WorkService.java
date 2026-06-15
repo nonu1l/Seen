@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.*;
@@ -34,6 +35,7 @@ public class WorkService {
     private final BangumiService            bangumiService;
     private final TransactionTemplate       transactionTemplate;
     private final SettingsService           settingsService;
+    private final ObjectMapper              objectMapper;
 
     /**
      * 构造服务实例。
@@ -45,12 +47,14 @@ public class WorkService {
      * @param bangumiService Bangumi API 服务
      * @param transactionTemplate 事务模板，用于把远程请求和数据库写入分离
      * @param settingsService 设置读取服务
+     * @param objectMapper JSON 映射工具
      */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
                        BangumiService bangumiService,
                        TransactionTemplate transactionTemplate,
-                       SettingsService settingsService) {
+                       SettingsService settingsService,
+                       ObjectMapper objectMapper) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
         this.subjectTypeRepo   = subjectTypeRepo;
@@ -58,6 +62,7 @@ public class WorkService {
         this.bangumiService    = bangumiService;
         this.transactionTemplate = transactionTemplate;
         this.settingsService   = settingsService;
+        this.objectMapper      = objectMapper;
     }
 
     /**
@@ -420,7 +425,7 @@ public class WorkService {
     private List<String> parseTags(String tagsJson) {
         if (tagsJson == null || tagsJson.isBlank()) return List.of();
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(tagsJson, List.class);
+            return objectMapper.readValue(tagsJson, List.class);
         } catch (Exception e) {
             return List.of();
         }
@@ -463,7 +468,7 @@ public class WorkService {
             try {
                 List<String> cleaned = ConversationService.cleanTags(meta.getTags(), meta.getPlatform());
                 if (!cleaned.isEmpty()) {
-                    w.setTagsCache(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cleaned));
+                    w.setTagsCache(objectMapper.writeValueAsString(cleaned));
                 }
             } catch (Exception e) {
                 log.debug("Failed to serialize tags: {}", e.getMessage());

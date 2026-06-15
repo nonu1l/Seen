@@ -24,6 +24,12 @@ public class TokenUsage {
     @Column(name = "model_name", length = 50)
     private String modelName;
 
+    @Column(name = "profile_id")
+    private Long profileId;
+
+    @Column(name = "profile_name", length = 80)
+    private String profileName;
+
     @Column(name = "prompt_tokens")
     private Integer promptTokens;
 
