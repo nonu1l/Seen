@@ -56,6 +56,15 @@ const FIELD_DEFS: FieldDef[] = [
     help: '留空保存时不会覆盖已有密钥。',
   },
   {
+    key: 'spring.ai.openai.chat.completions-path',
+    label: 'Chat Completions Path',
+    type: 'string',
+    group: 'ai',
+    defaultValue: '/v1/chat/completions',
+    placeholder: '/v1/chat/completions',
+    help: 'GLM 等非标准兼容服务可填写 /v4/chat/completions。',
+  },
+  {
     key: 'spring.ai.openai.chat.options.model',
     label: '模型名称',
     type: 'string',
@@ -281,6 +290,7 @@ export default function SettingsPage() {
         ? await api.testAiSettings({
           baseUrl: getString('spring.ai.openai.base-url'),
           apiKey: getString('spring.ai.openai.api-key'),
+          completionsPath: getString('spring.ai.openai.chat.completions-path'),
           model: getString('spring.ai.openai.chat.options.model'),
           temperature: getNumber('spring.ai.openai.chat.options.temperature'),
         })

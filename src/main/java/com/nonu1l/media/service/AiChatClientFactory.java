@@ -52,6 +52,7 @@ public class AiChatClientFactory {
         OpenAiApi api = OpenAiApi.builder()
                 .baseUrl(trimTrailingSlash(settings.baseUrl()))
                 .apiKey(settings.apiKey())
+                .completionsPath(normalizePath(settings.completionsPath()))
                 .restClientBuilder(restClientBuilder)
                 .webClientBuilder(WebClient.builder())
                 .responseErrorHandler(RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER)
@@ -77,6 +78,7 @@ public class AiChatClientFactory {
     private String cacheKey(SettingsService.AiRuntimeSettings settings) {
         String raw = trimTrailingSlash(settings.baseUrl()) + "\n"
                 + settings.apiKey() + "\n"
+                + normalizePath(settings.completionsPath()) + "\n"
                 + settings.model() + "\n"
                 + settings.temperature();
         try {
@@ -98,5 +100,10 @@ public class AiChatClientFactory {
             result = result.substring(0, result.length() - 1);
         }
         return result;
+    }
+
+    private static String normalizePath(String value) {
+        String result = value == null || value.isBlank() ? "/v1/chat/completions" : value.trim();
+        return result.startsWith("/") ? result : "/" + result;
     }
 }

@@ -46,7 +46,7 @@
 - Bangumi 代理保存即生效
 - 角色 / 演员展示开关保存即生效
 
-AI 的 `base-url`、`api-key`、`model`、`temperature` 也需要保存即生效。若当前 Spring AI 注入方式不方便大改，至少要为测试接口和下一步动态 ChatClient 改造留下清晰服务边界；不要保留“重启后生效”的接口语义。
+AI 的 `base-url`、`api-key`、`completions-path`、`model`、`temperature` 也需要保存即生效。若当前 Spring AI 注入方式不方便大改，至少要为测试接口和下一步动态 ChatClient 改造留下清晰服务边界；不要保留“重启后生效”的接口语义。
 
 ## 设置 Key
 
@@ -57,6 +57,7 @@ seen.ai.enabled
 seen.ai.token-usage-enabled
 spring.ai.openai.base-url
 spring.ai.openai.api-key
+spring.ai.openai.chat.completions-path
 spring.ai.openai.chat.options.model
 spring.ai.openai.chat.options.temperature
 seen.search.provider
@@ -217,7 +218,7 @@ Map<String, SettingValue> currentSettings
 
 ### test-ai
 
-- 使用请求体中的临时 baseUrl、apiKey、model、temperature。
+- 使用请求体中的临时 baseUrl、apiKey、completionsPath、model、temperature。
 - 不依赖当前保存值。
 - 发送极短 prompt。
 - 返回 ok、耗时、错误摘要。

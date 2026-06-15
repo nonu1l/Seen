@@ -56,6 +56,7 @@ public class SettingsController {
         long start = System.nanoTime();
         String apiKey = valueOrCurrent(request != null ? request.apiKey() : null, SettingsService.OPENAI_API_KEY);
         String baseUrl = valueOrCurrent(request != null ? request.baseUrl() : null, SettingsService.OPENAI_BASE_URL);
+        String completionsPath = valueOrCurrent(request != null ? request.completionsPath() : null, SettingsService.OPENAI_COMPLETIONS_PATH);
         String model = valueOrCurrent(request != null ? request.model() : null, SettingsService.OPENAI_MODEL);
         Double temperature = request != null && request.temperature() != null ? request.temperature() : 0.0d;
         if (baseUrl.isBlank() || apiKey.isBlank() || model.isBlank()) {
@@ -74,15 +75,15 @@ public class SettingsController {
             body.put("messages", List.of(Map.of("role", "user", "content", "ping")));
 
             ResponseEntity<String> resp = restTemplate.exchange(
-                    trimTrailingSlash(baseUrl) + "/chat/completions",
+                    trimTrailingSlash(baseUrl) + normalizePath(completionsPath),
                     HttpMethod.POST,
                     new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
                     String.class
             );
             boolean ok = resp.getStatusCode().is2xxSuccessful();
-            return response(ok, ok ? "连接正常" : "连接失败", start, Map.of("model", model));
+            return response(ok, ok ? "连接正常" : "连接失败", start, Map.of("model", model, "path", normalizePath(completionsPath)));
         } catch (Exception e) {
-            return response(false, sanitize(e.getMessage(), apiKey), start, Map.of("model", model));
+            return response(false, sanitize(e.getMessage(), apiKey), start, Map.of("model", model, "path", normalizePath(completionsPath)));
         }
     }
 
@@ -201,6 +202,11 @@ public class SettingsController {
             result = result.substring(0, result.length() - 1);
         }
         return result;
+    }
+
+    private static String normalizePath(String value) {
+        String result = value == null || value.isBlank() ? "/v1/chat/completions" : value.trim();
+        return result.startsWith("/") ? result : "/" + result;
     }
 
     private static String unescape(String s) {

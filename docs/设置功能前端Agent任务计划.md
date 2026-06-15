@@ -185,6 +185,7 @@ POST /api/settings/test-bangumi
 - `seen.ai.enabled`：toggle
 - `spring.ai.openai.base-url`：文本输入
 - `spring.ai.openai.api-key`：密码输入
+- `spring.ai.openai.chat.completions-path`：文本输入，默认 `/v1/chat/completions`
 - `spring.ai.openai.chat.options.model`：文本输入
 - `spring.ai.openai.chat.options.temperature`：数字输入或 slider，范围 `0` 到 `2`
 - `seen.ai.token-usage-enabled`：toggle

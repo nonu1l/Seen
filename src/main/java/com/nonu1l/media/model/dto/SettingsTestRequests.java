@@ -8,7 +8,7 @@ public final class SettingsTestRequests {
     private SettingsTestRequests() {
     }
 
-    public record AiTestRequest(String baseUrl, String apiKey, String model, Double temperature) {
+    public record AiTestRequest(String baseUrl, String apiKey, String completionsPath, String model, Double temperature) {
     }
 
     public record SearchTestRequest(String provider, String serperApiKey, String bangumiProxy, String query) {

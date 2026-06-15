@@ -20,6 +20,7 @@ public class SettingsService {
     public static final String AI_TOKEN_USAGE_ENABLED = "seen.ai.token-usage-enabled";
     public static final String OPENAI_BASE_URL = "spring.ai.openai.base-url";
     public static final String OPENAI_API_KEY = "spring.ai.openai.api-key";
+    public static final String OPENAI_COMPLETIONS_PATH = "spring.ai.openai.chat.completions-path";
     public static final String OPENAI_MODEL = "spring.ai.openai.chat.options.model";
     public static final String OPENAI_TEMPERATURE = "spring.ai.openai.chat.options.temperature";
     public static final String SEARCH_PROVIDER = "seen.search.provider";
@@ -50,6 +51,7 @@ public class SettingsService {
                         item(AI_ENABLED),
                         item(OPENAI_BASE_URL),
                         item(OPENAI_API_KEY),
+                        item(OPENAI_COMPLETIONS_PATH),
                         item(OPENAI_MODEL),
                         item(OPENAI_TEMPERATURE),
                         item(AI_TOKEN_USAGE_ENABLED)
@@ -120,6 +122,7 @@ public class SettingsService {
         return new AiRuntimeSettings(
                 getString(OPENAI_BASE_URL),
                 getString(OPENAI_API_KEY),
+                getString(OPENAI_COMPLETIONS_PATH),
                 getString(OPENAI_MODEL),
                 getDouble(OPENAI_TEMPERATURE)
         );
@@ -206,6 +209,9 @@ public class SettingsService {
     private String normalizeValue(SettingDefinition definition, Object raw) {
         if (raw == null) return "";
         String value = String.valueOf(raw).trim();
+        if (OPENAI_COMPLETIONS_PATH.equals(definition.key())) {
+            return normalizePath(value);
+        }
         return switch (definition.type()) {
             case "boolean" -> String.valueOf(Boolean.parseBoolean(value));
             case "number" -> String.valueOf(clampTemperature(value));
@@ -243,6 +249,11 @@ public class SettingsService {
         return "serper".equalsIgnoreCase(value) ? "serper" : "ddg";
     }
 
+    private String normalizePath(String value) {
+        String normalized = value == null || value.isBlank() ? "/v1/chat/completions" : value.trim();
+        return normalized.startsWith("/") ? normalized : "/" + normalized;
+    }
+
     private static String trimTrailingSlash(String value) {
         String result = value;
         while (result.endsWith("/")) {
@@ -257,6 +268,7 @@ public class SettingsService {
         map.put(AI_TOKEN_USAGE_ENABLED, new SettingDefinition(AI_TOKEN_USAGE_ENABLED, "Token 记录", "boolean", false, true));
         map.put(OPENAI_BASE_URL, new SettingDefinition(OPENAI_BASE_URL, "API Base URL", "string", false, "https://api.deepseek.com"));
         map.put(OPENAI_API_KEY, new SettingDefinition(OPENAI_API_KEY, "API Key", "string", true, ""));
+        map.put(OPENAI_COMPLETIONS_PATH, new SettingDefinition(OPENAI_COMPLETIONS_PATH, "Chat Completions Path", "string", false, "/v1/chat/completions"));
         map.put(OPENAI_MODEL, new SettingDefinition(OPENAI_MODEL, "模型名称", "string", false, "deepseek-v4-flash"));
         map.put(OPENAI_TEMPERATURE, new SettingDefinition(OPENAI_TEMPERATURE, "Temperature", "number", false, 0.0d));
         map.put(SEARCH_PROVIDER, new SettingDefinition(SEARCH_PROVIDER, "搜索源", "select", false, "ddg"));
@@ -272,6 +284,6 @@ public class SettingsService {
     private record StoredSetting(String value) {
     }
 
-    public record AiRuntimeSettings(String baseUrl, String apiKey, String model, double temperature) {
+    public record AiRuntimeSettings(String baseUrl, String apiKey, String completionsPath, String model, double temperature) {
     }
 }
