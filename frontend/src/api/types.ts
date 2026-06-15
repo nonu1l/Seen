@@ -51,7 +51,6 @@ export interface WorkListItem {
   status: Status | null;
   myRating: number | null;
   myReview: string | null;
-  rewatched: boolean;
   recordsCount: number | null;
   latestRecordAt: string | null;
 }
@@ -80,7 +79,6 @@ export interface WorkDetail {
   status: Status | null;
   myRating: number | null;
   myReview: string | null;
-  rewatched: boolean;
   watchedCount: number | null;
 }
 

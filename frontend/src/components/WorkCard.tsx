@@ -1,6 +1,7 @@
 import type { Status, WorkListItem, WorkSearchResult } from '../api/types';
 import { Cover } from './Cover';
 import { QuickMarkMenu } from './QuickMarkMenu';
+import { STATUS_META } from '../utils/statusMeta';
 
 interface Props {
   data: WorkListItem | WorkSearchResult;
@@ -9,15 +10,6 @@ interface Props {
   onQuickMark: (status: Status) => void;
   index?: number;
 }
-
-const LABEL: Record<Status, string> = { wish: '想看', doing: '在看', collect: '看过', on_hold: '搁置', dropped: '抛弃' };
-const STATUS_COLOR: Record<Status, string> = {
-  wish: 'var(--amber)',
-  doing: 'var(--green)',
-  collect: 'var(--blue)',
-  on_hold: 'var(--gray-text)',
-  dropped: 'var(--gray-text)',
-};
 
 export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Props) {
   const status: Status | null = unmarked ? null : ((data as WorkListItem).status ?? null);
@@ -56,9 +48,9 @@ export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Pro
                 status ? (
                   <span
                     className="text-[11px] leading-snug cursor-pointer select-none transition-all duration-150 hover:opacity-80"
-                    style={{ color: STATUS_COLOR[status] }}
+                    style={{ color: STATUS_META[status].color }}
                   >
-                    {LABEL[status]}
+                    {STATUS_META[status].label}
                   </span>
                 ) : (
                   <span className="unmarked-dots cursor-pointer select-none">

@@ -96,7 +96,7 @@ public class SettingsService {
             throw new IllegalArgumentException("请求不能为空");
         }
 
-        saveSetting(definitions.get(AI_BASE_URL), trimTrailingSlash(request.baseUrl() != null ? request.baseUrl().trim() : ""));
+        saveSetting(definitions.get(AI_BASE_URL), AiProviderSupport.trimTrailingSlash(request.baseUrl() != null ? request.baseUrl().trim() : ""));
         saveSetting(definitions.get(AI_MODEL), request.model() != null ? request.model().trim() : "");
         saveSetting(definitions.get(AI_TEMPERATURE), String.valueOf(clampTemperature(request.temperature())));
 
@@ -111,10 +111,10 @@ public class SettingsService {
     }
 
     public AiRuntimeSetting currentRuntimeSetting() {
-        String baseUrl = trimTrailingSlash(getString(AI_BASE_URL));
+        String baseUrl = AiProviderSupport.trimTrailingSlash(getString(AI_BASE_URL));
         return new AiRuntimeSetting(
                 null,
-                inferProviderKind(baseUrl),
+                AiProviderSupport.inferProviderKind(baseUrl),
                 baseUrl,
                 getString(AI_API_KEY),
                 getString(AI_MODEL),
@@ -123,9 +123,9 @@ public class SettingsService {
     }
 
     public AiRuntimeSetting runtimeFromDraft(AiProviderSettingRequest request) {
-        String currentBaseUrl = trimTrailingSlash(getString(AI_BASE_URL));
+        String currentBaseUrl = AiProviderSupport.trimTrailingSlash(getString(AI_BASE_URL));
         String baseUrl = request != null && request.baseUrl() != null
-                ? trimTrailingSlash(request.baseUrl().trim())
+                ? AiProviderSupport.trimTrailingSlash(request.baseUrl().trim())
                 : currentBaseUrl;
         String model = request != null && request.model() != null
                 ? request.model().trim()
@@ -134,7 +134,7 @@ public class SettingsService {
         double temperature = request != null && request.temperature() != null
                 ? clampTemperature(request.temperature())
                 : getDouble(AI_TEMPERATURE);
-        return new AiRuntimeSetting(null, inferProviderKind(baseUrl), baseUrl, apiKey, model, temperature);
+        return new AiRuntimeSetting(null, AiProviderSupport.inferProviderKind(baseUrl), baseUrl, apiKey, model, temperature);
     }
 
     public boolean getBoolean(String key) {
@@ -172,7 +172,7 @@ public class SettingsService {
         if (value.isBlank()) {
             return "https://api.bgm.tv/v0";
         }
-        value = trimTrailingSlash(value);
+        value = AiProviderSupport.trimTrailingSlash(value);
         return value.endsWith("/api") || value.endsWith("/v0") ? value : value + "/api";
     }
 
@@ -181,7 +181,7 @@ public class SettingsService {
         if (value.isBlank()) {
             return "https://lite.duckduckgo.com/lite/?q=";
         }
-        return trimTrailingSlash(value) + "/search?q=";
+        return AiProviderSupport.trimTrailingSlash(value) + "/search?q=";
     }
 
     private Object effectiveValue(String key) {
@@ -254,14 +254,6 @@ public class SettingsService {
         return "serper".equalsIgnoreCase(value) ? "serper" : "ddg";
     }
 
-    private static String trimTrailingSlash(String value) {
-        String result = value == null ? "" : value;
-        while (result.endsWith("/")) {
-            result = result.substring(0, result.length() - 1);
-        }
-        return result;
-    }
-
     private String resolveAiApiKey(AiProviderSettingRequest request) {
         if (request == null) {
             return getString(AI_API_KEY);
@@ -273,20 +265,6 @@ public class SettingsService {
             return request.apiKey().trim();
         }
         return getString(AI_API_KEY);
-    }
-
-    private static String inferProviderKind(String baseUrl) {
-        String value = baseUrl == null ? "" : baseUrl.toLowerCase();
-        if (value.contains("deepseek")) {
-            return "deepseek";
-        }
-        if (value.contains("bigmodel") || value.contains("zhipu")) {
-            return "glm";
-        }
-        if (value.contains("openai")) {
-            return "openai";
-        }
-        return "custom";
     }
 
     private static double clampTemperature(Double raw) {

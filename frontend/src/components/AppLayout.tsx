@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 export interface AppLayoutContext {
-  setOnReset: (fn: (() => void) | null) => void;
+  registerReset: (fn: (() => void) | null) => void;
 }
 
 /**
@@ -17,8 +17,8 @@ export default function AppLayout() {
 
   const [onReset, setOnReset] = useState<(() => void) | null>(null);
 
-  const handleSetReset = useCallback((fn: (() => void) | null) => {
-    setOnReset(fn);
+  const registerReset = useCallback((fn: (() => void) | null) => {
+    setOnReset(() => fn);
   }, []);
 
   const handleBack = useCallback(() => {
@@ -26,7 +26,7 @@ export default function AppLayout() {
     else navigate(-1);
   }, [location.key, navigate]);
 
-  const context: AppLayoutContext = { setOnReset: handleSetReset };
+  const context: AppLayoutContext = { registerReset };
 
   return (
     <div className="min-h-dvh flex flex-col px-3 pb-5 sm:pb-20 sm:px-8">

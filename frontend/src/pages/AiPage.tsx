@@ -9,24 +9,25 @@ import { AiCard } from '../components/AiCard';
 import { AiInput } from '../components/AiInput';
 
 export default function AiPage() {
-  const { setOnReset } = useOutletContext<AppLayoutContext>();
+  const { registerReset } = useOutletContext<AppLayoutContext>();
   const ai = useAiMode();
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // 向 AppLayout 注册 reset 回调
   useEffect(() => {
-    setOnReset(() => ai.reset);
-    return () => setOnReset(null);
-  }, [ai.reset, setOnReset]);
+    registerReset(ai.reset);
+    return () => registerReset(null);
+  }, [ai.reset, registerReset]);
 
   // 自动滚动到底部（等 DOM 布局稳定后再滚）
   useEffect(() => {
     const el = bottomRef.current;
     if (!el) return;
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       el.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 200);
+    return () => clearTimeout(timer);
   }, [ai.messages]);
 
   return (

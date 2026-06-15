@@ -36,12 +36,12 @@ public class AiChatClientFactory {
 
     private ChatClient buildClient(SettingsService.AiRuntimeSetting setting) {
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
-                .baseUrl(trimTrailingSlash(setting.baseUrl()))
+                .baseUrl(AiProviderSupport.trimTrailingSlash(setting.baseUrl()))
                 .apiKey(setting.apiKey())
                 .model(setting.model())
                 .temperature(setting.temperature());
 
-        if (usesThinkingToggle(setting.providerKind())) {
+        if (AiProviderSupport.usesThinkingToggle(setting.providerKind())) {
             options.extraBody(Map.of("thinking", Map.of("type", "disabled")));
         }
 
@@ -63,7 +63,7 @@ public class AiChatClientFactory {
     private String cacheKey(SettingsService.AiRuntimeSetting setting) {
         String raw = setting.id() + "\n"
                 + setting.providerKind() + "\n"
-                + trimTrailingSlash(setting.baseUrl()) + "\n"
+                + AiProviderSupport.trimTrailingSlash(setting.baseUrl()) + "\n"
                 + setting.apiKey() + "\n"
                 + setting.model() + "\n"
                 + setting.temperature();
@@ -80,15 +80,4 @@ public class AiChatClientFactory {
         }
     }
 
-    private static boolean usesThinkingToggle(String preset) {
-        return "deepseek".equalsIgnoreCase(preset) || "glm".equalsIgnoreCase(preset);
-    }
-
-    private static String trimTrailingSlash(String value) {
-        String result = value == null ? "" : value.trim();
-        while (result.endsWith("/")) {
-            result = result.substring(0, result.length() - 1);
-        }
-        return result;
-    }
 }

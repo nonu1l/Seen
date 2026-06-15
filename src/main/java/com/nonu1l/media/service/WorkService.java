@@ -332,31 +332,6 @@ public class WorkService {
     }
 
     /**
-     * 更新评分/影评并保留历史。
-     *
-     * <p>基于最新记录状态，新建一条历史记录，适用于需要时间线追踪的场景。</p>
-     *
-     * @param workId 作品ID
-     * @param rating 评分，可为空
-     * @param review 影评，可为空
-     * @return 包含新建记录的列表项
-     */
-    @Transactional
-    public WorkListItem updateReviewNew(Long workId, Double rating, String review) {
-        Record previous = recordRepo.findLatestByWorkId(workId)
-                .orElseThrow(() -> new IllegalStateException("no record to update"));
-
-        Record r = new Record();
-        r.setWorkId(workId);
-        r.setStatus(previous.getStatus());
-        r.setRating(rating);
-        r.setReview(review);
-        recordRepo.save(r);
-
-        return buildListItem(workRepo.findById(workId).orElse(null), r);
-    }
-
-    /**
      * 标记返回值：返回新记录对应列表项及其前序记录，用于前端展示变更对比。
      */
     public record MarkResult(WorkListItem item, Record previousRecord) {}

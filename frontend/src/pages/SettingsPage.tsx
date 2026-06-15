@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useToast } from '../components/ToastProvider';
+import { SecretInput } from '../components/settings/SecretInput';
+import { SettingsRow } from '../components/settings/SettingsRow';
+import { TestResult } from '../components/settings/TestResult';
+import { ToggleRow } from '../components/settings/ToggleRow';
 import type {
   AiProviderSettingRequest,
   SettingsResponse,
@@ -43,12 +47,6 @@ const EMPTY_AI_CONFIG: EditableAiConfig = {
   clearApiKey: false,
   apiKeySet: false,
 };
-
-const SECRET_MASK = '************';
-
-function secretDisplayValue(value: string, visible: boolean) {
-  return visible || value.trim() === '' ? value : SECRET_MASK;
-}
 
 function isSecretUnchanged(current: string, initial: string) {
   return current === initial;
@@ -99,29 +97,6 @@ function sameSources(a: SourceValues, b: SourceValues) {
     && isSecretUnchanged(a.serperApiKey, b.serperApiKey)
     && a.bangumiProxy === b.bangumiProxy
     && a.detailCastEnabled === b.detailCastEnabled;
-}
-
-function renderDetailValue(value: unknown) {
-  if (value == null) return '';
-  if (Array.isArray(value)) return value.join('、');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-}
-
-function SecretVisibilityIcon({ visible }: { visible: boolean }) {
-  return visible ? (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M7.1 7.5C5.4 8.6 4 10.2 3 12c2 3.5 5.2 5.5 9 5.5 1.3 0 2.6-.3 3.7-.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10.2 6.7c.6-.1 1.2-.2 1.8-.2 3.8 0 7 2 9 5.5-.5.9-1.2 1.8-2 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ) : (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3 12c2-3.5 5.2-5.5 9-5.5s7 2 9 5.5c-2 3.5-5.2 5.5-9 5.5S5 15.5 3 12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="2.7" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
 }
 
 export default function SettingsPage() {
@@ -295,25 +270,6 @@ export default function SettingsPage() {
     }
   };
 
-  const renderTestResult = (key: TestKey) => {
-    const result = testResults[key];
-    if (!result) return null;
-    const detailEntries = Object.entries(result.details ?? {});
-    return (
-      <div className={`settings-test-result ${result.ok ? 'is-ok' : 'is-error'}`}>
-        <span>{result.message}</span>
-        {typeof result.elapsedMs === 'number' && <span>{result.elapsedMs}ms</span>}
-        {detailEntries.length > 0 && (
-          <div className="settings-test-details">
-            {detailEntries.map(([detailKey, detailValue]) => (
-              <span key={detailKey}>{detailKey}: {renderDetailValue(detailValue)}</span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const renderAiSettings = () => (
     <>
       <div className="settings-panel-head">
@@ -333,126 +289,58 @@ export default function SettingsPage() {
 
       <div className="settings-ai-editor">
         <div className="settings-form">
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>AI 助手</span></div>
-            </div>
-            <div className="settings-row-control">
-              <button type="button" className={`settings-toggle ${aiDraft.aiEnabled ? 'is-on' : ''}`} aria-pressed={aiDraft.aiEnabled} onClick={() => setAiConfig('aiEnabled', !aiDraft.aiEnabled)}>
-                <span />
-              </button>
-            </div>
-          </div>
+          <ToggleRow title="AI 助手" checked={aiDraft.aiEnabled} onChange={value => setAiConfig('aiEnabled', value)} />
 
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>记录 token 使用明细</span></div>
-            </div>
-            <div className="settings-row-control">
-              <button type="button" className={`settings-toggle ${aiDraft.tokenUsageEnabled ? 'is-on' : ''}`} aria-pressed={aiDraft.tokenUsageEnabled} onClick={() => setAiConfig('tokenUsageEnabled', !aiDraft.tokenUsageEnabled)}>
-                <span />
-              </button>
-            </div>
-          </div>
+          <ToggleRow title="记录 token 使用明细" checked={aiDraft.tokenUsageEnabled} onChange={value => setAiConfig('tokenUsageEnabled', value)} />
 
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>API Base URL</span></div>
-              <p>填写完整 API 前缀，例如 https://api.deepseek.com/v1 或 https://open.bigmodel.cn/api/paas/v4。</p>
-            </div>
-            <div className="settings-row-control">
-              <input className="settings-input" value={aiDraft.baseUrl} onChange={event => setAiConfig('baseUrl', event.target.value)} />
-            </div>
-          </div>
+          <SettingsRow title="API Base URL" description="填写完整 API 前缀，例如 https://api.deepseek.com/v1 或 https://open.bigmodel.cn/api/paas/v4。">
+            <input className="settings-input" value={aiDraft.baseUrl} onChange={event => setAiConfig('baseUrl', event.target.value)} />
+          </SettingsRow>
 
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>模型名称</span></div>
-            </div>
-            <div className="settings-row-control">
-              <input className="settings-input" value={aiDraft.model} onChange={event => setAiConfig('model', event.target.value)} />
-            </div>
-          </div>
+          <SettingsRow title="模型名称">
+            <input className="settings-input" value={aiDraft.model} onChange={event => setAiConfig('model', event.target.value)} />
+          </SettingsRow>
 
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>API Key</span></div>
-            </div>
-            <div className="settings-row-control">
-              <div className="settings-secret-wrap">
-                <input
-                  className="settings-input"
-                  type="text"
-                  value={secretDisplayValue(aiDraft.apiKey, showAiSecret)}
-                  placeholder="API Key"
-                  readOnly={!showAiSecret && aiDraft.apiKey.trim() !== ''}
-                  onChange={event => {
-                    if (!showAiSecret) setShowAiSecret(true);
-                    setAiConfig('apiKey', event.target.value);
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn-icon settings-secret-button"
-                  title={showAiSecret ? '隐藏' : '显示'}
-                  aria-label={showAiSecret ? '隐藏' : '显示'}
-                  onClick={() => setShowAiSecret(prev => !prev)}
-                >
-                  <SecretVisibilityIcon visible={showAiSecret} />
-                </button>
-              </div>
-            </div>
-          </div>
+          <SettingsRow title="API Key">
+            <SecretInput
+              value={aiDraft.apiKey}
+              visible={showAiSecret}
+              placeholder="API Key"
+              onVisibilityChange={setShowAiSecret}
+              onChange={value => setAiConfig('apiKey', value)}
+            />
+          </SettingsRow>
 
           {aiDraft.apiKeySet && (
-            <div className="settings-row">
-              <div className="settings-row-meta">
-                <div className="settings-row-title"><span>清空 API Key</span></div>
-              </div>
-              <div className="settings-row-control">
-                <button
-                  type="button"
-                  className={`settings-toggle ${aiDraft.clearApiKey ? 'is-on' : ''}`}
-                  aria-pressed={aiDraft.clearApiKey}
-                  onClick={() => setAiConfig('clearApiKey', !aiDraft.clearApiKey)}
-                >
-                  <span />
-                </button>
-              </div>
-            </div>
+            <ToggleRow title="清空 API Key" checked={aiDraft.clearApiKey} onChange={value => setAiConfig('clearApiKey', value)} />
           )}
 
-          <div className="settings-row">
-            <div className="settings-row-meta">
-              <div className="settings-row-title"><span>Temperature</span></div>
+          <SettingsRow title="Temperature">
+            <div className="settings-number">
+              <input
+                className="settings-input"
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={String(aiDraft.temperature)}
+                onChange={event => setAiConfig('temperature', Number(event.target.value))}
+              />
+              <input
+                className="settings-range"
+                type="range"
+                min={0}
+                max={2}
+                step={0.1}
+                value={String(aiDraft.temperature)}
+                onChange={event => setAiConfig('temperature', Number(event.target.value))}
+              />
             </div>
-            <div className="settings-row-control">
-              <div className="settings-number">
-                <input
-                  className="settings-input"
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={String(aiDraft.temperature)}
-                  onChange={event => setAiConfig('temperature', Number(event.target.value))}
-                />
-                <input
-                  className="settings-range"
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={String(aiDraft.temperature)}
-                  onChange={event => setAiConfig('temperature', Number(event.target.value))}
-                />
-              </div>
-            </div>
-          </div>
+          </SettingsRow>
         </div>
       </div>
 
-      <div className="settings-results">{renderTestResult('ai')}</div>
+      <div className="settings-results"><TestResult result={testResults.ai} /></div>
     </>
   );
 
@@ -477,72 +365,33 @@ export default function SettingsPage() {
       </div>
 
       <div className="settings-form">
-        <div className="settings-row">
-          <div className="settings-row-meta">
-            <div className="settings-row-title"><span>搜索源</span></div>
+        <SettingsRow title="搜索源">
+          <div className="settings-segmented">
+            <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
+            <button type="button" className={sourceValues.searchProvider === 'ddg' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'ddg')}>DuckDuckGo</button>
           </div>
-          <div className="settings-row-control">
-            <div className="settings-segmented">
-              <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
-              <button type="button" className={sourceValues.searchProvider === 'ddg' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'ddg')}>DuckDuckGo</button>
-            </div>
-          </div>
-        </div>
+        </SettingsRow>
 
-        <div className="settings-row">
-          <div className="settings-row-meta">
-            <div className="settings-row-title"><span>Serper API Key</span></div>
-          </div>
-          <div className="settings-row-control">
-            <div className="settings-secret-wrap">
-              <input
-                className="settings-input"
-                type="text"
-                value={secretDisplayValue(sourceValues.serperApiKey, showSerperSecret)}
-                placeholder="Serper API Key"
-                readOnly={!showSerperSecret && sourceValues.serperApiKey.trim() !== ''}
-                onChange={event => {
-                  if (!showSerperSecret) setShowSerperSecret(true);
-                  setSource('serperApiKey', event.target.value);
-                }}
-              />
-              <button
-                type="button"
-                className="btn-icon settings-secret-button"
-                title={showSerperSecret ? '隐藏' : '显示'}
-                aria-label={showSerperSecret ? '隐藏' : '显示'}
-                onClick={() => setShowSerperSecret(prev => !prev)}
-              >
-                <SecretVisibilityIcon visible={showSerperSecret} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <SettingsRow title="Serper API Key">
+          <SecretInput
+            value={sourceValues.serperApiKey}
+            visible={showSerperSecret}
+            placeholder="Serper API Key"
+            onVisibilityChange={setShowSerperSecret}
+            onChange={value => setSource('serperApiKey', value)}
+          />
+        </SettingsRow>
 
-        <div className="settings-row">
-          <div className="settings-row-meta">
-            <div className="settings-row-title"><span>Bangumi 代理地址</span></div>
-          </div>
-          <div className="settings-row-control">
-            <input className="settings-input" value={sourceValues.bangumiProxy} placeholder="https://api.bgm.tv/v0" onChange={event => setSource('bangumiProxy', event.target.value)} />
-          </div>
-        </div>
+        <SettingsRow title="Bangumi 代理地址">
+          <input className="settings-input" value={sourceValues.bangumiProxy} placeholder="https://api.bgm.tv/v0" onChange={event => setSource('bangumiProxy', event.target.value)} />
+        </SettingsRow>
 
-        <div className="settings-row">
-          <div className="settings-row-meta">
-            <div className="settings-row-title"><span>展示角色 / 演员信息</span></div>
-          </div>
-          <div className="settings-row-control">
-            <button type="button" className={`settings-toggle ${sourceValues.detailCastEnabled ? 'is-on' : ''}`} aria-pressed={sourceValues.detailCastEnabled} onClick={() => setSource('detailCastEnabled', !sourceValues.detailCastEnabled)}>
-              <span />
-            </button>
-          </div>
-        </div>
+        <ToggleRow title="展示角色 / 演员信息" checked={sourceValues.detailCastEnabled} onChange={value => setSource('detailCastEnabled', value)} />
       </div>
 
       <div className="settings-results">
-        {renderTestResult('search')}
-        {renderTestResult('bangumi')}
+        <TestResult result={testResults.search} />
+        <TestResult result={testResults.bangumi} />
       </div>
     </>
   );

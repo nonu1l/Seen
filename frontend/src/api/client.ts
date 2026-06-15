@@ -21,9 +21,28 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...options
   });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+async function errorMessage(res: Response) {
+  const fallback = `API error: ${res.status} ${res.statusText}`;
+  try {
+    const text = await res.text();
+    if (!text) return fallback;
+    const contentType = res.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      const body = JSON.parse(text) as { error?: unknown; message?: unknown };
+      if (typeof body.message === 'string' && body.message.trim()) return body.message;
+      if (typeof body.error === 'string' && body.error.trim()) return body.error;
+    }
+    return text.length > 240 ? text.slice(0, 240) + '...' : text;
+  } catch {
+    return fallback;
+  }
 }
 
 export const api = {
@@ -38,9 +57,6 @@ export const api = {
 
   mark: (req: MarkRequest) =>
     request<WorkListItem>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
-
-  rewatch: (workId: number) =>
-    request<WorkListItem>('/works/rewatch', { method: 'POST', body: JSON.stringify({ workId }) }),
 
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),

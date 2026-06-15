@@ -82,17 +82,6 @@ public class WorksController {
         catch (Exception e) { log.error("mark failed", e); return ResponseEntity.internalServerError().build(); }
     }
 
-    //多刷接口，暂停开发这部分
-    // @PostMapping("/rewatch")
-    // public ResponseEntity<WorkListItem> rewatch(@RequestBody Map<String, Object> body) {
-    //     try {
-    //         Number workId = (Number) body.get("workId");
-    //         if (workId == null) return ResponseEntity.badRequest().build();
-    //         return ResponseEntity.ok(workService.rewatch(workId.longValue()));
-    //     } catch (IllegalStateException e) { return ResponseEntity.status(409).build(); }
-    //     catch (Exception e) { log.error("rewatch failed", e); return ResponseEntity.internalServerError().build(); }
-    // }
-
     /**
      * 取消作品标记。
      *

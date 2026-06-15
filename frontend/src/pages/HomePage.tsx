@@ -7,17 +7,9 @@ import type { Status, WorkListItem, WorkSearchResult } from '../api/types';
 import { WorkCard } from '../components/WorkCard';
 import { WorkDetailModal } from '../components/WorkDetailModal';
 import { RobotLogo } from '../components/RobotLogo';
+import { STATUS_FILTERS } from '../utils/statusMeta';
 
 interface OpenedWork { id: number; platform: string; }
-
-const FILTERS: { key: Status | 'all'; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'collect', label: '看过' },
-  { key: 'doing', label: '在看' },
-  { key: 'wish', label: '想看' },
-  { key: 'on_hold', label: '搁置' },
-  { key: 'dropped', label: '抛弃' },
-];
 
 export default function HomePage() {
   const { query, setQuery, marked, search, loading, error, refresh, refreshSearch } = useHomeList();
@@ -93,7 +85,7 @@ export default function HomePage() {
       {/* Filter tabs — only when not searching */}
       {!showingSearch && merged.marked.length > 0 && (
         <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-none">
-          {FILTERS.map(f => (
+          {STATUS_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}

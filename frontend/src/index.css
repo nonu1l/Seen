@@ -409,18 +409,6 @@ body {
   color: var(--text-secondary);
 }
 
-.rewatch-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
 /* ═══════════════════════════════════════════════════
    DROPDOWN MENU — glass panel for QuickMarkMenu
    ═══════════════════════════════════════════════════ */
@@ -582,18 +570,9 @@ body {
   animation: ai-enter 300ms ease-out forwards;
 }
 
-.ai-content--exit {
-  animation: ai-exit 250ms ease-in forwards;
-}
-
 @keyframes ai-enter {
   0%   { opacity: 0; }
   100% { opacity: 1; }
-}
-
-@keyframes ai-exit {
-  0%   { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-100%); }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -995,10 +974,6 @@ body {
   color: var(--accent);
 }
 
-.settings-segmented-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
 .settings-number {
   width: 100%;
   display: grid;
@@ -1169,11 +1144,6 @@ body {
 
   .settings-number {
     grid-template-columns: 74px minmax(0, 1fr);
-  }
-
-  .settings-segmented-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-height: 78px;
   }
 
   .settings-form {
