@@ -25,9 +25,6 @@ export const api = {
   mark: (req: MarkRequest) =>
     request<WorkListItem>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
 
-  rewatch: (workId: number) =>
-    request<WorkListItem>('/works/rewatch', { method: 'POST', body: JSON.stringify({ workId }) }),
-
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),
 

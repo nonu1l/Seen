@@ -82,8 +82,8 @@ public class ConversationService {
      * @return 最近会话实体；若库中无会话则返回新建并持久化的会话
      */
     public ConversationSession getOrCreateSession() {
-        List<ConversationSession> all = sessionRepo.findAll();
-        if (!all.isEmpty()) return all.getLast();
+        var latest = sessionRepo.findTopByOrderByIdDesc();
+        if (latest.isPresent()) return latest.get();
 
         ConversationSession session = new ConversationSession();
         session.setCreatedAt(Instant.now());
@@ -383,9 +383,9 @@ public class ConversationService {
      */
     @Transactional
     public void reset() {
-        List<ConversationSession> all = sessionRepo.findAll();
-        if (!all.isEmpty()) {
-            ConversationSession session = all.getLast();
+        var latest = sessionRepo.findTopByOrderByIdDesc();
+        if (latest.isPresent()) {
+            ConversationSession session = latest.get();
             messageRepo.deleteAllBySessionId(session.getId());
             cardRepo.deleteAllBySessionId(session.getId());
             sessionRepo.delete(session);

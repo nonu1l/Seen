@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.*;
@@ -32,6 +33,7 @@ public class WorkService {
     private final SubjectTypeRepository     subjectTypeRepo;
     private final RecordStatusRepository    recordStatusRepo;
     private final BangumiService            bangumiService;
+    private final TransactionTemplate       transactionTemplate;
     private final String                    bangumiProxy;
 
     /**
@@ -42,17 +44,20 @@ public class WorkService {
      * @param subjectTypeRepo 条目类型仓储
      * @param recordStatusRepo 进度状态仓储
      * @param bangumiService Bangumi API 服务
+     * @param transactionTemplate 事务模板，用于把远程请求和数据库写入分离
      * @param bangumiProxy Bangumi 代理地址（可空）
      */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
                        BangumiService bangumiService,
+                       TransactionTemplate transactionTemplate,
                        @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
         this.subjectTypeRepo   = subjectTypeRepo;
         this.recordStatusRepo  = recordStatusRepo;
         this.bangumiService    = bangumiService;
+        this.transactionTemplate = transactionTemplate;
         this.bangumiProxy      = bangumiProxy;
     }
 
@@ -206,7 +211,12 @@ public class WorkService {
         Long id = parseId(req.getId());
         if (id == null) throw new IllegalArgumentException("invalid id");
 
-        Work work = upsertWork(id, req.getMeta());
+        WorkSearchResult meta = resolveMetaForInsert(id, req.getMeta());
+        return Objects.requireNonNull(transactionTemplate.execute(tx -> markInTransaction(req, id, meta)));
+    }
+
+    private WorkListItem markInTransaction(MarkRequest req, Long id, WorkSearchResult meta) {
+        Work work = upsertWork(id, meta);
         Record saved;
 
         Optional<Record> latest = recordRepo.findLatestByWorkId(id);
@@ -256,7 +266,12 @@ public class WorkService {
         Long id = parseId(req.getId());
         if (id == null) throw new IllegalArgumentException("invalid id");
 
-        Work work = upsertWork(id, req.getMeta());
+        WorkSearchResult meta = resolveMetaForInsert(id, req.getMeta());
+        return Objects.requireNonNull(transactionTemplate.execute(tx -> markNewInTransaction(req, rating, review, id, meta)));
+    }
+
+    private MarkResult markNewInTransaction(MarkRequest req, Double rating, String review, Long id, WorkSearchResult meta) {
+        Work work = upsertWork(id, meta);
         Record previous = recordRepo.findLatestByWorkId(id).orElse(null);
 
         // null / 空串字段从旧记录沿用
@@ -301,6 +316,7 @@ public class WorkService {
      * @param review 影评，可为空
      * @return 更新后的列表项
      */
+    @Transactional
     public WorkListItem updateReview(Long workId, Double rating, String review) {
         Record r = recordRepo.findLatestByWorkId(workId)
                 .orElseThrow(() -> new IllegalStateException("no record to update"));
@@ -321,6 +337,7 @@ public class WorkService {
      * @param review 影评，可为空
      * @return 包含新建记录的列表项
      */
+    @Transactional
     public WorkListItem updateReviewNew(Long workId, Double rating, String review) {
         Record previous = recordRepo.findLatestByWorkId(workId)
                 .orElseThrow(() -> new IllegalStateException("no record to update"));
@@ -421,16 +438,18 @@ public class WorkService {
         }
         Work w = new Work();
         w.setId(id);
-        if (meta != null) {
-            applyMeta(w, meta);
-        } else {
-            WorkSearchResult fetched = bangumiService.getById(String.valueOf(id));
-            if (fetched == null) throw new IllegalStateException("Subject not found: " + id);
-            applyMeta(w, fetched);
-        }
+        if (meta == null) throw new IllegalStateException("Subject not found: " + id);
+        applyMeta(w, meta);
         w.setCreatedAt(now);
         w.setUpdatedAt(now);
         return workRepo.save(w);
+    }
+
+    private WorkSearchResult resolveMetaForInsert(Long id, WorkSearchResult meta) {
+        if (meta != null || workRepo.existsById(id)) return meta;
+        WorkSearchResult fetched = bangumiService.getById(String.valueOf(id));
+        if (fetched == null) throw new IllegalStateException("Subject not found: " + id);
+        return fetched;
     }
 
     private void applyMeta(Work w, WorkSearchResult meta) {

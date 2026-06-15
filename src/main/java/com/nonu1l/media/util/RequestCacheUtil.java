@@ -5,7 +5,6 @@ import com.nonu1l.media.repository.RequestCacheRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -23,15 +22,18 @@ public class RequestCacheUtil {
     private static final long DEFAULT_TTL = 300;
 
     private final RequestCacheRepository repo;
+    private final RequestCacheWriter writer;
     private final RestTemplate restTemplate;
 
     /**
      * 初始化缓存工具及其默认 RestTemplate 与仓储依赖。
      *
      * @param repo 请求缓存仓储。
+     * @param writer 异步缓存写入器。
      */
-    public RequestCacheUtil(RequestCacheRepository repo) {
+    public RequestCacheUtil(RequestCacheRepository repo, RequestCacheWriter writer) {
         this.repo = repo;
+        this.writer = writer;
         this.restTemplate = new RestTemplate();
     }
 
@@ -69,7 +71,7 @@ public class RequestCacheUtil {
             if (!resp.getStatusCode().is2xxSuccessful()) return null;
             String body = resp.getBody();
             if (body != null) {
-                asyncSave(url, "", body, ttlSeconds);
+                writer.save(url, "", body, ttlSeconds);
             }
             return body;
         } catch (Exception e) {
@@ -114,7 +116,7 @@ public class RequestCacheUtil {
             if (!resp.getStatusCode().is2xxSuccessful()) return null;
             String body = resp.getBody();
             if (body != null) {
-                asyncSave(url, requestBody, body, ttlSeconds);
+                writer.save(url, requestBody, body, ttlSeconds);
             }
             return body;
         } catch (Exception e) {
@@ -124,31 +126,8 @@ public class RequestCacheUtil {
     }
 
     private Optional<String> findCache(String url, String requestBody) {
-        Optional<RequestCache> entry = repo.findCache(url, requestBody, Instant.now());
+        String bodyKey = requestBody != null ? requestBody : "";
+        Optional<RequestCache> entry = repo.findCache(url, bodyKey, Instant.now());
         return entry.map(RequestCache::getResponseBody);
-    }
-
-    /**
-     * 异步持久化缓存条目（写入失败通常视为并发重复写，按日志忽略）。
-     *
-     * @param url         请求地址。
-     * @param requestBody 请求体。
-     * @param responseBody 响应内容。
-     * @param ttlSeconds  缓存有效期（秒）。
-     */
-    @Async
-    public void asyncSave(String url, String requestBody, String responseBody, long ttlSeconds) {
-        try {
-            RequestCache c = new RequestCache();
-            c.setUrl(url);
-            c.setRequestBody(requestBody);
-            c.setResponseBody(responseBody);
-            c.setExpireTime(Instant.now().plusSeconds(ttlSeconds));
-            repo.save(c);
-            log.debug("cache saved url={} ttl={}s", url, ttlSeconds);
-        } catch (Exception e) {
-            // 唯一约束冲突 → 已有其他线程写了，忽略
-            log.debug("cache save skipped (duplicate?) url={}", url);
-        }
     }
 }

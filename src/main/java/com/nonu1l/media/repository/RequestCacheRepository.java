@@ -29,6 +29,15 @@ public interface RequestCacheRepository extends JpaRepository<RequestCache, Long
     Optional<RequestCache> findCache(@Param("url") String url, @Param("body") String requestBody, @Param("now") Instant now);
 
     /**
+     * 查询指定请求的缓存记录，不区分是否过期。
+     *
+     * @param url 请求地址
+     * @param requestBody 请求体
+     * @return 已存在的缓存记录；无则返回 {@link Optional#empty()}
+     */
+    Optional<RequestCache> findFirstByUrlAndRequestBody(String url, String requestBody);
+
+    /**
      * 删除指定时间点之前的缓存记录。
      *
      * <p>关键副作用：会批量删除过期缓存，释放数据库占用；无返回值。</p>
