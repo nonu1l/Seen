@@ -7,6 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+/**
+ * 会话实体：表示一段对话会话及其创建/更新时间。
+ */
 @Entity
 @Table(name = "conversation_session")
 @Getter

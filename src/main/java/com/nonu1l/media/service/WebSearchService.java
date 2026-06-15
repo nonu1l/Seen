@@ -21,6 +21,13 @@ public class WebSearchService implements SearchProvider {
 
     private final SearchProvider delegate;
 
+    /**
+     * 按配置选择底层搜索实现并固定为单一 delegate。
+     *
+     * @param ddg DDG 备选实现
+     * @param serper Serper 实现
+     * @param provider 配置值，支持 ddg / serper
+     */
     public WebSearchService(DDGSearchService ddg, SerperSearchService serper,
                             @Value("${seen.search.provider:ddg}") String provider) {
         if ("serper".equalsIgnoreCase(provider) && serper.isAvailable()) {
@@ -32,11 +39,23 @@ public class WebSearchService implements SearchProvider {
         }
     }
 
+    /**
+     * 搜索外部网页。
+     *
+     * @param query 检索关键词
+     * @return 委托实现返回的结果
+     */
     @Override
     public List<WebSearchItem> search(String query) {
         return delegate.search(query);
     }
 
+    /**
+     * 抓取网页正文文本。
+     *
+     * @param url 目标 URL
+     * @return 清洗后的文本
+     */
     @Override
     public String fetch(String url) {
         String raw = delegate.fetch(url);

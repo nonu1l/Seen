@@ -8,7 +8,9 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * 作品实体 — 数据来自 Bangumi API，标记时落库一份快照。
+ * 作品实体：保存 Bangumi 作品元数据及其展示快照。
+ *
+ * <p>该表是作品搜索与会话卡片引用的主数据来源。</p>
  */
 @Entity
 @Table(name = "work")

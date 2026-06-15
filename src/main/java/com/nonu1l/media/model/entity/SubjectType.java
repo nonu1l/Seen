@@ -5,7 +5,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Bangumi subject type — 2=动画, 6=真人 */
+/**
+ * 条目类型实体：保存 Bangumi 条目类型码与可展示文案。
+ */
 @Entity
 @Table(name = "subject_type")
 @Getter

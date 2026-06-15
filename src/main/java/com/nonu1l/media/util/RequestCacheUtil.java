@@ -12,6 +12,10 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 import java.util.Optional;
 
+/**
+ * 基于数据库的 HTTP 请求缓存工具。
+ * <p>支持 GET/POST 的幂等请求缓存读取与异步持久化，减少重复网络请求。</p>
+ */
 @Service
 public class RequestCacheUtil {
 
@@ -21,15 +25,33 @@ public class RequestCacheUtil {
     private final RequestCacheRepository repo;
     private final RestTemplate restTemplate;
 
+    /**
+     * 初始化缓存工具及其默认 RestTemplate 与仓储依赖。
+     *
+     * @param repo 请求缓存仓储。
+     */
     public RequestCacheUtil(RequestCacheRepository repo) {
         this.repo = repo;
         this.restTemplate = new RestTemplate();
     }
 
+    /**
+     * 使用默认 TTL（300 秒）读取 GET 缓存。
+     *
+     * @param url 请求地址。
+     * @return 命中返回缓存体；未命中则发起网络请求并在成功后异步写入缓存。
+     */
     public String cacheGet(String url) {
         return cacheGet(url, DEFAULT_TTL);
     }
 
+    /**
+     * 使用指定 TTL 读取 GET 缓存。
+     *
+     * @param url 请求地址。
+     * @param ttlSeconds 缓存有效期（秒）。
+     * @return 请求响应文本；失败或非 2xx 返回 null。
+     */
     public String cacheGet(String url, long ttlSeconds) {
         long t0 = System.nanoTime();
         Optional<String> cached = findCache(url, "");
@@ -56,10 +78,25 @@ public class RequestCacheUtil {
         }
     }
 
+    /**
+     * 使用默认 TTL（300 秒）读取 POST 缓存。
+     *
+     * @param url         请求地址。
+     * @param requestBody 请求体（用于区分同名 URL 的不同参数）。
+     * @return 请求响应文本；失败或非 2xx 返回 null。
+     */
     public String cachePost(String url, String requestBody) {
         return cachePost(url, requestBody, DEFAULT_TTL);
     }
 
+    /**
+     * 使用指定 TTL 读取 POST 缓存。
+     *
+     * @param url         请求地址。
+     * @param requestBody 请求体原文。
+     * @param ttlSeconds 缓存有效期（秒）。
+     * @return 命中则返回缓存，否则发起请求并异步存储结果；失败返回 null。
+     */
     public String cachePost(String url, String requestBody, long ttlSeconds) {
         long t0 = System.nanoTime();
         Optional<String> cached = findCache(url, requestBody);
@@ -91,6 +128,14 @@ public class RequestCacheUtil {
         return entry.map(RequestCache::getResponseBody);
     }
 
+    /**
+     * 异步持久化缓存条目（写入失败通常视为并发重复写，按日志忽略）。
+     *
+     * @param url         请求地址。
+     * @param requestBody 请求体。
+     * @param responseBody 响应内容。
+     * @param ttlSeconds  缓存有效期（秒）。
+     */
     @Async
     public void asyncSave(String url, String requestBody, String responseBody, long ttlSeconds) {
         try {

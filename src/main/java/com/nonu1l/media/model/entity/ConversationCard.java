@@ -5,6 +5,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * 会话卡片实体：保存对话中展示的作品卡片快照信息。
+ */
 @Entity
 @Table(name = "conversation_card")
 @Getter

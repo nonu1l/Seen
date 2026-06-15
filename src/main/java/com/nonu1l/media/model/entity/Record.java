@@ -7,6 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+/**
+ * 作品记录实体：保存用户对单个作品的状态、评分与评价快照。
+ */
 @Entity
 @Table(name = "record")
 @Getter
@@ -34,6 +37,11 @@ public class Record {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /**
+     * 新建记录前补齐创建和更新时间。
+     *
+     * <p>关键副作用：在首次落库时自动写入 {@code createdAt} 与 {@code updatedAt}。</p>
+     */
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -41,6 +49,11 @@ public class Record {
         if (this.updatedAt == null) this.updatedAt = now;
     }
 
+    /**
+     * 更新记录前刷新最后更新时间。
+     *
+     * <p>关键副作用：每次更新时强制覆盖 {@code updatedAt} 为当前时间。</p>
+     */
     @PreUpdate
     void preUpdate() {
         this.updatedAt = Instant.now();

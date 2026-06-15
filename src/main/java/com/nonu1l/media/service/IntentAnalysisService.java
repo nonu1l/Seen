@@ -9,6 +9,10 @@ public class IntentAnalysisService {
     /**
      * 从 LLM 返回文本中提取首个完整 JSON 对象。
      * 通过括号配对（跳过字符串字面量与转义符）定位结尾。
+     *
+     * @param text LLM 原始响应
+     * @return 修剪后的 JSON 片段字符串
+     * @throws IllegalArgumentException 输入为空、未找到对象或括号不平衡时抛出
      */
     public static String extractJsonObject(String text) {
         if (text == null || text.isBlank()) {
@@ -54,6 +58,9 @@ public class IntentAnalysisService {
      * 状态机遍历：当在字符串内遇到 " 时，向前看下一个非空白字符 —
      * 若是 , } ] : 则认为是真正的 JSON 字符串终结符；
      * 否则认为是未转义的内容引号，补上反斜杠。
+     *
+     * @param content 原始 JSON 文本
+     * @return 修复后的 JSON 文本
      */
     public static String repairUnescapedQuotesInJsonStrings(String content) {
         if (content == null || content.isBlank()) return content;

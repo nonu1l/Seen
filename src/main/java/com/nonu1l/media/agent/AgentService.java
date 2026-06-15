@@ -26,7 +26,7 @@ import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
 /**
- * Agent Graph Service — LangGraph4j 构建确定性的多步 Agent 流程。
+ * 基于 LangGraph4j 的对话 Agent 服务：先做意图分类，再路由到标记/取消/推荐/搜索/分析节点，最终输出回复与卡片建议。
  */
 @Service
 public class AgentService {
@@ -39,6 +39,12 @@ public class AgentService {
     private final String classifyPrompt;
     private final SearchPipeline searchPipeline;
 
+    /**
+     * @param chatClientBuilder Spring AI 对话客户端构造器（注入统一 Token 监控 advisor）
+     * @param tools Bangumi/本地/网络搜索与抓取工具集合
+     * @param objectMapper JSON 解析器
+     * @param tokenAdvisor 令牌统计 advisor
+     */
     public AgentService(ChatClient.Builder chatClientBuilder, BangumiTools tools,
                          ObjectMapper objectMapper, TokenUsageAdvisor tokenAdvisor) {
         this.chatClient = chatClientBuilder.defaultAdvisors(tokenAdvisor).build();
@@ -48,6 +54,14 @@ public class AgentService {
         this.searchPipeline = new SearchPipeline(this.chatClient, tools);
     }
 
+    /**
+     * 按 LangGraph4j 图执行一次 Agent 对话。
+     *
+     * @param userInput 用户输入
+     * @param history 会话历史文本（用于消解“上条/第一个”等指代）
+     * @return 解析后的状态对象，包含 intent、replyText、cards、unmarkIds
+     * @throws GraphStateException 图执行异常
+     */
     public SeenAgentState invoke(String userInput, String history) throws GraphStateException {
         var graph = new StateGraph<>(SeenAgentState.SCHEMA, SeenAgentState::new)
             .addNode("classify",         node_async(this::classifyIntent))
@@ -91,10 +105,10 @@ public class AgentService {
     // ── 节点 ──
 
     /**
-     * 由LLM意图分析 -> 使用哪个节点
+     * 分类节点：调用 LLM 判定意图并返回下一跳边。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return intent 键值 map，值仅限 mark/unmark/recommend/search/analyze
      */
     Map<String, Object> classifyIntent(SeenAgentState s) {
         log.debug("Node[classify] enter: {}", s.userInput().length() > 100 ? s.userInput().substring(0, 100) + "..." : s.userInput());
@@ -110,10 +124,10 @@ public class AgentService {
     }
 
     /**
-     * 标记
+     * 标记节点：通过完整系统提示与工具回调，解析用户标记意图为卡片/取消标记列表。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return 包含 replyText、cards、unmarkIds 的 map；解析失败则返回提示文案
      */
     Map<String, Object> handleMark(SeenAgentState s) {
         log.debug("Node[mark] enter");
@@ -157,9 +171,10 @@ public class AgentService {
     }
 
     /**
-     * 取消标记
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * 取消标记节点：解析待取消作品，并返回 subjectId 列表。
+     *
+     * @param s 当前状态
+     * @return 包含 replyText 与 unmarkIds 的 map；解析失败返回兜底提示文案
      */
     Map<String, Object> handleUnmark(SeenAgentState s) {
         log.debug("Node[unmark] enter");
@@ -191,10 +206,10 @@ public class AgentService {
     }
 
     /**
-     * 推荐
+     * 推荐节点：运行搜索流水线并返回卡片建议。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return 有结果返回 cards；无结果返回 failReason 或默认提示
      */
     Map<String, Object> handleRecommend(SeenAgentState s) {
         log.debug("Node[recommend] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
@@ -208,10 +223,10 @@ public class AgentService {
     }
 
     /**
-     * 搜索
+     * 搜索节点：同推荐节点，区别在于语义上给用户明确执行“搜索”入口，流程复用搜索流水线。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return 有结果返回 cards；否则返回 failReason 或默认提示
      */
     Map<String, Object> handleSearch(SeenAgentState s) {
         log.debug("Node[search] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
@@ -225,10 +240,10 @@ public class AgentService {
     }
 
     /**
-     * 回答分析
+     * 分析节点：基于历史信息生成自然语言回答，不进行推荐/标记的结构化返回。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return 仅含 replyText 的 map
      */
     Map<String, Object> handleAnalyze(SeenAgentState s) {
         log.debug("Node[analyze] enter");
@@ -242,10 +257,10 @@ public class AgentService {
     }
 
     /**
-     * 处理输出
+     * 输出节点：按上游状态合成最终回复文本，必要时附带卡片列表或 JSON 兼容回退。
      *
-     * @param s s
-     * @return {@link Map }<{@link String }, {@link Object }>
+     * @param s 当前状态
+     * @return 包含 replyText，必要时包含 cards 的 map
      */
     Map<String, Object> handleOutput(SeenAgentState s) {
         log.debug("Node[output] enter: intent={}", s.intent());
@@ -310,7 +325,11 @@ public class AgentService {
 
     // ── helpers ─────────────────────────────────────────────
 
-
+    /**
+     * 构建 Agent 工具回调列表：Bangumi 搜索、搜索本地、搜索网络、抓取网页。
+     *
+     * @return 可供 Spring AI 注册的工具回调数组
+     */
     private ToolCallback[] toolsAsCallbacks() {
         return new ToolCallback[] {
             FunctionToolCallback.builder("searchBangumi",
@@ -335,6 +354,12 @@ public class AgentService {
     record SearchReq(String keyword) {}
     record FetchReq(String url) {}
 
+    /**
+     * 从 classpath 读取提示词模板。
+     *
+     * @param path 资源路径
+     * @return 提示词内容；读取失败返回兜底提示词
+     */
     private String loadPrompt(String path) {
         try {
             return new String(new ClassPathResource(path).getInputStream().readAllBytes(), StandardCharsets.UTF_8);

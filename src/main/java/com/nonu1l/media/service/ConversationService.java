@@ -25,6 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 对话服务：管理会话状态，组织用户消息到 Agent 的处理链路，并持久化 AI 回复与卡片动作。
+ */
 @Service
 public class ConversationService {
 
@@ -40,6 +43,17 @@ public class ConversationService {
     private final WorkRepository workRepo;
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * @param sessionRepo 会话数据仓储
+     * @param messageRepo 消息数据仓储
+     * @param cardRepo 卡片数据仓储
+     * @param agentService 对话 Agent 调用服务
+     * @param workService 作品标记/取消标记服务
+     * @param bangumiService Bangumi 元数据服务
+     * @param recordRepo 作品记录仓储
+     * @param workRepo 作品仓储
+     * @param transactionTemplate 事务模板，用于分段提交与避免长事务
+     */
     public ConversationService(ConversationSessionRepository sessionRepo,
                                 ConversationMessageRepository messageRepo,
                                 ConversationCardRepository cardRepo,
@@ -62,6 +76,11 @@ public class ConversationService {
 
     // ── 会话管理 ─────────────────────────────────────────────
 
+    /**
+     * 获取当前可用会话；若不存在则创建新会话。
+     *
+     * @return 最近会话实体；若库中无会话则返回新建并持久化的会话
+     */
     public ConversationSession getOrCreateSession() {
         List<ConversationSession> all = sessionRepo.findAll();
         if (!all.isEmpty()) return all.getLast();
@@ -72,6 +91,11 @@ public class ConversationService {
         return sessionRepo.save(session);
     }
 
+    /**
+     * 查询当前会话的完整状态快照，供前端加载。
+     *
+     * @return 会话 ID、时间升序消息列表、卡片列表组成的状态对象
+     */
     @Transactional(readOnly = true)
     public ConversationState getState() {
         ConversationSession session = getOrCreateSession();
@@ -93,8 +117,12 @@ public class ConversationService {
     // ── 发送消息 ─────────────────────────────────────────────
 
     /**
-     * LLM 调用耗时长，拆出事务避免长时间锁 DB。
-     * 步骤：存用户消息（事务）→ LLM 调用（无事务）→ 存回复/卡片/取消标记（事务）
+     * 处理一条用户输入：先落库用户消息、构建上下文并调用 Agent，再落库助手回复与副作用。
+     *
+     * <p>为避免长事务，拆分为两段短事务：用户侧写入、LLM 调用、回复侧写入。</p>
+     *
+     * @param userInput 用户输入文本
+     * @return 包含助手消息 ID、回复文本及本轮卡片列表的响应对象
      */
     public AiChatResponse sendMessage(String userInput) {
         ConversationSession session = getOrCreateSession();
@@ -109,6 +137,13 @@ public class ConversationService {
                 tx -> saveAssistantResponse(session, result, userMsg, now));
     }
 
+    /**
+     * 调用 Agent 进行意图识别与结果归一化；失败时返回友好降级结果。
+     *
+     * @param userInput 用户输入
+     * @param history 用于解析指代的最近会话历史文本
+     * @return 归一化后的意图分析结果（reply、推荐卡片、取消标记 id）
+     */
     private IntentAnalysisResult invokeAgent(String userInput, String history) {
         Long sessionId = getOrCreateSession().getId();
         TokenUsageAdvisor.setSession(sessionId);
@@ -131,6 +166,14 @@ public class ConversationService {
         }
     }
 
+    /**
+     * 生成并持久化一条用户消息。
+     *
+     * @param session 所属会话
+     * @param userInput 用户输入
+     * @param now 统一时间戳
+     * @return 已持久化的用户消息实体
+     */
     private ConversationMessage saveUserMessage(ConversationSession session, String userInput, Instant now) {
         ConversationMessage userMsg = new ConversationMessage();
         userMsg.setSessionId(session.getId());
@@ -140,6 +183,17 @@ public class ConversationService {
         return messageRepo.save(userMsg);
     }
 
+    /**
+     * 在单次事务内写入助手回复、卡片实体、自动标记与取消标记快照。
+     *
+     * <p>如果 Agent 未返回回复文案，会基于匹配结果兜底生成。</p>
+     *
+     * @param session 当前会话
+     * @param result Agent 解析结果
+     * @param userMsg 本轮用户消息（用于关联回写）
+     * @param now 统一时间戳
+     * @return AiChatResponse，含本轮助手消息 ID、文案、返回卡片列表
+     */
     private AiChatResponse saveAssistantResponse(ConversationSession session, IntentAnalysisResult result,
                                                   ConversationMessage userMsg, Instant now) {
         String replyText = result.replyText() != null && !result.replyText().isBlank()
@@ -201,6 +255,13 @@ public class ConversationService {
 
     // ── 卡片操作 ─────────────────────────────────────────────
 
+    /**
+     * 保存/更新卡片建议：支持用户手工修改评分、评论、状态后落库标记。
+     *
+     * @param cardId 目标卡片 ID
+     * @param req 入参可选字段：rating/review/status
+     * @return 更新后的卡片 VO（含历史对比信息）
+     */
     @Transactional
     public ConversationCardVO saveCard(Long cardId, SaveCardRequest req) {
         ConversationCard card = cardRepo.findById(cardId)
@@ -223,7 +284,12 @@ public class ConversationService {
         return doSaveNew(card);
     }
 
-    /** 撤销 AI 标记：只删最新一条 record */
+    /**
+     * 撤销 AI 标记：仅回滚该作品最近一条标记记录，并把卡片状态置为可编辑。
+     *
+     * @param cardId 卡片 ID
+     * @return 撤销后的卡片 VO
+     */
     @Transactional
     public ConversationCardVO undoCard(Long cardId) {
         ConversationCard card = cardRepo.findById(cardId)
@@ -241,7 +307,12 @@ public class ConversationService {
         return toVO(card);
     }
 
-    /** 自动保存：无 status 的卡片仅为推荐，不自动保存 */
+    /**
+     * 自动保存入口：仅当卡片有状态时才调用外部标记；无状态表示纯推荐不落库状态。
+     *
+     * @param card 会话卡片实体
+     * @return 卡片 VO
+     */
     private ConversationCardVO autoSaveCard(ConversationCard card) {
         if (card.getStatus() == null) {
             return toVO(card);
@@ -249,7 +320,14 @@ public class ConversationService {
         return doSaveNew(card);
     }
 
-    /** AI 模式保存：总是新增 record，附带 history 信息供前端对比展示 */
+    /**
+     * 发起一次“AI 标记”保存动作：生成 Mark 请求、补充元数据、写入 record，并更新卡片状态。
+     *
+     * <p>副作用：会创建新的标记记录，返回的 VO 包含历史评分/评论/状态用于前端对比。</p>
+     *
+     * @param card 待保存卡片
+     * @return 带历史对比字段的卡片 VO
+     */
     private ConversationCardVO doSaveNew(ConversationCard card) {
         MarkRequest markReq = new MarkRequest();
         markReq.setId(String.valueOf(card.getSubjectId()));
@@ -279,6 +357,13 @@ public class ConversationService {
         return toVOWithHistory(card, mr.previousRecord());
     }
 
+    /**
+     * 将卡片实体与上一条记录组合成返回对象，用于前端显示“变更前后”对比。
+     *
+     * @param card 当前卡片
+     * @param previous 上一条标记记录，可为 null
+     * @return 含历史字段的卡片 VO
+     */
     private ConversationCardVO toVOWithHistory(ConversationCard card, Record previous) {
         return new ConversationCardVO(
                 card.getId(), card.getMessageId(), card.getSubjectId(),
@@ -292,6 +377,10 @@ public class ConversationService {
         );
     }
 
+    /**
+     * 清空并重建会话：删除最近会话所有消息与卡片后创建新会话。
+     * 该操作会移除该会话历史记录，副作用为“会话上下文与卡片记录重置”。
+     */
     @Transactional
     public void reset() {
         List<ConversationSession> all = sessionRepo.findAll();
@@ -311,6 +400,12 @@ public class ConversationService {
 
     // ── 回复文案 ─────────────────────────────────────────────
 
+    /**
+     * 根据匹配结果生成中文回复文案。
+     *
+     * @param result Agent 意图分析结果
+     * @return 可直接返回给前端的提示文本
+     */
     static String generateReplyText(IntentAnalysisResult result) {
         List<MatchedEntry> entries = result.entries();
         if (entries == null || entries.isEmpty()) {
@@ -361,7 +456,12 @@ public class ConversationService {
 
     // ── helper ──────────────────────────────────────────────
 
-    /** 將最近几轮对话拼接为历史文本，附卡片结构化信息供 LLM 解析指代 */
+    /**
+     * 拼接最近会话历史为 LLM 可读文本，并附带最近助手输出的结构化卡片供指代解析。
+     *
+     * @param sessionId 会话 ID
+     * @return 按时间顺序裁剪后的历史文本
+     */
     private String buildHistory(Long sessionId) {
         List<ConversationMessage> msgs = messageRepo.findAllBySessionIdOrderByIdAsc(sessionId);
         if (msgs.isEmpty()) return "";
@@ -400,6 +500,12 @@ public class ConversationService {
         return sb.toString().trim();
     }
 
+    /**
+     * 将卡片实体转换为前端展示 VO。
+     *
+     * @param card 卡片实体
+     * @return 前端展示结构
+     */
     private ConversationCardVO toVO(ConversationCard card) {
         return new ConversationCardVO(
                 card.getId(), card.getMessageId(), card.getSubjectId(),
@@ -410,7 +516,12 @@ public class ConversationService {
         );
     }
 
-    /** 从 Bangumi 补充封面、年份、平台、标签、简介 */
+    /**
+     * 使用 Bangumi 数据补全卡片展示字段（封面、年份、平台、标签、简介、评分）。
+     * 失败时仅保留原卡片内容，不影响主流程。
+     *
+     * @param card 待补全的卡片实体
+     */
     private void enrichCardMeta(ConversationCard card) {
         try {
             WorkSearchResult w = bangumiService.getById(String.valueOf(card.getSubjectId()));
@@ -447,7 +558,13 @@ public class ConversationService {
         }
     }
 
-    /** 去重 + 过滤空白 + 排除与 platform 相同的标签 */
+    /**
+     * 清洗并去重标签：去除空字符串、去重、过滤与平台同名标签。
+     *
+     * @param tags 输入标签列表
+     * @param platform 平台名
+     * @return 过滤后的标签列表
+     */
     static List<String> cleanTags(List<String> tags, String platform) {
         if (tags == null || tags.isEmpty()) return List.of();
         String plat = platform != null ? platform.trim() : "";
@@ -459,7 +576,14 @@ public class ConversationService {
                 .toList();
     }
 
-    /** 取消标记前快照：读取 work + 最新 record 数据，生成 UNMARK 卡片供撤回 */
+    /**
+     * 取消标记前生成快照卡片：读取作品和最近一条记录，用于前端撤回与回显。
+     *
+     * @param sessionId 会话 ID
+     * @param messageId 助手消息 ID
+     * @param subjectId 作品 subjectId
+     * @return 生成成功则返回快照卡片；失败则返回 null
+     */
     private ConversationCard snapshotBeforeUnmark(Long sessionId, Long messageId, Long subjectId) {
         try {
             Work w = workRepo.findById(subjectId).orElse(null);

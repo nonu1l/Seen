@@ -1,5 +1,14 @@
 package com.nonu1l.media.model.dto;
 
+/**
+ * Token 使用详情 DTO。
+ *
+ * @param id 流水主键。
+ * @param modelName 模型名称。
+ * @param totalTokens 总 token 数。
+ * @param inputText 输入片段。
+ * @param outputText 输出片段。
+ */
 public record TokenUsageDetail(
     Long id,
     String modelName,

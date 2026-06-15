@@ -17,15 +17,29 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 后台管理接口：展示 Token 用量页面并提供树状汇总及明细查询 API。
+ */
 @RestController
 public class TokenUsageController {
 
     private final TokenUsageRepository repo;
 
+    /**
+     * 注入 Token 用量仓储。
+     *
+     * @param repo token 用量持久化仓库。
+     */
     public TokenUsageController(TokenUsageRepository repo) {
         this.repo = repo;
     }
 
+    /**
+     * 返回 Token 用量管理 HTML 页面。
+     *
+     * @return 页面 HTML 文本。
+     * @throws Exception 读取模板文件失败时抛出。
+     */
     @GetMapping(value = "/admin/token-usage", produces = MediaType.TEXT_HTML_VALUE)
     @ResponseBody
     public String page() throws Exception {
@@ -33,6 +47,14 @@ public class TokenUsageController {
                 .getInputStream().readAllBytes(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * 按会话与轮次聚合 Token 用量，构建树状列表。
+     *
+     * <p>返回数据包含会话节点、回合节点与模型调用节点，并在节点上带上
+     * prompt / completion / total 的汇总统计。</p>
+     *
+     * @return 树形结构 token 用量数据。
+     */
     @GetMapping("/api/admin/token-usage/tree")
     public List<TokenUsageTreeNode> getTree() {
         List<TokenUsage> all = repo.findAll(Sort.by(Sort.Direction.ASC, "sessionId", "turn", "id"));
@@ -90,6 +112,14 @@ public class TokenUsageController {
         return sessions;
     }
 
+    /**
+     * 查询某一会话回合、节点的 token 明细。
+     *
+     * @param sessionId 会话 ID，必填。
+     * @param turn      对话轮次，必填。
+     * @param node      节点名，必填。
+     * @return 对应明细列表，按记录 ID 升序排序返回。
+     */
     @GetMapping("/api/admin/token-usage/detail")
     public List<TokenUsageDetail> getDetail(@RequestParam Long sessionId,
                                              @RequestParam Integer turn,

@@ -30,6 +30,10 @@ public class DDGSearchService implements SearchProvider {
     private final RestTemplate restTemplate;
     private final String searchUrl;
 
+    /**
+     * @param builder RestTemplate 构造器
+     * @param proxy DDG 代理地址（可空）
+     */
     public DDGSearchService(RestTemplateBuilder builder,
                             @Value("${seen.bangumi-proxy:}") String proxy) {
         this.restTemplate = builder
@@ -41,6 +45,14 @@ public class DDGSearchService implements SearchProvider {
                 : "https://lite.duckduckgo.com/lite/?q=";
     }
 
+    /**
+     * 使用 DDG Lite 页面解析搜索结果。
+     *
+     * <p>内建重试与限额保护，最多尝试 3 次，并返回最多 10 条结果。</p>
+     *
+     * @param query 检索关键词
+     * @return 标准化搜索结果
+     */
     @Override
     public List<WebSearchItem> search(String query) {
         List<WebSearchItem> results = new ArrayList<>();
@@ -83,6 +95,14 @@ public class DDGSearchService implements SearchProvider {
         return results;
     }
 
+    /**
+     * 抓取 URL 并移除 HTML 标签与常见噪音内容。
+     *
+     * <p>返回文本截断为最多 3000 字符。</p>
+     *
+     * @param url 目标链接
+     * @return 清洗后的正文文本
+     */
     @Override
     public String fetch(String url) {
         try {
@@ -102,6 +122,12 @@ public class DDGSearchService implements SearchProvider {
         }
     }
 
+    /**
+     * HTML 字符转义处理，复用于标题与链接字段。
+     *
+     * @param s 原始字符串
+     * @return 转义后的字符串
+     */
     private String unescape(String s) {
         return s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#x27;", "'").replace("&#39;", "'");

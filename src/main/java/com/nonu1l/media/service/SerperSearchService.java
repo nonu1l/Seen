@@ -69,6 +69,13 @@ public class SerperSearchService implements SearchProvider {
     private final ObjectMapper objectMapper;
     private final String apiKey;
 
+    /**
+     * 构造 Serper 搜索服务。
+     *
+     * @param builder RestTemplate 构造器
+     * @param objectMapper JSON 映射工具
+     * @param apiKey Serper API key
+     */
     public SerperSearchService(RestTemplateBuilder builder,
                                 ObjectMapper objectMapper,
                                 @Value("${seen.search.serper-api-key:}") String apiKey) {
@@ -83,10 +90,19 @@ public class SerperSearchService implements SearchProvider {
         }
     }
 
+    /**
+     * @return API Key 已配置则返回 true，可用于 provider 路由判断
+     */
     public boolean isAvailable() {
         return !apiKey.isBlank();
     }
 
+    /**
+     * 调用 Serper 的 search 接口返回前 10 条有效结果。
+     *
+     * @param query 搜索关键词
+     * @return 结构化搜索结果
+     */
     @Override
     public List<WebSearchItem> search(String query) {
         List<WebSearchItem> results = new ArrayList<>();
@@ -129,6 +145,14 @@ public class SerperSearchService implements SearchProvider {
         return results;
     }
 
+    /**
+     * 抓取目标页面并做 HTML 到纯文本清洗。
+     *
+     * <p>返回长度限制为 3000 字符，便于下游 LLM 处理。</p>
+     *
+     * @param url 页面 URL
+     * @return 清洗后的正文文本
+     */
     @Override
     public String fetch(String url) {
         try {

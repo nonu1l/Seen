@@ -23,6 +23,16 @@ public record MatchedEntry(
         /** 播出/上映日期 */
         String airDate
 ) implements Serializable {
+    /**
+     * 使用默认空播出日期构造匹配条目。
+     *
+     * @param subjectId Bangumi 条目 ID。
+     * @param nameCn 中文名称。
+     * @param rating 用户评分（1-10）。
+     * @param comment 用户评价文本。
+     * @param status 标记状态。
+     * @param confidence 匹配置信度（0-1）。
+     */
     public MatchedEntry(Long subjectId, String nameCn, Integer rating, String comment,
                         String status, Double confidence) {
         this(subjectId, nameCn, rating, comment, status, confidence, null);

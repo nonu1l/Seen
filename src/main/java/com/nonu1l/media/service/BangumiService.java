@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * 统一封装 Bangumi API 调用与结果映射。
+ */
 @Service
 public class BangumiService {
 
@@ -32,6 +35,13 @@ public class BangumiService {
 
     private volatile List<Integer> cachedSubjectTypes;
 
+    /**
+     * @param objectMapper JSON 解析工具
+     * @param subjectTypeRepository 条目类型配置仓储
+     * @param cache 请求缓存工具
+     * @param preCacheService 预缓存服务
+     * @param bangumiProxy Bangumi 代理地址（可空）
+     */
     public BangumiService(ObjectMapper objectMapper, SubjectTypeRepository subjectTypeRepository,
                           RequestCacheUtil cache, PreCacheService preCacheService,
                           @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
@@ -46,19 +56,24 @@ public class BangumiService {
         }
     }
 
-    /** 搜索 bangumi 默认查询20条结果
-     * @param query 查询
-     * @return {@link List }<{@link WorkSearchResult }>
+    /** 搜索 bangumi，默认返回 20 条结果。
+     *
+     * @param query 查询关键字
+     * @return 映射后的 {@link WorkSearchResult} 列表
      */
     public List<WorkSearchResult> search(String query) {
         return  search(query,20);
     }
 
 
-    /** 搜索 bangumi
-     * @param query 查询
-     * @param limit 条数
-     * @return {@link List }<{@link WorkSearchResult }>
+    /**
+     * 搜索 bangumi。
+     *
+     * <p>请求参数使用 bangumi v0 搜索接口，命中结果会触发详细页预取以便后续详情接口提速。</p>
+     *
+     * @param query 查询关键字
+     * @param limit 返回条数上限
+     * @return 映射后的 {@link WorkSearchResult} 列表
      */
     public List<WorkSearchResult> search(String query, int limit) {
         List<WorkSearchResult> results = new ArrayList<>();
@@ -94,7 +109,13 @@ public class BangumiService {
         return results;
     }
 
-    /** 获取 Bangumi 趋势热门排行：type=2(动画)/6(真人)，year 可空 */
+    /**
+     * 获取 Bangumi 趋势热门排行（兼容旧接口）。
+     *
+     * @param type 条目类型（2 动画，6 真人）
+     * @param year 可选年份过滤
+     * @return 指定条件下的榜单结果
+     */
     @Deprecated
     public List<WorkSearchResult> trending(int type, Integer year) {
         List<WorkSearchResult> results = new ArrayList<>();
@@ -124,6 +145,12 @@ public class BangumiService {
         return results;
     }
 
+    /**
+     * 按 ID 查询条目基础信息。
+     *
+     * @param subjectId 条目ID
+     * @return 条目基础字段映射结果，异常或未命中返回 {@code null}
+     */
     public WorkSearchResult getById(String subjectId) {
         try {
             String json = get(base + "/subjects/" + subjectId, 1800);
@@ -135,6 +162,14 @@ public class BangumiService {
         }
     }
 
+    /**
+     * 查询条目详情（含地区、IMDb、集数/片长与可选角色信息）。
+     *
+     * <p>角色与基础信息并行请求，提高首屏响应速度。</p>
+     *
+     * @param subjectId 条目ID
+     * @return 组合后的 {@link DetailedWork}，无数据返回 {@code null}
+     */
     public DetailedWork getDetailed(String subjectId) {
         try {
             // 元数据与角色信息并行请求，互不阻塞
@@ -193,7 +228,11 @@ public class BangumiService {
     }
 
     /**
-     * @param subjectType Bangumi 条目类型：2=动画, 6=真人
+     * 解析角色信息为内部 CastMember 结构。
+     *
+     * @param charJson Bangumi /subjects/{id}/characters 返回内容
+     * @param subjectType 条目类型：2=动画，6=真人
+     * @return 最多 12 位角色的角色出演列表
      */
     private List<CastMember> parseCast(String charJson, int subjectType) {
         List<CastMember> cast = new ArrayList<>();
@@ -264,10 +303,10 @@ public class BangumiService {
 
 
     /**
-     * 字段映射
+     * 将 Bangumi 搜索条目映射为统一 DTO。
      *
-     * @param item 结果项
-     * @return {@link WorkSearchResult }
+     * @param item Bangumi 原始条目节点
+     * @return 标准化后的 {@link WorkSearchResult}
      */
     private WorkSearchResult mapSubject(JsonNode item) {
         WorkSearchResult r = new WorkSearchResult();
@@ -350,6 +389,14 @@ public class BangumiService {
         return result;
     }
 
+    /**
+     * 获取角色中文名。
+     *
+     * <p>优先取 infobox 中“简体中文名”，无则回退“别名/第二中文名”。</p>
+     *
+     * @param id Bangumi 角色ID
+     * @return 角色中文名，未命中返回 {@code null}
+     */
     public String getCharacterName(Long id) {
         try {
             String json = get(base + "/characters/" + id, TTL_CHARACTER);
@@ -361,6 +408,14 @@ public class BangumiService {
         }
     }
 
+    /**
+     * 获取人物中文名。
+     *
+     * <p>优先取 infobox 中“简体中文名”，无则尝试别名字段回退。</p>
+     *
+     * @param id Bangumi 人物ID
+     * @return 人物中文名，未命中返回 {@code null}
+     */
     public String getPersonName(Long id) {
         try {
             String json = get(base + "/persons/" + id, TTL_CHARACTER);

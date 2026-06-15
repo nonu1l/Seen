@@ -5,9 +5,17 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Web 通用配置：跨域策略与静态资源映射。
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+    /**
+     * 配置 API 跨域规则：允许前端开发域名访问并携带凭证。
+     *
+     * @param registry 拦截器/映射注册表。
+     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
@@ -23,6 +31,11 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
+    /**
+     * 注册本地静态资源路径映射。
+     *
+     * @param registry 资源处理器注册表。
+     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/static/**")

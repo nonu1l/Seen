@@ -7,8 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
+/**
+ * 会话相关的 HTTP 接口，负责查询会话状态、发送消息、卡片操作及会话重置。
+ */
 @RestController
 @RequestMapping("/api/conversation")
 public class ConversationController {
@@ -16,10 +17,20 @@ public class ConversationController {
     private static final Logger log = LoggerFactory.getLogger(ConversationController.class);
     private final ConversationService conversationService;
 
+    /**
+     * 注入会话服务依赖。
+     *
+     * @param conversationService 会话领域服务，封装会话状态与消息处理逻辑。
+     */
     public ConversationController(ConversationService conversationService) {
         this.conversationService = conversationService;
     }
 
+    /**
+     * 获取当前会话状态。
+     *
+     * @return 成功时返回 {@link ConversationState}，失败时返回 500。
+     */
     @GetMapping("/state")
     public ResponseEntity<ConversationState> getState() {
         try {
@@ -30,6 +41,12 @@ public class ConversationController {
         }
     }
 
+    /**
+     * 发送一条用户输入并获取 AI 回复。
+     *
+     * @param req 用户输入请求，{@code userInput} 不能为空或空白。
+     * @return 成功返回聊天响应；输入无效返回 400；异常返回 500。
+     */
     @PostMapping("/send")
     public ResponseEntity<AiChatResponse> send(@RequestBody AiChatRequest req) {
         try {
@@ -43,6 +60,13 @@ public class ConversationController {
         }
     }
 
+    /**
+     * 保存一张对话卡片。
+     *
+     * @param id  会话卡片主键 ID。
+     * @param req 保存参数，可选，用于覆盖卡片标题与备注等字段。
+     * @return 成功返回更新后的卡片；参数非法或不存在则返回 400；其他异常返回 500。
+     */
     @PostMapping("/cards/{id}/save")
     public ResponseEntity<ConversationCardVO> saveCard(@PathVariable Long id,
                                                         @RequestBody(required = false) SaveCardRequest req) {
@@ -56,6 +80,12 @@ public class ConversationController {
         }
     }
 
+    /**
+     * 回滚最近一次卡片保存操作。
+     *
+     * @param id 卡片 ID。
+     * @return 成功返回回滚后的卡片；失败则返回 400 或 500。
+     */
     @PostMapping("/cards/{id}/undo")
     public ResponseEntity<ConversationCardVO> undoCard(@PathVariable Long id) {
         try {
@@ -68,6 +98,11 @@ public class ConversationController {
         }
     }
 
+    /**
+     * 重置当前会话上下文。
+     *
+     * @return 操作成功返回 {@code {"ok": true}}，否则返回 500。
+     */
     @PostMapping("/reset")
     public ResponseEntity<Map<String, Boolean>> reset() {
         try {

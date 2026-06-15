@@ -30,6 +30,10 @@ public class PreCacheService {
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final AtomicLong batchCounter = new AtomicLong(0);
 
+    /**
+     * @param cache 请求缓存工具
+     * @param bangumiProxy Bangumi 代理地址（可空）
+     */
     public PreCacheService(RequestCacheUtil cache,
                            @Value("${seen.bangumi-proxy:}") String bangumiProxy) {
         this.cache = cache;
@@ -40,6 +44,13 @@ public class PreCacheService {
         }
     }
 
+    /**
+     * 异步预请求 Bangumi 作品详情与角色页缓存。
+     *
+     * <p>按固定线程池并行拉取，避免阻塞主请求线程；重复触发会覆盖旧 batchId。</p>
+     *
+     * @param ids 条目ID列表
+     */
     public void preCache(List<Long> ids) {
         long batchId = batchCounter.incrementAndGet();
         long t0 = System.nanoTime();
@@ -55,6 +66,9 @@ public class PreCacheService {
             .thenRun(() -> log.debug("preCache batch={} done {}ms", batchId, (System.nanoTime() - t0) / 1_000_000));
     }
 
+    /**
+     * 释放线程池资源，避免应用退出时线程泄漏。
+     */
     @PreDestroy
     void shutdown() { executor.shutdownNow(); }
 }

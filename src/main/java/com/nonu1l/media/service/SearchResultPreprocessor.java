@@ -19,7 +19,7 @@ public class SearchResultPreprocessor {
     private static final Logger log = LoggerFactory.getLogger(SearchResultPreprocessor.class);
 
     /**
-     * 对搜索结果进行过滤、分类
+     * 对搜索结果进行过滤与分类。
      *
      * @param rawResults Bangumi 原始搜索结果
      * @param keyword    用户搜索关键词
@@ -66,6 +66,11 @@ public class SearchResultPreprocessor {
 
     /**
      * 将 CompactSubject 列表格式化为 LLM 友好的紧凑文本。
+     *
+     * @param subjects 条目列表
+     * @param keyword  触发检索的关键词
+     * @param intent   可选的意图上下文
+     * @return 带规则约束的可直接注入 LLM 的文本
      */
     @Deprecated
     public String toCompactText(List<CompactSubject> subjects, String keyword, StructuredIntent intent) {
@@ -110,6 +115,10 @@ public class SearchResultPreprocessor {
 
     /**
      * 判断是否为搜索噪音 — 名称与关键词无关的条目。
+     *
+     * @param item    条目
+     * @param keyword 用户关键词
+     * @return 当前实现返回 {@code false}
      */
     public boolean isNoise(WorkSearchResult item, String keyword) {
 //        if (keyword == null || keyword.isBlank()) return false;
@@ -137,6 +146,9 @@ public class SearchResultPreprocessor {
 
     /**
      * 条目分类：TV / OVA / MOVIE / UNRELEASED / SPECIAL。
+     *
+     * @param item 条目
+     * @return 分类标识字符串
      */
     public String classify(WorkSearchResult item) {
         String airDate = item.getAirDate();

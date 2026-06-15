@@ -16,6 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * 后端通用业务服务：统一处理作品检索、详情读取与进度标注的核心流程。
+ *
+ * <p>本服务负责本地作品与 Bangumi 元数据之间的组装与同步，外层 Controller
+ * 依赖其返回模型进行展示和写回。</p>
+ */
 @Service
 public class WorkService {
 
@@ -28,6 +34,16 @@ public class WorkService {
     private final BangumiService            bangumiService;
     private final String                    bangumiProxy;
 
+    /**
+     * 构造服务实例。
+     *
+     * @param workRepo 本地作品仓储
+     * @param recordRepo 记录仓储
+     * @param subjectTypeRepo 条目类型仓储
+     * @param recordStatusRepo 进度状态仓储
+     * @param bangumiService Bangumi API 服务
+     * @param bangumiProxy Bangumi 代理地址（可空）
+     */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
                        BangumiService bangumiService,
@@ -40,6 +56,13 @@ public class WorkService {
         this.bangumiProxy      = bangumiProxy;
     }
 
+    /**
+     * 列出用户全部作品清单。
+     *
+     * <p>会优先加载每部作品的最新记录用于列表展示；单条作品组装失败时会记录告警并跳过，避免整体失败。</p>
+     *
+     * @return 过滤后的 {@link WorkListItem} 列表
+     */
     public List<WorkListItem> listAll() {
         List<Work> works = workRepo.findAllOrderByLatestRecord();
         if (works.isEmpty()) return List.of();
@@ -64,6 +87,15 @@ public class WorkService {
         return results;
     }
 
+    /**
+     * 按关键词搜索作品。
+     *
+     * <p>搜索结果分为本地已存在条目与远端 Bangumi 条目两个集合返回：
+     * 先命中本地库的作品会按本地数据返回；否则返回远端候选。</p>
+     *
+     * @param query 用户输入关键词
+     * @return {@link SearchResponse}，其中本地与远端两类结果会合并返回
+     */
     public SearchResponse search(String query) {
         List<WorkSearchResult> remote = bangumiService.search(query);
 
@@ -113,6 +145,14 @@ public class WorkService {
         return new SearchResponse(local, works);
     }
 
+    /**
+     * 查询作品详情。
+     *
+     * <p>先读取 Bangumi 详情，再按本地作品ID补充状态、评分、影评和已看集数；未找到本地数据则返回纯远端字段。</p>
+     *
+     * @param subjectId 条目ID（字符串）
+     * @return 包含详情信息的 {@link WorkDetail}，若远端不存在则返回 {@code null}
+     */
     public WorkDetail getDetail(String subjectId) {
         DetailedWork remote = bangumiService.getDetailed(subjectId);
         if (remote == null || remote.getBase() == null) return null;
@@ -151,6 +191,15 @@ public class WorkService {
         return d;
     }
 
+    /**
+     * 标记/更新单条作品状态（覆盖式）。
+     *
+     * <p>当最新记录状态与新状态不同会新增/更新一条记录；否则返回当前最新记录。
+     * 该方法不会新增历史记录快照（与 {@link #markNew} 行为不同）。</p>
+     *
+     * @param req 标记参数，需包含作品ID与目标状态
+     * @return 标记后的 {@link WorkListItem}
+     */
     public WorkListItem mark(MarkRequest req) {
         if (req.getId() == null || req.getStatus() == null)
             throw new IllegalArgumentException("id, status required");
@@ -178,6 +227,13 @@ public class WorkService {
         return buildListItem(work, saved);
     }
 
+    /**
+     * 取消标记并清理作品相关记录。
+     *
+     * <p>删除该作品的全部进度记录，再删除作品本体，属于不可逆删除操作。</p>
+     *
+     * @param workId 作品ID
+     */
     @Transactional
     public void unmark(Long workId) {
         recordRepo.deleteAllByWorkId(workId);
@@ -185,9 +241,14 @@ public class WorkService {
     }
 
     /**
-     * AI 模式标记：总是新增一条 record，保留历史记录可追溯。
-     * 参数为 null 的字段自动从旧记录沿用（缺什么补什么）。
-     * @return 包含新旧记录的上下文
+     * AI 模式新增标记：每次都创建新记录。
+     *
+     * <p>用于需要保留全部历史的场景；当 req 中可选字段为空时会从上条记录继承并保持原字段。</p>
+     *
+     * @param req 标记请求，需至少包含作品ID
+     * @param rating 可选评分，空时继承上一条评分
+     * @param review 可选影评，空时继承上一条影评
+     * @return 新建记录与旧记录的上下文结果
      */
     public MarkResult markNew(MarkRequest req, Double rating, String review) {
         if (req.getId() == null)
@@ -217,12 +278,29 @@ public class WorkService {
         return new MarkResult(buildListItem(work, rec), previous);
     }
 
+    /**
+     * 回退最新一条记录。
+     *
+     * <p>仅删除该作品的最新记录，用于撤销最近一次操作。</p>
+     *
+     * @param workId 作品ID
+     */
     @Transactional
     public void undoLastRecord(Long workId) {
         recordRepo.findLatestIdByWorkId(workId)
                 .ifPresent(recordRepo::deleteRecordById);
     }
 
+    /**
+     * 更新当前最新记录的评分与影评（覆盖式）。
+     *
+     * <p>该方法直接改写最新记录，不保留历史副本。</p>
+     *
+     * @param workId 作品ID
+     * @param rating 评分，可为空
+     * @param review 影评，可为空
+     * @return 更新后的列表项
+     */
     public WorkListItem updateReview(Long workId, Double rating, String review) {
         Record r = recordRepo.findLatestByWorkId(workId)
                 .orElseThrow(() -> new IllegalStateException("no record to update"));
@@ -234,7 +312,14 @@ public class WorkService {
     }
 
     /**
-     * AI 模式更新评分/影评：总是新建一条 record，保留历史。
+     * 更新评分/影评并保留历史。
+     *
+     * <p>基于最新记录状态，新建一条历史记录，适用于需要时间线追踪的场景。</p>
+     *
+     * @param workId 作品ID
+     * @param rating 评分，可为空
+     * @param review 影评，可为空
+     * @return 包含新建记录的列表项
      */
     public WorkListItem updateReviewNew(Long workId, Double rating, String review) {
         Record previous = recordRepo.findLatestByWorkId(workId)
@@ -250,17 +335,36 @@ public class WorkService {
         return buildListItem(workRepo.findById(workId).orElse(null), r);
     }
 
-    /** markNew 的返回值：新记录 + 旧记录（用于前端对比展示） */
+    /**
+     * 标记返回值：返回新记录对应列表项及其前序记录，用于前端展示变更对比。
+     */
     public record MarkResult(WorkListItem item, Record previousRecord) {}
 
+    /**
+     * 查询角色中文名（透传 Bangumi API）。
+     *
+     * @param id 角色ID
+     * @return 角色中文名，未命中返回 {@code null}
+     */
     public String getCharacterName(Long id) {
         return bangumiService.getCharacterName(id);
     }
 
+    /**
+     * 查询人物中文名（透传 Bangumi API）。
+     *
+     * @param id 人物ID
+     * @return 人物中文名，未命中返回 {@code null}
+     */
     public String getActorName(Long id) {
         return bangumiService.getPersonName(id);
     }
 
+    /**
+     * 读取用于前端下拉或表单渲染的字典数据。
+     *
+     * @return 包含条目类型、记录状态及 Bangumi 代理配置的映射
+     */
     public Map<String, Object> getDict() {
         return Map.of(
                 "subjectTypes", subjectTypeRepo.findAll(),

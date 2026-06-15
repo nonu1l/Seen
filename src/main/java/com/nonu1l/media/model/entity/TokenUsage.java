@@ -7,6 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+/**
+ * Token 使用明细实体：记录每次模型调用在会话与节点维度的消耗。
+ */
 @Entity
 @Table(name = "token_usage")
 @Getter
@@ -51,6 +54,11 @@ public class TokenUsage {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * 新建记录前补齐创建时间，确保审计时间完整。
+     *
+     * <p>关键副作用：若 {@code createdAt} 为空则自动写入当前时间。</p>
+     */
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = Instant.now();

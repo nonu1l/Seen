@@ -7,6 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+/**
+ * 会话消息实体：持久化单条用户/模型消息内容与时间戳。
+ */
 @Entity
 @Table(name = "conversation_message")
 @Getter

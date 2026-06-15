@@ -14,8 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 仅对 DeepSeek 的 /chat/completions 请求体追加 thinking={type:disabled}，
- * 关闭思考模式以避免工具调用多轮循环时被要求回传 reasoning_content（Spring AI 1.1.x 不支持）。
+ * 拦截 DeepSeek 类 LLM 的聊天完成请求，为请求体补齐
+ * {@code thinking: {type: disabled}}，避免返回推理链路内容导致的兼容问题。
  */
 public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInterceptor {
 
@@ -23,10 +23,24 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 使用 Jackson 对请求体进行可变更的拦截器。
+     *
+     * @param objectMapper JSON 反序列化与序列化工具。
+     */
     public DeepSeekThinkingDisableInterceptor(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 在发送 HTTP 请求前尝试增强 DeepSeek 请求体。
+     *
+     * @param request 当前请求。
+     * @param body    原始请求内容。
+     * @param execution 下游执行器。
+     * @return 拦截器返回的响应体；仅在 DeepSeek chat completion 且未包含 thinking 时才修改 body。
+     * @throws IOException 读取或写入请求体异常。
+     */
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
         if (!isDeepSeekChatCompletion(request)) {
@@ -75,9 +89,10 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
     }
 
     /**
-     * 匹配请求的url，如果使用以下配置的模型外，需要再配置
-     * @param request
-     * @return
+     * 判断当前请求是否为 DeepSeek 聊天完成接口。
+     *
+     * @param request 当前请求对象。
+     * @return host 与 path 命中规则返回 true。
      */
     private static boolean isDeepSeekChatCompletion(HttpRequest request) {
         String host = request.getURI().getHost();

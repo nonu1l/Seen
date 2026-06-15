@@ -31,6 +31,13 @@ public class BangumiTools {
     private final WorkRepository workRepo;
     private final WebSearchService webSearchService;
 
+    /**
+     * @param bangumiService Bangumi 业务服务
+     * @param preprocessor 搜索结果预处理器
+     * @param recordRepo 记录仓储
+     * @param workRepo 作品仓储
+     * @param webSearchService Web 搜索聚合服务
+     */
     public BangumiTools(BangumiService bangumiService, SearchResultPreprocessor preprocessor,
                          RecordRepository recordRepo, WorkRepository workRepo,
                          WebSearchService webSearchService) {
@@ -74,6 +81,14 @@ public class BangumiTools {
         return compact.stream().map(CompactResult::from).toList().getFirst();
     }
 
+    /**
+     * 搜索本地数据库中的作品。
+     *
+     * <p>返回有最新记录的本地条目，未有记录的作品不会展示为已追踪状态。</p>
+     *
+     * @param keyword 关键词，空白时返回全部
+     * @return 紧凑本地记录列表
+     */
     public List<LocalRecord> searchLocal(String keyword) {
         log.debug("Tool: searchLocal keyword='{}'", keyword);
         List<Work> works = (keyword == null || keyword.isBlank())
@@ -92,16 +107,35 @@ public class BangumiTools {
         return results;
     }
 
+    /**
+     * 走统一 Web 搜索入口进行外部检索。
+     *
+     * @param query 检索关键词
+     * @return 外部检索结果
+     */
     public List<WebSearchItem> searchWeb(String query) {
         log.debug("Tool: searchWeb query='{}'", query);
         return webSearchService.search(query);
     }
 
+    /**
+     * 抓取 Web 页面正文文本。
+     *
+     * @param url 要抓取的 URL
+     * @return 清洗后的文本片段，失败时可能为 {@code null}
+     */
     public String fetchWeb(String url) {
         log.debug("Tool: fetchWeb url='{}'", url);
         return webSearchService.fetch(url);
     }
 
+    /**
+     * 获取 Bangumi 热门排行（已废弃，保留兼容）。
+     *
+     * @param type 条目类型
+     * @param year 年份过滤，可为空
+     * @return 紧凑排行结果
+     */
     @Deprecated
     public List<CompactResult> trendingBangumi(int type, Integer year) {
         log.debug("Tool: trendingBangumi type={} year={}", type, year);

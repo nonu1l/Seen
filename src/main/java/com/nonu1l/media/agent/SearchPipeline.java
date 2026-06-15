@@ -17,12 +17,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * 多步搜索管道 Skill。
+ * 多步搜索流水线：生成搜索关键词、抓取页面、抽取标题、Bangumi 匹配并做结果校验。
  *
  * 流程：
  * 1. 生成 3 组搜索关键词
  * 2. 依次搜索 → 多线程抓取 → LLM 提炼片名 → 多线程 Bangumi 匹配
- * 3. 够 3 条提前结束，全空则 LLM 生成失败原因
+ * 3. 可用结果提前返回；全空则通过 LLM 生成失败原因
  */
 public class SearchPipeline {
 
@@ -37,6 +37,10 @@ public class SearchPipeline {
     private final String promptValidate;
     private final String promptFail;
 
+    /**
+     * @param chatClient 用于关键词、标题提炼、校验和失败文案生成的 LLM 客户端
+     * @param tools 搜索与抓取能力封装（web/searchBangumi等）
+     */
     public SearchPipeline(ChatClient chatClient, BangumiTools tools) {
         this.chatClient = chatClient;
         this.tools = tools;
@@ -54,14 +58,33 @@ public class SearchPipeline {
         }
     }
 
+    /**
+     * 搜索流水线执行结果。
+     *
+     * @param cards 命中的作品列表，通常最多 maxCards 条
+     * @param failReason 全空时可见失败原因
+     */
     public record PipelineResult(List<MatchedEntry> cards, String failReason) {}
 
     // ── 主入口 ──
 
+    /**
+     * 不带历史上下文的搜索入口，内部自动透传空历史。
+     *
+     * @param userInput 用户检索意图
+     * @return 流水线执行结果
+     */
     public PipelineResult execute(String userInput) {
         return execute(userInput, "");
     }
 
+    /**
+     * 执行一次推荐/搜索流水线：先生成关键词，循环查询每组关键词并并发抓取与匹配。
+     *
+     * @param userInput 当前用户输入
+     * @param history 会话历史（用于提升标题提炼准确率）
+     * @return 命中卡片或失败原因
+     */
     public PipelineResult execute(String userInput, String history) {
         String context = history.isEmpty() ? userInput : "对话历史：\n" + history + "\n当前请求：" + userInput;
         List<String> keywords = generateKeywords(context);
@@ -129,6 +152,13 @@ public class SearchPipeline {
         return new PipelineResult(allCards, null);
     }
 
+    /**
+     * 按关键词重试搜索 Bangumi 单条结果，命中后立即返回第一条。
+     *
+     * @param keyword 查询关键字
+     * @param maxRetries 最大重试次数
+     * @return 命中条目；失败则返回 null
+     */
     MatchedEntry searchBangumiWithRetry(String keyword, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             try {
@@ -147,7 +177,13 @@ public class SearchPipeline {
         return null;
     }
 
-    /** 用 LLM 校验 title→card 映射，返回通过校验的 subjectId 集合 */
+    /**
+     * 用 LLM 校验标题与 Bangumi 候选映射，过滤误匹配。
+     *
+     * @param cardMap 标题到匹配卡片映射
+     * @param context 归一化后的上下文
+     * @return 通过校验的 subjectId 集合；若 LLM 返回空则退化为不变更原集合
+     */
     java.util.Set<Long> validateMatchIds(Map<String, MatchedEntry> cardMap, String context) {
         TokenUsageAdvisor.setCurrentNode("pipeline-validateMatch");
         if (cardMap.isEmpty()) return java.util.Set.of();
@@ -168,6 +204,12 @@ public class SearchPipeline {
 
     // ── 内部方法 ──
 
+    /**
+     * 调用 LLM 从上下文生成最多 3 条搜索关键词。
+     *
+     * @param userInput 联合历史的上下文输入
+     * @return 非空行列表；空时回退为输入原文
+     */
     List<String> generateKeywords(String userInput) {
         TokenUsageAdvisor.setCurrentNode("pipeline-generateKeywords");
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
@@ -176,6 +218,13 @@ public class SearchPipeline {
         return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
     }
 
+    /**
+     * 从抓取文本中抽取候选作品标题。
+     *
+     * @param text 页面文本聚合
+     * @param userInput 用户原始输入
+     * @return 过滤后的标题列表
+     */
     List<String> extractTitles(String text, String userInput) {
         TokenUsageAdvisor.setCurrentNode("pipeline-extractTitles");
         if (text.length() > 8000) text = text.substring(0, 8000);
@@ -186,6 +235,13 @@ public class SearchPipeline {
         return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
     }
 
+    /**
+     * 生成“无结果”时的友好失败文案。
+     *
+     * @param userInput 用户原始输入
+     * @param reason 失败原因（如关键词生成失败、关键词均无命中）
+     * @return 向用户展示的中文说明
+     */
     String failMessage(String userInput, String reason) {
         TokenUsageAdvisor.setCurrentNode("pipeline-failMessage");
         String prompt = promptFail.replace("{reason}", reason);

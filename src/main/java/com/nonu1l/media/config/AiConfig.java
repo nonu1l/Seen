@@ -7,17 +7,29 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * AI 相关配置：ChatClient 定制、token 用量记录 Advisor。
+ * AI 基础设施配置：定制 HTTP 客户端与注册 Token 用量统计 Advisor。
  */
 @Configuration
 public class AiConfig {
 
+    /**
+     * 为所有 RestClient 注册 DeepSeek 请求拦截器，用于统一关闭思考模式。
+     *
+     * @param objectMapper JSON 序列化工具。
+     * @return RestClient 自定义器 Bean。
+     */
     @Bean
     public RestClientCustomizer deepSeekThinkingDisableCustomizer(ObjectMapper objectMapper) {
         return restClientBuilder -> restClientBuilder
                 .requestInterceptor(new DeepSeekThinkingDisableInterceptor(objectMapper));
     }
 
+    /**
+     * 注册 token 用量统计 Advisor，便于在 ChatClient 调用时落库记录。
+     *
+     * @param repo token 持久化仓库。
+     * @return token 用量 Advisor 实例。
+     */
     @Bean
     public TokenUsageAdvisor tokenUsageAdvisor(TokenUsageRepository repo) {
         return new TokenUsageAdvisor(repo);
