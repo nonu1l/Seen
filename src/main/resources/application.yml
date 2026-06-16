@@ -34,7 +34,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    com.nonu1l.media.service.BangumiTools: DEBUG
+    com.nonu1l.media.agent.tool.AiBangumiTools: DEBUG
     com.nonu1l.media.service.WebSearchService: DEBUG
     com.nonu1l.media.service.SerperSearchService: DEBUG
     com.nonu1l.media.service.DDGSearchService: DEBUG
@@ -44,4 +44,4 @@ logging:
 #    org.hibernate.orm.jdbc.bind: TRACE
 #    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG
-#    com.nonu1l.media.service.RequestCacheUtil: DEBUG
+#    com.nonu1l.media.cache.CaffeineRequestCacheAspect: DEBUG
