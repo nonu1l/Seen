@@ -3,6 +3,7 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
@@ -22,6 +23,7 @@ public class WebSearchService implements SearchProvider {
     private final SerperSearchService serper;
     private final SettingsService settingsService;
     private final WebFetchService webFetchService;
+    private final boolean searchEnabled;
 
     /**
      * 注入底层搜索实现，实际请求时按当前设置动态选择。
@@ -30,14 +32,17 @@ public class WebSearchService implements SearchProvider {
      * @param serper Serper 实现
      * @param settingsService 设置读取服务
      * @param webFetchService 独立网页抓取服务
+     * @param searchEnabled 是否启用外部搜索源
      */
     public WebSearchService(DDGSearchService ddg, SerperSearchService serper,
                             SettingsService settingsService,
-                            WebFetchService webFetchService) {
+                            WebFetchService webFetchService,
+                            @Value("${app.search.enabled:true}") boolean searchEnabled) {
         this.ddg = ddg;
         this.serper = serper;
         this.settingsService = settingsService;
         this.webFetchService = webFetchService;
+        this.searchEnabled = searchEnabled;
     }
 
     /**
@@ -48,6 +53,10 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItem> search(String query) {
+        if (!isSearchEnabled()) {
+            log.warn("Web search disabled by app.search.enabled=false");
+            return List.of();
+        }
         String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
         if ("auto".equalsIgnoreCase(provider)) {
             return searchAuto(query);
@@ -93,6 +102,15 @@ public class WebSearchService implements SearchProvider {
             log.warn("Web search provider={} failed query='{}': {}", providerName, query, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * 判断外部搜索源是否启用，用于在联调或测试中模拟搜索源整体不可用。
+     *
+     * @return 配置允许外部搜索时返回 true
+     */
+    private boolean isSearchEnabled() {
+        return searchEnabled;
     }
 
     // ── 抓取文本清洗 ──

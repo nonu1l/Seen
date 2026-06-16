@@ -1,6 +1,6 @@
 # Agentic Web Search 分支改动说明
 
-本文分析当前 `dev-agentic-web-search` 分支相对 `dev` 的已提交改动，并补充当前工作区中尚未提交的临时变更说明。文档面向后续 Agent 执行、联调、评审使用，重点说明本轮升级如何让搜索链路从“固定搜索源”演进为“搜索源优先级 + LLM 自主取数”的 Agentic Web Search。
+本文分析当前 `dev-agentic-web-search` 分支相对 `dev` 的主要改动。文档面向后续 Agent 执行、联调、评审使用，重点说明本轮升级如何让搜索链路从“固定搜索源”演进为“搜索源优先级 + LLM 自主取数”的 Agentic Web Search。
 
 ## 一、分支范围
 
@@ -8,7 +8,7 @@
 
 共同基线：`d63e88c`
 
-当前分支已提交记录：
+实现阶段主要提交记录：
 
 | 提交 | 说明 |
 | --- | --- |
@@ -16,14 +16,15 @@
 | `29a99c0` | 将 `Agentic Web Search升级计划.md` 改为面向 Agent 执行的升级计划 |
 | `10464df` | 增加 Agentic Web Search fallback、`fetch_url` 工具和智能搜索源链路 |
 | `4a87a15` | 修复前端搜索源选项布局，保持横向排列 |
+| `ecba916` | 新增当前分支改动说明文档 |
 
-已提交改动规模：
+主要改动范围：
 
-| 类型 | 文件数 | 说明 |
-| --- | ---: | --- |
-| 后端 Agent / 搜索链路 | 8 | 搜索管道、工具注册、搜索服务、URL 抓取服务 |
-| 前端设置页 | 3 | 搜索源类型、设置页选项、横向布局样式 |
-| 文档与数据目录 | 3 | 升级计划文档、`.gitkeep`、`.gitignore` |
+| 类型 | 说明 |
+| --- | --- |
+| 后端 Agent / 搜索链路 | 搜索管道、工具注册、搜索服务、URL 抓取服务、搜索可用性配置 |
+| 前端设置页 | 搜索源类型、设置页选项、横向布局样式 |
+| 文档与数据目录 | 分支改动说明、`.gitkeep`、`.gitignore` |
 
 ## 二、改动总览
 
@@ -74,6 +75,25 @@ pipeline-directFetchUrls
 ```
 
 并修复为横向三列布局。移动端会保持横向滚动，不会挤压成多行。
+
+### 6. 搜索可用性配置
+
+`application.yml` 新增：
+
+```yaml
+app:
+  search:
+    enabled: "${WEB_SEARCH_ENABLED:true}"
+```
+
+该配置用于控制 `web_search` 是否可用：
+
+| 值 | 行为 |
+| --- | --- |
+| `true` | 正常调用 Serper / DuckDuckGo / Auto 链路 |
+| `false` | `web_search` 直接返回空结果，用于验证 `fetch_url` 直访 URL fallback |
+
+这让“搜索源不可用”的联调从临时文件开关变成明确配置，可以通过环境变量 `WEB_SEARCH_ENABLED=false` 稳定复现。
 
 ## 三、Agent 架构变化
 
@@ -153,11 +173,14 @@ flowchart TB
 
 ## 五、智能搜索源链路
 
-搜索源配置仍然由设置项 `search.provider` 控制。
+搜索源配置仍然由设置项 `search.provider` 控制；搜索工具整体是否启用由 `app.search.enabled` 控制。
 
 ```mermaid
 flowchart TB
     Provider["search.provider"] --> Mode{"配置值"}
+    Enabled["app.search.enabled"] --> SearchEnabled{"是否启用 web_search?"}
+    SearchEnabled -- "false" --> Empty["返回空结果"]
+    SearchEnabled -- "true" --> Provider
 
     Mode -- "serper" --> SerperOnly["只调用 Serper"]
     Mode -- "duckduckgo" --> DdgOnly["只调用 DuckDuckGo"]
@@ -229,7 +252,7 @@ flowchart TB
 
 ### 2. 搜索源不可用 fallback 验证
 
-在后端端口 `8081` 上使用临时测试开关模拟搜索源不可用，并发送请求：
+在后端端口 `8081` 上使用 `app.search.enabled=false` 模拟搜索源不可用，并发送请求：
 
 ```text
 近期热门动画推荐，按当前热门榜单找几部
@@ -271,28 +294,13 @@ classify
 | URL 抓取 | url、statusCode、contentType、contentLength、blockedReason |
 | Agent fallback | selectedUrls、successCount、failedCount |
 
-## 九、当前未提交/临时变更
-
-除已提交分支改动外，当前工作区还存在未提交内容。它们不属于已提交分支范围，但会影响本地验证环境。
-
-| 文件 | 状态 | 说明 |
-| --- | --- | --- |
-| `docs/CodeWhale 搜索流程.md` | 新增/暂存 | 记录 CodeWhale 在搜索失败后调用 `fetch_url` 访问 Jikan 的过程 |
-| `src/main/java/com/nonu1l/media/config/WebMvcConfig.java` | 修改 | 本地 CORS 允许端口从 `5173` 调整到 `5174` |
-| `src/main/java/com/nonu1l/media/service/WebSearchService.java` | 修改 | 临时测试开关：检测 `data/force-search-unavailable.flag` 时模拟搜索源不可用 |
-
-其中 `data/force-search-unavailable.flag` 测试文件已经删除，但对应的临时代码仍在工作区中。后续需要决定：
-
-| 选择 | 影响 |
-| --- | --- |
-| 保留并产品化 | 可作为本地/测试环境故障注入能力，但需要配置化和测试保护 |
-| 删除临时代码 | 保持生产代码干净，后续用单元测试 Mock 搜索服务 |
-
-## 十、后续建议
+## 九、后续建议与待完成功能
 
 1. 将搜索尝试、降级、URL 抓取结果写入统一观测模型，让 `/admin/token-usage` 或新的调试页面能看到完整链路。
-2. 明确 `auto` 是否作为新安装默认值；已有数据库中的旧设置不会因为代码默认值变化自动迁移。
-3. 为 `WebFetchService` 增加更细的测试，包括重定向到内网、超大响应、HTML 清洗、JSON 截断。
-4. 为 `SearchPipeline` 增加搜索为空时的集成测试，锁定 `pipeline-directFetchUrls` 行为。
-5. 如果保留故障注入能力，应改成 profile 或配置项，避免依赖魔法文件影响生产行为。
-
+2. 搜索观测建议记录 `provider`、`query`、结果数、耗时、错误、fallback 原因。
+3. `fetch_url` 观测建议记录 `host`、HTTP 状态码、contentType、文本长度、是否截断、失败原因。
+4. Token Usage 中建议进一步区分 `agentic-web-search`、`fetch-url`、`bangumi-validate` 等阶段。
+5. 明确 `auto` 是否作为新安装默认值；已有数据库中的旧设置不会因为代码默认值变化自动迁移。
+6. 为 `WebFetchService` 增加更细的测试，包括重定向到内网、超大响应、HTML 清洗、JSON 截断。
+7. 为 `SearchPipeline` 增加搜索为空时的集成测试，锁定 `pipeline-directFetchUrls` 行为。
+8. 补充 `app.search.enabled=false` 的联调说明，用于稳定复现 Serper 与 DuckDuckGo 都不可用时的 Agentic fallback。
