@@ -220,8 +220,7 @@ public class AiPreferenceMemoryService {
 
     private boolean shouldAutoRebuild() {
         if (!settingsService.getBoolean(SettingsService.AI_ENABLED)
-                || !settingsService.getBoolean(SettingsService.AI_MEMORY_ENABLED)
-                || !settingsService.getBoolean(SettingsService.AI_MEMORY_AUTO_UPDATE_ENABLED)) {
+                || !settingsService.getBoolean(SettingsService.AI_MEMORY_ENABLED)) {
             return false;
         }
         SettingsService.AiRuntimeSetting setting = settingsService.currentRuntimeSetting();

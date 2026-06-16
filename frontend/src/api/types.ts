@@ -138,8 +138,26 @@ export interface ConversationState {
 export interface SettingsResponse {
   aiEnabled: boolean;
   tokenUsageEnabled: boolean;
+  aiMemory: AiMemorySettings;
   aiProfile: AiProviderSetting;
   sources: SourceSettings;
+}
+
+export interface AiMemorySettings {
+  enabled: boolean;
+  autoUpdateEnabled?: boolean;
+}
+
+export interface AiMemoryResponse {
+  exists: boolean;
+  version: number | null;
+  summary: string | null;
+  likesJson: string | null;
+  dislikesJson: string | null;
+  recentShiftJson: string | null;
+  recommendationRulesJson: string | null;
+  sourceHash: string | null;
+  updatedAt: string | null;
 }
 
 export interface AiProviderSetting {

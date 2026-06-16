@@ -12,6 +12,7 @@ import type {
   SettingsTestResult,
   AiProviderSetting,
   AiProviderSettingRequest,
+  AiMemoryResponse,
 } from './types';
 
 const BASE = '/api';
@@ -106,6 +107,12 @@ export const api = {
 
   updateAiProfile: (req: AiProviderSettingRequest) =>
     request<AiProviderSetting>('/settings/ai-profile', { method: 'PUT', body: JSON.stringify(req) }),
+
+  getAiMemory: () =>
+    request<AiMemoryResponse>('/admin/ai-memory'),
+
+  rebuildAiMemory: () =>
+    request<AiMemoryResponse>('/admin/ai-memory/rebuild', { method: 'POST' }),
 
   testAiProfile: (req: Record<string, unknown>) =>
     request<SettingsTestResult>('/settings/ai-profile/test', { method: 'POST', body: JSON.stringify(req) }),

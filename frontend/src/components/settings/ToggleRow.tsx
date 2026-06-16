@@ -2,13 +2,14 @@ import { SettingsRow } from './SettingsRow';
 
 interface Props {
   title: string;
+  description?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }
 
-export function ToggleRow({ title, checked, onChange }: Props) {
+export function ToggleRow({ title, description, checked, onChange }: Props) {
   return (
-    <SettingsRow title={title}>
+    <SettingsRow title={title} description={description}>
       <button
         type="button"
         className={`settings-toggle ${checked ? 'is-on' : ''}`}
