@@ -614,13 +614,13 @@ export default function SettingsPage() {
 
         <div className="settings-form">
           <ToggleRow
-            title="记录 token 使用明细"
+            title="记录 Token 使用明细"
             description="开启后记录每次 AI 调用的 token 用量，并可在后台明细页查看。"
             checked={aiDraft.tokenUsageEnabled}
             onChange={value => setAiConfig('tokenUsageEnabled', value)}
           />
 
-          <SettingsRow title="缓存维护" description="清空当前进程内 HTTP 请求缓存，下一次请求会重新访问数据源。">
+          <SettingsRow title="缓存维护" description="请求缓存会按过期时间定期自动清理；手动清空后，下一次请求会重新访问数据源。">
             <button
               type="button"
               className="btn-ghost"
