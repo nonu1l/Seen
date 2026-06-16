@@ -823,6 +823,42 @@ body {
   min-width: 0;
 }
 
+.settings-extra {
+  min-width: 0;
+}
+
+.settings-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.settings-overview-metric {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.025);
+  padding: 14px;
+}
+
+.settings-overview-metric span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-overview-metric strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
 .settings-form {
   padding: 4px 18px 8px;
 }
@@ -1252,6 +1288,12 @@ body {
   }
 
   .settings-form {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .settings-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
     padding-left: 16px;
     padding-right: 16px;
   }

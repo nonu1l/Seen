@@ -2,6 +2,7 @@ package com.nonu1l.media.repository;
 
 import com.nonu1l.media.model.entity.TokenUsage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -11,4 +12,12 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface TokenUsageRepository extends JpaRepository<TokenUsage, Long> {
+
+    /**
+     * 汇总全部 Token 使用量。
+     *
+     * @return totalTokens 求和；无记录时返回 {@code null}
+     */
+    @Query("SELECT SUM(t.totalTokens) FROM TokenUsage t")
+    Long sumTotalTokens();
 }

@@ -6,6 +6,7 @@ import { SettingsRow } from '../components/settings/SettingsRow';
 import { TestResult } from '../components/settings/TestResult';
 import { ToggleRow } from '../components/settings/ToggleRow';
 import type {
+  AdminOverviewResponse,
   AiMemoryResponse,
   AiProviderSettingRequest,
   SettingsResponse,
@@ -13,6 +14,7 @@ import type {
 } from '../api/types';
 
 type TestKey = 'ai' | 'search' | 'bangumi';
+type SettingsGroup = 'ai' | 'sources' | 'extra';
 
 interface EditableAiConfig {
   aiEnabled: boolean;
@@ -35,6 +37,7 @@ interface SourceValues {
 const GROUPS = [
   { key: 'ai' as const, label: 'AI 助手' },
   { key: 'sources' as const, label: '搜索与数据源' },
+  { key: 'extra' as const, label: '额外配置' },
 ];
 
 const EMPTY_AI_CONFIG: EditableAiConfig = {
@@ -129,6 +132,18 @@ function formatMemoryTime(value: string | null) {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return unitIndex === 0 ? `${Math.round(size)} ${units[unitIndex]}` : `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
 function sameSources(a: SourceValues, b: SourceValues) {
   return a.searchProvider === b.searchProvider
     && isSecretUnchanged(a.serperApiKey, b.serperApiKey)
@@ -138,18 +153,22 @@ function sameSources(a: SourceValues, b: SourceValues) {
 
 export default function SettingsPage() {
   const toast = useToast();
-  const [activeGroup, setActiveGroup] = useState<'ai' | 'sources'>('ai');
+  const [activeGroup, setActiveGroup] = useState<SettingsGroup>('ai');
   const [aiDraft, setAiDraft] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
   const [aiInitial, setAiInitial] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
   const [sourceValues, setSourceValues] = useState<SourceValues>(() => toSourceValues(null));
   const [sourceInitial, setSourceInitial] = useState<SourceValues>(() => toSourceValues(null));
   const [aiMemory, setAiMemory] = useState<AiMemoryResponse | null>(null);
+  const [adminOverview, setAdminOverview] = useState<AdminOverviewResponse | null>(null);
   const [showAiSecret, setShowAiSecret] = useState(false);
   const [showSerperSecret, setShowSerperSecret] = useState(false);
   const [loading, setLoading] = useState(true);
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [memoryRebuilding, setMemoryRebuilding] = useState(false);
   const [memoryDetailsOpen, setMemoryDetailsOpen] = useState(false);
+  const [adminOverviewLoading, setAdminOverviewLoading] = useState(false);
+  const [adminOverviewRequested, setAdminOverviewRequested] = useState(false);
+  const [adminActionLoading, setAdminActionLoading] = useState<'cache' | 'token' | null>(null);
   const [saving, setSaving] = useState(false);
   const [testLoading, setTestLoading] = useState<TestKey | null>(null);
   const [testResults, setTestResults] = useState<Record<TestKey, SettingsTestResult | null>>({
@@ -159,8 +178,9 @@ export default function SettingsPage() {
   });
 
   const aiDirty = useMemo(() => !sameAiConfig(aiDraft, aiInitial), [aiDraft, aiInitial]);
+  const extraDirty = useMemo(() => aiDraft.tokenUsageEnabled !== aiInitial.tokenUsageEnabled, [aiDraft, aiInitial]);
   const sourceDirty = useMemo(() => !sameSources(sourceValues, sourceInitial), [sourceValues, sourceInitial]);
-  const dirty = activeGroup === 'ai' ? aiDirty : sourceDirty;
+  const dirty = activeGroup === 'ai' ? aiDirty : activeGroup === 'sources' ? sourceDirty : extraDirty;
 
   const applySettings = (next: SettingsResponse) => {
     const nextSources = toSourceValues(next);
@@ -178,6 +198,20 @@ export default function SettingsPage() {
     const next = await api.getSettings();
     applySettings(next);
     return next;
+  };
+
+  const reloadAdminOverview = async () => {
+    setAdminOverviewLoading(true);
+    try {
+      const next = await api.getAdminOverview();
+      setAdminOverview(next);
+      return next;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '读取额外配置汇总失败');
+      throw err;
+    } finally {
+      setAdminOverviewLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -222,14 +256,21 @@ export default function SettingsPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!aiDirty && !sourceDirty) return;
+    if (activeGroup !== 'extra') return;
+    if (adminOverview !== null || adminOverviewLoading || adminOverviewRequested) return;
+    setAdminOverviewRequested(true);
+    reloadAdminOverview().catch(() => {});
+  }, [activeGroup, adminOverview, adminOverviewLoading, adminOverviewRequested]);
+
+  useEffect(() => {
+    if (!aiDirty && !sourceDirty && !extraDirty) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [aiDirty, sourceDirty]);
+  }, [aiDirty, sourceDirty, extraDirty]);
 
   const setAiConfig = <K extends keyof EditableAiConfig>(key: K, value: EditableAiConfig[K]) => {
     setAiDraft(prev => ({ ...prev, [key]: value }));
@@ -256,7 +297,6 @@ export default function SettingsPage() {
       await api.updateSettings({
         settings: {
           'ai.enabled': aiDraft.aiEnabled,
-          'ai.token-usage.enabled': aiDraft.tokenUsageEnabled,
           'ai.memory.enabled': aiDraft.memoryEnabled,
         },
       });
@@ -267,6 +307,55 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveExtraConfig = async () => {
+    setSaving(true);
+    try {
+      const next = await api.updateSettings({
+        settings: {
+          'ai.token-usage.enabled': aiDraft.tokenUsageEnabled,
+        },
+      });
+      applySettings(next);
+      toast.success('设置已生效');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存额外配置失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearRequestCache = async () => {
+    if (!window.confirm('确定要清空当前请求缓存吗？')) return;
+    setAdminActionLoading('cache');
+    try {
+      const next = await api.clearRequestCache();
+      setAdminOverview(next);
+      toast.success('请求缓存已清空');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '清空请求缓存失败');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const resetTokenUsage = async () => {
+    if (!window.confirm('确定要重置 Token 计算吗？这会删除全部 Token 使用明细。')) return;
+    setAdminActionLoading('token');
+    try {
+      const next = await api.resetTokenUsage();
+      setAdminOverview(next);
+      toast.success('Token 计算已重置');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '重置 Token 计算失败');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const openAdminPage = (path: string) => {
+    window.open(path, '_blank');
   };
 
   const rebuildMemory = async () => {
@@ -442,8 +531,6 @@ export default function SettingsPage() {
         <div className="settings-form">
           <ToggleRow title="AI 助手" checked={aiDraft.aiEnabled} onChange={value => setAiConfig('aiEnabled', value)} />
 
-          <ToggleRow title="记录 token 使用明细" checked={aiDraft.tokenUsageEnabled} onChange={value => setAiConfig('tokenUsageEnabled', value)} />
-
           <SettingsRow title="API Base URL" description="填写完整 API 前缀，例如 https://api.deepseek.com/v1 或 https://open.bigmodel.cn/api/paas/v4。">
             <input className="settings-input" value={aiDraft.baseUrl} onChange={event => setAiConfig('baseUrl', event.target.value)} />
           </SettingsRow>
@@ -490,6 +577,72 @@ export default function SettingsPage() {
       </div>
 
       <div className="settings-results"><TestResult result={testResults.ai} /></div>
+    </>
+  );
+
+  const renderExtraSettings = () => (
+    <>
+      <div className="settings-panel-head">
+        <div>
+          <h3>额外配置</h3>
+          <p>查看 Token 与请求缓存总量，管理调试明细和本地运行数据。</p>
+        </div>
+        <div className="settings-panel-buttons">
+          <button type="button" className="btn-ghost" onClick={() => openAdminPage('/admin/token-usage')}>
+            查看 Token 明细
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => openAdminPage('/admin/request-cache')}>
+            查看缓存明细
+          </button>
+          <button type="button" className="btn-primary" disabled={!extraDirty || saving} onClick={saveExtraConfig}>
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+
+      <div className="settings-extra">
+        <div className="settings-overview-grid">
+          <div className="settings-overview-metric">
+            <span>Token 消耗总量</span>
+            <strong>{adminOverviewLoading && !adminOverview ? '读取中...' : (adminOverview?.totalTokens ?? 0).toLocaleString()}</strong>
+          </div>
+          <div className="settings-overview-metric">
+            <span>缓存使用总量</span>
+            <strong>{adminOverviewLoading && !adminOverview ? '读取中...' : formatBytes(adminOverview?.cacheBytes ?? 0)}</strong>
+          </div>
+        </div>
+
+        <div className="settings-form">
+          <ToggleRow
+            title="记录 token 使用明细"
+            description="开启后记录每次 AI 调用的 token 用量，并可在后台明细页查看。"
+            checked={aiDraft.tokenUsageEnabled}
+            onChange={value => setAiConfig('tokenUsageEnabled', value)}
+          />
+
+          <SettingsRow title="缓存维护" description="清空当前进程内 HTTP 请求缓存，下一次请求会重新访问数据源。">
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={adminActionLoading !== null}
+              onClick={clearRequestCache}
+            >
+              {adminActionLoading === 'cache' ? '清空中...' : '清空缓存'}
+            </button>
+          </SettingsRow>
+
+          <SettingsRow title="Token 计算" description="删除全部 token 使用明细，并将统计总量重置为 0。">
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={adminActionLoading !== null}
+              onClick={resetTokenUsage}
+            >
+              {adminActionLoading === 'token' ? '重置中...' : '重置 Token 计算'}
+            </button>
+          </SettingsRow>
+        </div>
+      </div>
     </>
   );
 
@@ -578,7 +731,7 @@ export default function SettingsPage() {
               <span className="h-2 w-2 dot-2 rounded-full" style={{ background: 'var(--accent)' }} />
               <span className="h-2 w-2 dot-3 rounded-full" style={{ background: 'var(--accent)' }} />
             </div>
-          ) : activeGroup === 'ai' ? renderAiSettings() : renderSourceSettings()}
+          ) : activeGroup === 'ai' ? renderAiSettings() : activeGroup === 'sources' ? renderSourceSettings() : renderExtraSettings()}
         </section>
       </div>
     </div>

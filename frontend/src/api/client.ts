@@ -13,6 +13,7 @@ import type {
   AiProviderSetting,
   AiProviderSettingRequest,
   AiMemoryResponse,
+  AdminOverviewResponse,
 } from './types';
 
 const BASE = '/api';
@@ -113,6 +114,15 @@ export const api = {
 
   rebuildAiMemory: () =>
     request<AiMemoryResponse>('/admin/ai-memory/rebuild', { method: 'POST' }),
+
+  getAdminOverview: () =>
+    request<AdminOverviewResponse>('/admin/overview'),
+
+  clearRequestCache: () =>
+    request<AdminOverviewResponse>('/admin/request-cache/clear', { method: 'POST' }),
+
+  resetTokenUsage: () =>
+    request<AdminOverviewResponse>('/admin/token-usage/reset', { method: 'POST' }),
 
   testAiProfile: (req: Record<string, unknown>) =>
     request<SettingsTestResult>('/settings/ai-profile/test', { method: 'POST', body: JSON.stringify(req) }),

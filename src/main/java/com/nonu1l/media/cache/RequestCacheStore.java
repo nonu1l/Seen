@@ -87,6 +87,25 @@ public class RequestCacheStore {
     }
 
     /**
+     * 统计当前进程内缓存响应体总字节数。
+     *
+     * @return 未过期缓存响应体 UTF-8 字节数之和
+     */
+    public long totalBytes() {
+        return snapshot().stream()
+                .mapToLong(SnapshotEntry::responseBytes)
+                .sum();
+    }
+
+    /**
+     * 清空当前进程内请求缓存。
+     */
+    public void clear() {
+        cache.invalidateAll();
+        cache.cleanUp();
+    }
+
+    /**
      * 查询单条缓存详情。
      *
      * @param key 缓存 key

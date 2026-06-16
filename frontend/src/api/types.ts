@@ -160,6 +160,11 @@ export interface AiMemoryResponse {
   updatedAt: string | null;
 }
 
+export interface AdminOverviewResponse {
+  totalTokens: number;
+  cacheBytes: number;
+}
+
 export interface AiProviderSetting {
   baseUrl: string;
   model: string;
