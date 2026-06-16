@@ -40,7 +40,7 @@ public class PreCacheService {
     }
 
     /**
-     * 异步预请求 Bangumi 作品详情与角色页缓存。
+     * 异步预请求 Bangumi 作品详情，并按设置决定是否预取角色页缓存。
      *
      * <p>按固定线程池并行拉取，避免阻塞主请求线程；重复触发会覆盖旧 batchId。</p>
      *
@@ -50,11 +50,14 @@ public class PreCacheService {
         long batchId = batchCounter.incrementAndGet();
         long t0 = System.nanoTime();
         String base = settingsService.bangumiApiBase();
+        boolean castEnabled = settingsService.getBoolean(SettingsService.DETAIL_CAST_ENABLED);
         List<CompletableFuture<Void>> futures = ids.stream()
             .map(id -> CompletableFuture.runAsync(() -> {
                 if (batchId != batchCounter.get()) return;
                 httpClient.get(base + "/subjects/" + id, TTL_SUBJECT);
-                httpClient.get(base + "/subjects/" + id + "/characters", TTL_CHARS);
+                if (castEnabled) {
+                    httpClient.get(base + "/subjects/" + id + "/characters", TTL_CHARS);
+                }
             }, executor))
             .toList();
         // 异步等待全部完成，输出总耗时
