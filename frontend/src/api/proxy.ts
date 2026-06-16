@@ -2,7 +2,11 @@ let _proxy = '';
 
 export function setBangumiProxy(url: string) {
   _proxy = url || '';
-  if (_proxy) localStorage.setItem('bgm_proxy', _proxy);
+  if (_proxy) {
+    localStorage.setItem('bgm_proxy', _proxy);
+  } else {
+    localStorage.removeItem('bgm_proxy');
+  }
 }
 
 export function getBangumiProxy(): string {

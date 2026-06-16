@@ -10,6 +10,8 @@ import type {
   SettingsResponse,
   UpdateSettingsRequest,
   SettingsTestResult,
+  AiProviderSetting,
+  AiProviderSettingRequest,
 } from './types';
 
 const BASE = '/api';
@@ -19,9 +21,28 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...options
   });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(await errorMessage(res));
+  }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+async function errorMessage(res: Response) {
+  const fallback = `API error: ${res.status} ${res.statusText}`;
+  try {
+    const text = await res.text();
+    if (!text) return fallback;
+    const contentType = res.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      const body = JSON.parse(text) as { error?: unknown; message?: unknown };
+      if (typeof body.message === 'string' && body.message.trim()) return body.message;
+      if (typeof body.error === 'string' && body.error.trim()) return body.error;
+    }
+    return text.length > 240 ? text.slice(0, 240) + '...' : text;
+  } catch {
+    return fallback;
+  }
 }
 
 export const api = {
@@ -36,9 +57,6 @@ export const api = {
 
   mark: (req: MarkRequest) =>
     request<WorkListItem>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
-
-  rewatch: (workId: number) =>
-    request<WorkListItem>('/works/rewatch', { method: 'POST', body: JSON.stringify({ workId }) }),
 
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),
@@ -86,8 +104,11 @@ export const api = {
   updateSettings: (req: UpdateSettingsRequest) =>
     request<SettingsResponse>('/settings', { method: 'PUT', body: JSON.stringify(req) }),
 
-  testAiSettings: (req: Record<string, unknown>) =>
-    request<SettingsTestResult>('/settings/test-ai', { method: 'POST', body: JSON.stringify(req) }),
+  updateAiProfile: (req: AiProviderSettingRequest) =>
+    request<AiProviderSetting>('/settings/ai-profile', { method: 'PUT', body: JSON.stringify(req) }),
+
+  testAiProfile: (req: Record<string, unknown>) =>
+    request<SettingsTestResult>('/settings/ai-profile/test', { method: 'POST', body: JSON.stringify(req) }),
 
   testSearchSettings: (req: Record<string, unknown>) =>
     request<SettingsTestResult>('/settings/test-search', { method: 'POST', body: JSON.stringify(req) }),

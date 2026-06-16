@@ -2,85 +2,71 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.ai.retry.RetryUtils;
-import org.springframework.boot.web.client.RestClientCustomizer;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 根据当前设置动态创建和复用 AI ChatClient。
+ * 根据当前 AI 接入配置动态创建和复用 ChatClient。
  */
 @Service
 public class AiChatClientFactory {
 
     private final SettingsService settingsService;
     private final TokenUsageAdvisor tokenUsageAdvisor;
-    private final ObjectProvider<RestClientCustomizer> restClientCustomizers;
-    private final ObjectProvider<ToolCallingManager> toolCallingManagers;
     private final ConcurrentHashMap<String, ChatClient> cache = new ConcurrentHashMap<>();
 
     public AiChatClientFactory(SettingsService settingsService,
-                               TokenUsageAdvisor tokenUsageAdvisor,
-                               ObjectProvider<RestClientCustomizer> restClientCustomizers,
-                               ObjectProvider<ToolCallingManager> toolCallingManagers) {
+                               TokenUsageAdvisor tokenUsageAdvisor) {
         this.settingsService = settingsService;
         this.tokenUsageAdvisor = tokenUsageAdvisor;
-        this.restClientCustomizers = restClientCustomizers;
-        this.toolCallingManagers = toolCallingManagers;
     }
 
     public ChatClient currentClient() {
-        SettingsService.AiRuntimeSettings settings = settingsService.getAiRuntimeSettings();
-        String cacheKey = cacheKey(settings);
-        return cache.computeIfAbsent(cacheKey, ignored -> buildClient(settings));
+        SettingsService.AiRuntimeSetting setting = settingsService.currentRuntimeSetting();
+        validate(setting);
+        String cacheKey = cacheKey(setting);
+        return cache.computeIfAbsent(cacheKey, ignored -> buildClient(setting));
     }
 
-    private ChatClient buildClient(SettingsService.AiRuntimeSettings settings) {
-        RestClient.Builder restClientBuilder = RestClient.builder();
-        restClientCustomizers.orderedStream().forEach(customizer -> customizer.customize(restClientBuilder));
+    private ChatClient buildClient(SettingsService.AiRuntimeSetting setting) {
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
+                .baseUrl(AiProviderSupport.trimTrailingSlash(setting.baseUrl()))
+                .apiKey(setting.apiKey())
+                .model(setting.model())
+                .temperature(setting.temperature());
 
-        OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(trimTrailingSlash(settings.baseUrl()))
-                .apiKey(settings.apiKey())
-                .completionsPath(normalizePath(settings.completionsPath()))
-                .restClientBuilder(restClientBuilder)
-                .webClientBuilder(WebClient.builder())
-                .responseErrorHandler(RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER)
-                .build();
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(settings.model())
-                .temperature(settings.temperature())
-                .build();
+        if (AiProviderSupport.usesThinkingToggle(setting.providerKind())) {
+            options.extraBody(Map.of("thinking", Map.of("type", "disabled")));
+        }
 
         OpenAiChatModel model = OpenAiChatModel.builder()
-                .openAiApi(api)
-                .defaultOptions(options)
-                .toolCallingManager(toolCallingManagers.getIfAvailable(ToolCallingManager.builder()::build))
-                .retryTemplate(RetryUtils.DEFAULT_RETRY_TEMPLATE)
+                .options(options.build())
                 .build();
 
         return ChatClient.builder(model)
-                .defaultAdvisors(tokenUsageAdvisor)
+                .defaultAdvisors(tokenUsageAdvisor.withSetting(setting))
                 .build();
     }
 
-    private String cacheKey(SettingsService.AiRuntimeSettings settings) {
-        String raw = trimTrailingSlash(settings.baseUrl()) + "\n"
-                + settings.apiKey() + "\n"
-                + normalizePath(settings.completionsPath()) + "\n"
-                + settings.model() + "\n"
-                + settings.temperature();
+    private void validate(SettingsService.AiRuntimeSetting setting) {
+        if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
+            throw new IllegalStateException("请先在设置页配置 AI 地址、API Key 和模型");
+        }
+    }
+
+    private String cacheKey(SettingsService.AiRuntimeSetting setting) {
+        String raw = setting.id() + "\n"
+                + setting.providerKind() + "\n"
+                + AiProviderSupport.trimTrailingSlash(setting.baseUrl()) + "\n"
+                + setting.apiKey() + "\n"
+                + setting.model() + "\n"
+                + setting.temperature();
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] bytes = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
@@ -94,16 +80,4 @@ public class AiChatClientFactory {
         }
     }
 
-    private static String trimTrailingSlash(String value) {
-        String result = value == null ? "" : value.trim();
-        while (result.endsWith("/")) {
-            result = result.substring(0, result.length() - 1);
-        }
-        return result;
-    }
-
-    private static String normalizePath(String value) {
-        String result = value == null || value.isBlank() ? "/v1/chat/completions" : value.trim();
-        return result.startsWith("/") ? result : "/" + result;
-    }
 }

@@ -1,20 +1,20 @@
 package com.nonu1l.media.agent;
 
 import com.nonu1l.media.model.dto.MatchedEntry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.config.TokenUsageAdvisor;
+import com.nonu1l.media.agent.tool.AiBangumiTools;
+import com.nonu1l.media.agent.tool.AiToolRegistry;
+import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.service.AiChatClientFactory;
-import com.nonu1l.media.service.BangumiTools;
 import com.nonu1l.media.service.IntentAnalysisService;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,23 +35,28 @@ public class AgentService {
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
 
     private final AiChatClientFactory chatClientFactory;
-    private final BangumiTools tools;
+    private final AiToolRegistry toolRegistry;
     private final ObjectMapper objectMapper;
     private final String classifyPrompt;
     private final SearchPipeline searchPipeline;
 
     /**
      * @param chatClientFactory 运行时 AI 客户端工厂
-     * @param tools Bangumi/本地/网络搜索与抓取工具集合
+     * @param toolRegistry AI 工具回调注册器
+     * @param bangumiTools AI Bangumi 查询工具
+     * @param webSearchTools AI Web 搜索工具
      * @param objectMapper JSON 解析器
      */
-    public AgentService(AiChatClientFactory chatClientFactory, BangumiTools tools,
+    public AgentService(AiChatClientFactory chatClientFactory,
+                         AiToolRegistry toolRegistry,
+                         AiBangumiTools bangumiTools,
+                         AiWebSearchTools webSearchTools,
                          ObjectMapper objectMapper) {
         this.chatClientFactory = chatClientFactory;
-        this.tools = tools;
+        this.toolRegistry = toolRegistry;
         this.objectMapper = objectMapper;
         this.classifyPrompt = loadPrompt("prompts/classify-system.st");
-        this.searchPipeline = new SearchPipeline(this::chatClient, tools);
+        this.searchPipeline = new SearchPipeline(this::chatClient, bangumiTools, webSearchTools);
     }
 
     /**
@@ -138,7 +143,7 @@ public class AgentService {
                 .replace("{history}", s.history());
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
-                .toolCallbacks(toolsAsCallbacks()).call().content();
+                .toolCallbacks(toolRegistry.callbacks()).call().content();
         if (content != null && !content.isBlank()) {
             try {
                 String json = IntentAnalysisService.extractJsonObject(content);
@@ -184,7 +189,7 @@ public class AgentService {
                 .replace("{history}", s.history());
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
-                .toolCallbacks(toolsAsCallbacks()).call().content();
+                .toolCallbacks(toolRegistry.callbacks()).call().content();
         if (content != null && !content.isBlank()) {
             try {
                 String json = IntentAnalysisService.extractJsonObject(content);
@@ -294,7 +299,7 @@ public class AgentService {
         String content = chatClient().prompt()
                 .system(system)
                 .user(s.userInput())
-                .toolCallbacks(toolsAsCallbacks())
+                .toolCallbacks(toolRegistry.callbacks())
                 .call()
                 .content();
         if (content != null && !content.isBlank()) {
@@ -324,35 +329,6 @@ public class AgentService {
     }
 
     // ── helpers ─────────────────────────────────────────────
-
-    /**
-     * 构建 Agent 工具回调列表：Bangumi 搜索、搜索本地、搜索网络、抓取网页。
-     *
-     * @return 可供 Spring AI 注册的工具回调数组
-     */
-    private ToolCallback[] toolsAsCallbacks() {
-        return new ToolCallback[] {
-            FunctionToolCallback.builder("searchBangumi",
-                    (SearchReq req) -> tools.searchBangumi(req.keyword()))
-                .description("搜索 Bangumi 影视数据库")
-                .inputType(SearchReq.class).build(),
-            FunctionToolCallback.builder("searchLocal",
-                    (SearchReq req) -> tools.searchLocal(req.keyword()))
-                .description("查询本地已标记的作品记录")
-                .inputType(SearchReq.class).build(),
-            FunctionToolCallback.builder("searchWeb",
-                    (SearchReq req) -> tools.searchWeb(req.keyword()))
-                .description("搜索引擎")
-                .inputType(SearchReq.class).build(),
-            FunctionToolCallback.builder("fetchWeb",
-                    (FetchReq req) -> tools.fetchWeb(req.url()))
-                .description("抓取网页纯文本")
-                .inputType(FetchReq.class).build(),
-        };
-    }
-
-    record SearchReq(String keyword) {}
-    record FetchReq(String url) {}
 
     private ChatClient chatClient() {
         return chatClientFactory.currentClient();

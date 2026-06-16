@@ -2,20 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import type { Status } from '../api/types';
+import { STATUS_OPTIONS } from '../utils/statusMeta';
 
 interface Props {
   current: Status | null;
   onSelect: (s: Status) => void;
   trigger?: ReactNode;
 }
-
-const ITEMS: { s: Status; label: string; dot: string }[] = [
-  { s: 'wish', label: '想看', dot: 'dot-amber' },
-  { s: 'doing', label: '在看', dot: 'dot-green' },
-  { s: 'collect', label: '看过', dot: 'dot-blue' },
-  { s: 'on_hold', label: '搁置', dot: 'dot-gray' },
-  { s: 'dropped', label: '抛弃', dot: 'dot-gray' },
-];
 
 export function QuickMarkMenu({ current, onSelect, trigger }: Props) {
   const [open, setOpen] = useState(false);
@@ -90,7 +83,7 @@ export function QuickMarkMenu({ current, onSelect, trigger }: Props) {
           onClick={e => e.stopPropagation()}
           role="menu"
         >
-          {ITEMS.map(({ s, label, dot: dd }) => (
+          {STATUS_OPTIONS.map(({ status: s, label, dot: dd }) => (
             <button
               key={s}
               type="button"

@@ -129,6 +129,7 @@ public class TokenUsageController {
                 .filter(t -> turn.equals(t.getTurn()))
                 .filter(t -> node.equals(t.getNodeName()))
                 .map(t -> new TokenUsageDetail(t.getId(),
+                        t.getProfileName(),
                         t.getModelName(),
                         t.getTotalTokens() != null ? t.getTotalTokens().longValue() : 0L,
                         t.getInputText(),

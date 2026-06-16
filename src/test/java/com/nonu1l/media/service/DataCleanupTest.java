@@ -22,7 +22,6 @@ public class DataCleanupTest {
     @Autowired private ConversationSessionRepository sessionRepo;
     @Autowired private RecordRepository recordRepo;
     @Autowired private WorkRepository workRepo;
-    @Autowired private RequestCacheRepository requestCacheRepo;
     @Autowired private TokenUsageRepository tokenUsageRepo;
 
     @Test @DisplayName("清空 token_usage")
@@ -50,17 +49,13 @@ public class DataCleanupTest {
         workRepo.deleteAll();
     }
 
-    @Test @DisplayName("清空 request_cache")
-    void clearRequestCache() { requestCacheRepo.deleteAll(); }
-
-    @Test @DisplayName("清空全部 7 张表（按 FK 顺序）")
+    @Test @DisplayName("清空全部 6 张表（按 FK 顺序）")
     void clearAll() {
         cardRepo.deleteAll();
         messageRepo.deleteAll();
         sessionRepo.deleteAll();
         recordRepo.deleteAll();
         workRepo.deleteAll();
-        requestCacheRepo.deleteAll();
         tokenUsageRepo.deleteAll();
     }
 }

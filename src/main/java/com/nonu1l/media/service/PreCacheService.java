@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.util.RequestCacheUtil;
+import com.nonu1l.media.util.CachedHttpClient;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,23 +24,23 @@ public class PreCacheService {
     private static final long TTL_SUBJECT = 600;
     private static final long TTL_CHARS = 600;
 
-    private final RequestCacheUtil cache;
+    private final CachedHttpClient httpClient;
     private final SettingsService settingsService;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final AtomicLong batchCounter = new AtomicLong(0);
 
     /**
-     * @param cache 请求缓存工具
+     * @param httpClient 带缓存的 HTTP 客户端
      * @param settingsService 设置读取服务
      */
-    public PreCacheService(RequestCacheUtil cache,
+    public PreCacheService(CachedHttpClient httpClient,
                            SettingsService settingsService) {
-        this.cache = cache;
+        this.httpClient = httpClient;
         this.settingsService = settingsService;
     }
 
     /**
-     * 异步预请求 Bangumi 作品详情与角色页缓存。
+     * 异步预请求 Bangumi 作品详情，并按设置决定是否预取角色页缓存。
      *
      * <p>按固定线程池并行拉取，避免阻塞主请求线程；重复触发会覆盖旧 batchId。</p>
      *
@@ -50,11 +50,14 @@ public class PreCacheService {
         long batchId = batchCounter.incrementAndGet();
         long t0 = System.nanoTime();
         String base = settingsService.bangumiApiBase();
+        boolean castEnabled = settingsService.getBoolean(SettingsService.DETAIL_CAST_ENABLED);
         List<CompletableFuture<Void>> futures = ids.stream()
             .map(id -> CompletableFuture.runAsync(() -> {
                 if (batchId != batchCounter.get()) return;
-                cache.cacheGet(base + "/subjects/" + id, TTL_SUBJECT);
-                cache.cacheGet(base + "/subjects/" + id + "/characters", TTL_CHARS);
+                httpClient.get(base + "/subjects/" + id, TTL_SUBJECT);
+                if (castEnabled) {
+                    httpClient.get(base + "/subjects/" + id + "/characters", TTL_CHARS);
+                }
             }, executor))
             .toList();
         // 异步等待全部完成，输出总耗时

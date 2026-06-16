@@ -1,7 +1,5 @@
 package com.nonu1l.media.config;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpRequest;
@@ -12,6 +10,8 @@ import org.springframework.http.client.ClientHttpResponse;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 拦截 DeepSeek 类 LLM 的聊天完成请求，为请求体补齐

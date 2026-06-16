@@ -1,11 +1,10 @@
 package com.nonu1l.media.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -14,6 +13,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Serper.dev Google 搜索 API
@@ -25,7 +26,7 @@ import java.util.Map;
  * MediaType mediaType = MediaType.parse("application/json");
  * RequestBody body = RequestBody.create(mediaType, "{\"q\":\"2026年热门欧美剧推荐\",\"gl\":\"cn\",\"hl\":\"zh-cn\"}");
  * Request request = new Request.Builder()
- *   .url("https://google.serper.dev/search")
+ *   .url("Serper search endpoint")
  *   .method("POST", body)
  *   .addHeader("X-API-KEY", "your-api-key")
  *   .addHeader("Content-Type", "application/json")
@@ -67,6 +68,7 @@ public class SerperSearchService implements SearchProvider {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final SettingsService settingsService;
+    private final ExternalEndpointProperties endpointProperties;
 
     /**
      * 构造 Serper 搜索服务。
@@ -77,13 +79,15 @@ public class SerperSearchService implements SearchProvider {
      */
     public SerperSearchService(RestTemplateBuilder builder,
                                 ObjectMapper objectMapper,
-                                SettingsService settingsService) {
+                                SettingsService settingsService,
+                                ExternalEndpointProperties endpointProperties) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = objectMapper;
         this.settingsService = settingsService;
+        this.endpointProperties = endpointProperties;
     }
 
     /**
@@ -116,7 +120,7 @@ public class SerperSearchService implements SearchProvider {
             HttpEntity<String> request = new HttpEntity<>(body, headers);
 
             String json = restTemplate.postForObject(
-                    "https://google.serper.dev/search", request, String.class);
+                    endpointProperties.getSerperSearchUrl(), request, String.class);
             if (json == null) return results;
 
             JsonNode root = objectMapper.readTree(json);

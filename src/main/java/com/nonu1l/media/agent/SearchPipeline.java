@@ -1,9 +1,10 @@
 package com.nonu1l.media.agent;
 
 import com.nonu1l.media.config.TokenUsageAdvisor;
+import com.nonu1l.media.agent.tool.AiBangumiTools;
+import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.model.dto.MatchedEntry;
 import com.nonu1l.media.model.dto.WebSearchItem;
-import com.nonu1l.media.service.BangumiTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -30,7 +31,8 @@ public class SearchPipeline {
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
 
     private final Supplier<ChatClient> chatClientSupplier;
-    private final BangumiTools tools;
+    private final AiBangumiTools bangumiTools;
+    private final AiWebSearchTools webSearchTools;
     private final static int maxCards = 5;
     private final static int maxPages = 10;
     private final String promptKeywords;
@@ -40,11 +42,15 @@ public class SearchPipeline {
 
     /**
      * @param chatClientSupplier 用于关键词、标题提炼、校验和失败文案生成的 LLM 客户端供应器
-     * @param tools 搜索与抓取能力封装（web/searchBangumi等）
+     * @param bangumiTools AI Bangumi 查询工具
+     * @param webSearchTools AI Web 搜索工具
      */
-    public SearchPipeline(Supplier<ChatClient> chatClientSupplier, BangumiTools tools) {
+    public SearchPipeline(Supplier<ChatClient> chatClientSupplier,
+                          AiBangumiTools bangumiTools,
+                          AiWebSearchTools webSearchTools) {
         this.chatClientSupplier = chatClientSupplier;
-        this.tools = tools;
+        this.bangumiTools = bangumiTools;
+        this.webSearchTools = webSearchTools;
         this.promptKeywords = load("prompts/pipeline-keywords.st");
         this.promptTitles = load("prompts/pipeline-titles.st");
         this.promptValidate = load("prompts/pipeline-validate.st");
@@ -102,12 +108,12 @@ public class SearchPipeline {
             tried++;
 
             // 2a. 搜索
-            List<WebSearchItem> webResults = tools.searchWeb(kw);
+            List<WebSearchItem> webResults = webSearchTools.searchWeb(kw);
             if (webResults.isEmpty()) continue;
 
             // 2b. 多线程抓取 + 清洗
             List<String> pageTexts = webResults.stream().limit(maxPages).parallel()
-                    .map(r -> tools.fetchWeb(r.url()))
+                    .map(r -> webSearchTools.fetchWeb(r.url()))
                     .filter(t -> t != null && !t.isBlank())
                     .toList();
             if (pageTexts.isEmpty()) continue;
@@ -163,7 +169,7 @@ public class SearchPipeline {
     MatchedEntry searchBangumiWithRetry(String keyword, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             try {
-                var first = tools.searchBangumiOneResult(keyword);
+                var first = bangumiTools.searchBangumiOneResult(keyword);
                 if (first != null) {
                     return new MatchedEntry(first.id(), first.nameCn(), null, null, null, null,
                             first.airDate());

@@ -3,16 +3,9 @@ import { api } from '../api/client';
 import type { Status, WorkDetail } from '../api/types';
 import { Cover } from './Cover';
 import { StarRating } from './StarRating';
+import { STATUS_OPTIONS } from '../utils/statusMeta';
 
 interface Props { id: number; platform: string; onClose: (changed: boolean) => void; }
-
-const STATUSES: { s: Status; label: string; dot: string }[] = [
-  { s: 'wish', label: '想看', dot: 'dot-amber' },
-  { s: 'doing', label: '在看', dot: 'dot-green' },
-  { s: 'collect', label: '看过', dot: 'dot-blue' },
-  { s: 'on_hold', label: '搁置', dot: 'dot-gray' },
-  { s: 'dropped', label: '抛弃', dot: 'dot-gray' },
-];
 
 export function WorkDetailModal({ id, platform, onClose }: Props) {
   const [d, setD] = useState<WorkDetail | null>(null);
@@ -90,8 +83,6 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     } catch (e: any) { setError(e?.message || '标记失败'); }
   };
 
-  // FIXME: 保留
-  // const rewatch = async () => { if (!d?.id) return; try { await api.rewatch(d.id); setChanged(true); await refresh(); } catch (e: any) { setError(e?.message || '操作失败'); } };
   const saveReview = async () => {
     if (!d?.id) return; setSaving(true);
     try { await api.updateReview(d.id, rating, review.trim() || null); setChanged(true); }
@@ -105,7 +96,6 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     catch (e: any) { setError(e?.message || '操作失败'); }
   };
 
-{/* FIXME: 保留 const rwDisabled = !d?.id || d.status === 'wish' || d.status === 'dropped' || (d.watchedCount ?? 0) === 0; */}
   const pLabel = d?.platform || platform;
 
   return (
@@ -216,24 +206,12 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
               </div>
             )}
 
-            {/* FIXME: 保留
-              <button onClick={rewatch} disabled={rwDisabled}
-                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors"
-                style={{ borderColor:'var(--border)', color: rwDisabled ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: rwDisabled ? 0.35 : 1, cursor: rwDisabled ? 'not-allowed' : 'pointer' }}>
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                多刷{(d.watchedCount ?? 0) > 1 ? ` ×${d.watchedCount}` : ''}
-              </button>
-              */}
-
-
             {/* Mark section */}
             <div className="space-y-3 pt-3" style={{borderTop:'1px solid var(--border)'}}>
               <p className="text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">标记</p>
 
               <div className="grid grid-cols-5 gap-1.5">
-                {STATUSES.map(({ s, label, dot: dd }) => {
+                {STATUS_OPTIONS.map(({ status: s, label, dot: dd }) => {
                   const active = d.status === s;
                   return (
                     <button key={s} onClick={() => mark(s)}
@@ -248,17 +226,6 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                   );
                 })}
               </div>
-{/* FIXME: 保留
-              <button onClick={rewatch} disabled={rwDisabled}
-                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors"
-                style={{ borderColor:'var(--border)', color: rwDisabled ? 'var(--text-muted)' : 'var(--text-secondary)', opacity: rwDisabled ? 0.35 : 1, cursor: rwDisabled ? 'not-allowed' : 'pointer' }}>
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                多刷{(d.watchedCount ?? 0) > 1 ? ` ×${d.watchedCount}` : ''}
-              </button>
-              */}
-
               {d.id != null && (<>
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">评分</p>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useHomeList } from '../api/hooks';
@@ -7,17 +7,9 @@ import type { Status, WorkListItem, WorkSearchResult } from '../api/types';
 import { WorkCard } from '../components/WorkCard';
 import { WorkDetailModal } from '../components/WorkDetailModal';
 import { RobotLogo } from '../components/RobotLogo';
+import { STATUS_FILTERS } from '../utils/statusMeta';
 
 interface OpenedWork { id: number; platform: string; }
-
-const FILTERS: { key: Status | 'all'; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'collect', label: '看过' },
-  { key: 'doing', label: '在看' },
-  { key: 'wish', label: '想看' },
-  { key: 'on_hold', label: '搁置' },
-  { key: 'dropped', label: '抛弃' },
-];
 
 export default function HomePage() {
   const { query, setQuery, marked, search, loading, error, refresh, refreshSearch } = useHomeList();
@@ -26,10 +18,17 @@ export default function HomePage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const showingSearch = query.trim().length > 0;
 
+  /** IME 组合状态：中文输入法拼音期间不触发搜索 */
+  const composingRef = useRef(false);
+  const [displayQuery, setDisplayQuery] = useState('');
+
   useEffect(() => {
     api.getDict().then(d => setBangumiProxy(d.bangumiProxy));
     api.getAppConfig().then(c => setAiEnabled(c.aiEnabled)).catch(() => {});
   }, []);
+
+  /** 同步 displayQuery ← query（外部重置或 hooks 变化时） */
+  useEffect(() => { setDisplayQuery(query); }, [query]);
 
   const merged = useMemo(() => {
     if (!showingSearch || !search) return { marked, unmarked: [] as WorkSearchResult[] };
@@ -71,11 +70,22 @@ export default function HomePage() {
                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
-          <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+          <input type="text" value={displayQuery}
+                 onChange={e => {
+                   setDisplayQuery(e.target.value);
+                   if (!composingRef.current) {
+                     setQuery(e.target.value);
+                   }
+                 }}
+                 onCompositionStart={() => { composingRef.current = true; }}
+                 onCompositionEnd={e => {
+                   composingRef.current = false;
+                   setQuery(e.currentTarget.value);
+                 }}
                  placeholder="搜索片名..."
                  className="search-input" />
-          {query && (
-            <button type="button" onClick={() => setQuery('')}
+          {displayQuery && (
+            <button type="button" onClick={() => { setQuery(''); setDisplayQuery(''); }}
                     className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors hover:opacity-70" style={{ color: 'var(--text-muted)' }} aria-label="清除">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -93,7 +103,7 @@ export default function HomePage() {
       {/* Filter tabs — only when not searching */}
       {!showingSearch && merged.marked.length > 0 && (
         <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-none">
-          {FILTERS.map(f => (
+          {STATUS_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}

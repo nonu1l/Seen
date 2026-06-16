@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.*;
@@ -34,6 +35,7 @@ public class WorkService {
     private final BangumiService            bangumiService;
     private final TransactionTemplate       transactionTemplate;
     private final SettingsService           settingsService;
+    private final ObjectMapper              objectMapper;
 
     /**
      * 构造服务实例。
@@ -45,12 +47,14 @@ public class WorkService {
      * @param bangumiService Bangumi API 服务
      * @param transactionTemplate 事务模板，用于把远程请求和数据库写入分离
      * @param settingsService 设置读取服务
+     * @param objectMapper JSON 映射工具
      */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
                        SubjectTypeRepository subjectTypeRepo, RecordStatusRepository recordStatusRepo,
                        BangumiService bangumiService,
                        TransactionTemplate transactionTemplate,
-                       SettingsService settingsService) {
+                       SettingsService settingsService,
+                       ObjectMapper objectMapper) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
         this.subjectTypeRepo   = subjectTypeRepo;
@@ -58,6 +62,7 @@ public class WorkService {
         this.bangumiService    = bangumiService;
         this.transactionTemplate = transactionTemplate;
         this.settingsService   = settingsService;
+        this.objectMapper      = objectMapper;
     }
 
     /**
@@ -327,31 +332,6 @@ public class WorkService {
     }
 
     /**
-     * 更新评分/影评并保留历史。
-     *
-     * <p>基于最新记录状态，新建一条历史记录，适用于需要时间线追踪的场景。</p>
-     *
-     * @param workId 作品ID
-     * @param rating 评分，可为空
-     * @param review 影评，可为空
-     * @return 包含新建记录的列表项
-     */
-    @Transactional
-    public WorkListItem updateReviewNew(Long workId, Double rating, String review) {
-        Record previous = recordRepo.findLatestByWorkId(workId)
-                .orElseThrow(() -> new IllegalStateException("no record to update"));
-
-        Record r = new Record();
-        r.setWorkId(workId);
-        r.setStatus(previous.getStatus());
-        r.setRating(rating);
-        r.setReview(review);
-        recordRepo.save(r);
-
-        return buildListItem(workRepo.findById(workId).orElse(null), r);
-    }
-
-    /**
      * 标记返回值：返回新记录对应列表项及其前序记录，用于前端展示变更对比。
      */
     public record MarkResult(WorkListItem item, Record previousRecord) {}
@@ -420,7 +400,7 @@ public class WorkService {
     private List<String> parseTags(String tagsJson) {
         if (tagsJson == null || tagsJson.isBlank()) return List.of();
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(tagsJson, List.class);
+            return objectMapper.readValue(tagsJson, List.class);
         } catch (Exception e) {
             return List.of();
         }
@@ -463,7 +443,7 @@ public class WorkService {
             try {
                 List<String> cleaned = ConversationService.cleanTags(meta.getTags(), meta.getPlatform());
                 if (!cleaned.isEmpty()) {
-                    w.setTagsCache(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(cleaned));
+                    w.setTagsCache(objectMapper.writeValueAsString(cleaned));
                 }
             } catch (Exception e) {
                 log.debug("Failed to serialize tags: {}", e.getMessage());

@@ -1,23 +1,13 @@
 import { useState } from 'react';
 import type { ConversationCardVO, Status } from '../api/types';
 import { Cover } from './Cover';
+import { STATUS_OPTIONS, statusLabel } from '../utils/statusMeta';
 
 interface Props {
   card: ConversationCardVO;
   onSave: (id: number, rating: number | null, review: string | null, status: string | null) => void;
   onUndo: (id: number) => void;
 }
-
-const STATUS_LABEL: Record<Status, string> = {
-  wish: '想看', doing: '在看', collect: '看过', on_hold: '搁置', dropped: '抛弃',
-};
-const STATUSES: { s: Status; label: string; dot: string }[] = [
-  { s: 'wish', label: '想看', dot: 'dot-amber' },
-  { s: 'doing', label: '在看', dot: 'dot-green' },
-  { s: 'collect', label: '看过', dot: 'dot-blue' },
-  { s: 'on_hold', label: '搁置', dot: 'dot-gray' },
-  { s: 'dropped', label: '抛弃', dot: 'dot-gray' },
-];
 
 export function AiCard({ card, onSave, onUndo }: Props) {
   const saved = card.cardState === 'SAVED';
@@ -62,7 +52,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
           </div>
           <div className="flex-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</p>
-            <p className="mt-0.5">本次输入：{status ? STATUS_LABEL[status as Status] : '未指定'} · {rating ? rating + '星' : '未评分'}</p>
+            <p className="mt-0.5">本次输入：{status ? statusLabel(status) : '未指定'} · {rating ? rating + '星' : '未评分'}</p>
           </div>
         </div>
         <div className="flex justify-end gap-2">
@@ -93,7 +83,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
             <p className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</p>
             <p className="mt-0.5">
               已取消标记
-              {card.status && <> · {STATUS_LABEL[card.status] ?? card.status}</>}
+              {card.status && <> · {statusLabel(card.status)}</>}
               {card.rating != null && <> · {card.rating}分</>}
               {card.review && <> · 「{card.review}」</>}
             </p>
@@ -201,7 +191,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-[color:var(--text-muted)] flex-shrink-0">标记</span>
           <span className="flex flex-wrap gap-1.5">
-          {STATUSES.map(({ s, label, dot: dd }) => {
+          {STATUS_OPTIONS.map(({ status: s, label, dot: dd }) => {
             const active = status === s;
             return (
               <button key={s} type="button" disabled={readOnly}
@@ -260,7 +250,7 @@ function hasHistory(card: ConversationCardVO) {
 function formatHistory(card: ConversationCardVO) {
   const parts: string[] = [];
   if (card.previousStatus != null) {
-    parts.push(STATUS_LABEL[card.previousStatus] ?? card.previousStatus);
+    parts.push(statusLabel(card.previousStatus));
   }
   if (card.previousRating != null) {
     parts.push(card.previousRating + '分');

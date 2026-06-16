@@ -1,19 +1,19 @@
 package com.nonu1l.media.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonu1l.media.model.dto.CastMember;
 import com.nonu1l.media.model.dto.DetailedWork;
 import com.nonu1l.media.model.dto.WorkSearchResult;
 import com.nonu1l.media.model.entity.SubjectType;
 import com.nonu1l.media.repository.SubjectTypeRepository;
-import com.nonu1l.media.util.RequestCacheUtil;
+import com.nonu1l.media.util.CachedHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 统一封装 Bangumi API 调用与结果映射。
@@ -26,7 +26,7 @@ public class BangumiService {
 
     private final ObjectMapper objectMapper;
     private final SubjectTypeRepository subjectTypeRepository;
-    private final RequestCacheUtil cache;
+    private final CachedHttpClient httpClient;
     private final PreCacheService preCacheService;
     private final SettingsService settingsService;
 
@@ -35,16 +35,16 @@ public class BangumiService {
     /**
      * @param objectMapper JSON 解析工具
      * @param subjectTypeRepository 条目类型配置仓储
-     * @param cache 请求缓存工具
+     * @param httpClient 带缓存的 HTTP 客户端
      * @param preCacheService 预缓存服务
      * @param settingsService 设置读取服务
      */
     public BangumiService(ObjectMapper objectMapper, SubjectTypeRepository subjectTypeRepository,
-                          RequestCacheUtil cache, PreCacheService preCacheService,
+                          CachedHttpClient httpClient, PreCacheService preCacheService,
                           SettingsService settingsService) {
         this.objectMapper = objectMapper;
         this.subjectTypeRepository = subjectTypeRepository;
-        this.cache = cache;
+        this.httpClient = httpClient;
         this.preCacheService = preCacheService;
         this.settingsService = settingsService;
     }
@@ -458,11 +458,11 @@ public class BangumiService {
     }
 
     private String get(String url, long ttlSeconds) {
-        return cache.cacheGet(url, ttlSeconds);
+        return httpClient.get(url, ttlSeconds);
     }
 
     private String post(String url, String body, long ttlSeconds) {
-        return cache.cachePost(url, body, ttlSeconds);
+        return httpClient.post(url, body, ttlSeconds);
     }
 
     private String text(JsonNode n, String field) {

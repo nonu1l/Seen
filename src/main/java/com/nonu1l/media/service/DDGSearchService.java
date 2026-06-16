@@ -3,7 +3,7 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -58,7 +58,7 @@ public class DDGSearchService implements SearchProvider {
         try {
             int searchCount = 0;
             while (results.isEmpty() && searchCount < 3) {
-                String searchUrl = SettingsService.ddgSearchUrl(settingsService.getString(SettingsService.BANGUMI_PROXY));
+                String searchUrl = settingsService.ddgSearchUrl(settingsService.getString(SettingsService.BANGUMI_PROXY));
                 String html = restTemplate.getForObject(
                         searchUrl + URLEncoder.encode(query, StandardCharsets.UTF_8), String.class);
                 if (html == null) break;
