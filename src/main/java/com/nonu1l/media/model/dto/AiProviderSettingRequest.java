@@ -7,7 +7,6 @@ public record AiProviderSettingRequest(
         String baseUrl,
         String model,
         Double temperature,
-        String apiKey,
-        Boolean clearApiKey
+        String apiKey
 ) {
 }

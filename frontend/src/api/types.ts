@@ -173,7 +173,6 @@ export interface AiProviderSettingRequest {
   model: string;
   temperature: number;
   apiKey?: string;
-  clearApiKey?: boolean;
 }
 
 export interface SourceSettings {

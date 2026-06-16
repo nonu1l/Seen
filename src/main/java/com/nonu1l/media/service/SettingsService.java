@@ -110,9 +110,7 @@ public class SettingsService {
         saveSetting(definitions.get(AI_MODEL), request.model() != null ? request.model().trim() : "");
         saveSetting(definitions.get(AI_TEMPERATURE), String.valueOf(clampTemperature(request.temperature())));
 
-        if (Boolean.TRUE.equals(request.clearApiKey())) {
-            saveSetting(definitions.get(AI_API_KEY), "");
-        } else if (request.apiKey() != null && !request.apiKey().isBlank()) {
+        if (request.apiKey() != null) {
             saveSetting(definitions.get(AI_API_KEY), request.apiKey().trim());
         }
 
@@ -273,10 +271,7 @@ public class SettingsService {
         if (request == null) {
             return getString(AI_API_KEY);
         }
-        if (Boolean.TRUE.equals(request.clearApiKey())) {
-            return "";
-        }
-        if (request.apiKey() != null && !request.apiKey().isBlank()) {
+        if (request.apiKey() != null) {
             return request.apiKey().trim();
         }
         return getString(AI_API_KEY);

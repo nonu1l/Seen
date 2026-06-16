@@ -22,8 +22,6 @@ interface EditableAiConfig {
   model: string;
   temperature: number;
   apiKey: string;
-  clearApiKey: boolean;
-  apiKeySet: boolean;
 }
 
 interface SourceValues {
@@ -47,8 +45,6 @@ const EMPTY_AI_CONFIG: EditableAiConfig = {
   model: '',
   temperature: 0,
   apiKey: '',
-  clearApiKey: false,
-  apiKeySet: false,
 };
 
 function isSecretUnchanged(current: string, initial: string) {
@@ -58,6 +54,10 @@ function isSecretUnchanged(current: string, initial: string) {
 function shouldSubmitSecret(current: string, initial: string) {
   const normalized = current.trim();
   return normalized !== '' && normalized !== initial;
+}
+
+function shouldSubmitAiSecret(current: string, initial: string) {
+  return current !== initial;
 }
 
 function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
@@ -71,8 +71,6 @@ function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
     model: profile.model ?? '',
     temperature: Number.isFinite(profile.temperature) ? profile.temperature : 0,
     apiKey: profile.apiKey ?? '',
-    clearApiKey: false,
-    apiKeySet: profile.apiKeySet,
   };
 }
 
@@ -93,8 +91,7 @@ function sameAiConfig(a: EditableAiConfig, b: EditableAiConfig) {
     && a.baseUrl === b.baseUrl
     && a.model === b.model
     && String(a.temperature) === String(b.temperature)
-    && isSecretUnchanged(a.apiKey, b.apiKey)
-    && a.clearApiKey === b.clearApiKey;
+    && isSecretUnchanged(a.apiKey, b.apiKey);
 }
 
 /** 将长期记忆 JSON 字段压平成可展示的短文本列表。 */
@@ -247,9 +244,8 @@ export default function SettingsPage() {
       baseUrl: aiDraft.baseUrl.trim(),
       model: aiDraft.model.trim(),
       temperature: Number.isFinite(aiDraft.temperature) ? aiDraft.temperature : 0,
-      clearApiKey: aiDraft.clearApiKey,
     };
-    if (shouldSubmitSecret(aiDraft.apiKey, aiInitial.apiKey)) req.apiKey = aiDraft.apiKey.trim();
+    if (shouldSubmitAiSecret(aiDraft.apiKey, aiInitial.apiKey)) req.apiKey = aiDraft.apiKey.trim();
     return req;
   };
 
@@ -318,7 +314,6 @@ export default function SettingsPage() {
           apiKey: aiDraft.apiKey,
           model: aiDraft.model,
           temperature: aiDraft.temperature,
-          clearApiKey: aiDraft.clearApiKey,
         })
         : key === 'search'
           ? await api.testSearchSettings({
@@ -397,28 +392,30 @@ export default function SettingsPage() {
 
   const renderMemorySettings = () => (
     <div className="settings-subsection">
-      <div className="settings-subsection-head">
-        <div>
-          <h4>长期记忆</h4>
-          <p>从本地标记、评分和影评生成可重建的长期偏好画像。</p>
-        </div>
-        <button
-          type="button"
-          className="btn-ghost"
-          disabled={!aiDraft.memoryEnabled || memoryRebuilding}
-          title={!aiDraft.memoryEnabled ? '开启长期记忆后可重建' : undefined}
-          onClick={rebuildMemory}
-        >
-          {memoryRebuilding ? '重建中...' : '重建长期记忆'}
-        </button>
-      </div>
-
-      <ToggleRow
+      <SettingsRow
         title="AI 长期记忆"
         description="开启后自动更新偏好画像，并用于推荐与分析；当前请求和明确条件始终优先。"
-        checked={aiDraft.memoryEnabled}
-        onChange={value => setAiConfig('memoryEnabled', value)}
-      />
+      >
+        <div className="settings-memory-control">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={!aiDraft.memoryEnabled || memoryRebuilding}
+            title={!aiDraft.memoryEnabled ? '开启长期记忆后可重建' : undefined}
+            onClick={rebuildMemory}
+          >
+            {memoryRebuilding ? '重建中...' : '重建长期记忆'}
+          </button>
+          <button
+            type="button"
+            className={`settings-toggle ${aiDraft.memoryEnabled ? 'is-on' : ''}`}
+            aria-pressed={aiDraft.memoryEnabled}
+            onClick={() => setAiConfig('memoryEnabled', !aiDraft.memoryEnabled)}
+          >
+            <span />
+          </button>
+        </div>
+      </SettingsRow>
 
       {renderMemoryPreview()}
     </div>
@@ -464,10 +461,6 @@ export default function SettingsPage() {
               onChange={value => setAiConfig('apiKey', value)}
             />
           </SettingsRow>
-
-          {aiDraft.apiKeySet && (
-            <ToggleRow title="清空 API Key" checked={aiDraft.clearApiKey} onChange={value => setAiConfig('clearApiKey', value)} />
-          )}
 
           <SettingsRow title="Temperature">
             <div className="settings-number">

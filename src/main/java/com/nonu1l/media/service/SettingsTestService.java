@@ -129,8 +129,7 @@ public class SettingsTestService {
                 request != null ? request.baseUrl() : null,
                 request != null ? request.model() : null,
                 request != null ? request.temperature() : null,
-                request != null ? request.apiKey() : null,
-                request != null ? request.clearApiKey() : false
+                request != null ? request.apiKey() : null
         ));
     }
 

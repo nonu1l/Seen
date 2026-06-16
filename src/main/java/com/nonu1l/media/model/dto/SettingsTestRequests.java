@@ -12,8 +12,7 @@ public final class SettingsTestRequests {
             String baseUrl,
             String apiKey,
             String model,
-            Double temperature,
-            Boolean clearApiKey
+            Double temperature
     ) {
     }
 
