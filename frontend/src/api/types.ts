@@ -159,7 +159,7 @@ export interface AiProviderSettingRequest {
 }
 
 export interface SourceSettings {
-  searchProvider: 'serper' | 'ddg';
+  searchProvider: 'auto' | 'serper' | 'ddg';
   serperApiKeySet: boolean;
   serperApiKey: string;
   bangumiProxy: string;

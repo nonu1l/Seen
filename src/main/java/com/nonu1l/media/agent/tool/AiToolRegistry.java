@@ -46,13 +46,22 @@ public class AiToolRegistry {
                     (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
                 .description("搜索引擎")
                 .inputType(SearchReq.class).build(),
+            FunctionToolCallback.builder("web_search",
+                    (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
+                .description("使用当前搜索源检索网页候选结果；智能选择模式会优先 Serper，失败后切换 DuckDuckGo")
+                .inputType(SearchReq.class).build(),
             FunctionToolCallback.builder("fetchWeb",
                     (FetchReq req) -> webSearchTools.fetchWeb(req.url()))
                 .description("抓取网页纯文本")
                 .inputType(FetchReq.class).build(),
+            FunctionToolCallback.builder("fetch_url",
+                    (FetchUrlReq req) -> webSearchTools.fetchUrl(req.url(), req.purpose(), req.maxChars()))
+                .description("直接访问公开 HTTP(S) URL 或公开 API，返回状态、内容类型和清洗文本；搜索源不可用时可用于获取榜单或资料")
+                .inputType(FetchUrlReq.class).build(),
         };
     }
 
     public record SearchReq(String keyword) {}
     public record FetchReq(String url) {}
+    public record FetchUrlReq(String url, String purpose, Integer maxChars) {}
 }

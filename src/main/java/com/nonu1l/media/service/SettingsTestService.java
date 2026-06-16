@@ -92,26 +92,15 @@ public class SettingsTestService {
 
     public SettingsTestResponse testSearch(SettingsTestRequests.SearchTestRequest request) {
         long start = System.nanoTime();
-        String provider = request != null ? blankToEmpty(request.provider()) : "ddg";
+        String provider = normalizeProvider(request != null ? request.provider() : null);
         String serperApiKey = valueOrCurrent(request != null ? request.serperApiKey() : null, SettingsService.SERPER_API_KEY);
         String bangumiProxy = valueOrCurrent(request != null ? request.bangumiProxy() : null, SettingsService.BANGUMI_PROXY);
         String query = request != null && request.query() != null && !request.query().isBlank()
                 ? request.query().trim()
                 : TEST_QUERY;
-        try {
-            List<String> titles = "serper".equalsIgnoreCase(provider)
-                    ? testSerperSearch(query, serperApiKey)
-                    : testDdgSearch(query, bangumiProxy);
-            Map<String, Object> details = new LinkedHashMap<>();
-            details.put("provider", "serper".equalsIgnoreCase(provider) ? "serper" : "ddg");
-            details.put("count", titles.size());
-            details.put("titles", titles.stream().limit(5).toList());
-            return response(true, "搜索连接正常", start, details);
-        } catch (Exception e) {
-            return response(false, sanitize(e.getMessage(), serperApiKey), start, Map.of(
-                    "provider", "serper".equalsIgnoreCase(provider) ? "serper" : "ddg"
-            ));
-        }
+        return "auto".equals(provider)
+                ? testAutoSearch(start, query, serperApiKey, bangumiProxy)
+                : testSingleSearch(start, provider, query, serperApiKey, bangumiProxy);
     }
 
     public SettingsTestResponse testBangumi(SettingsTestRequests.BangumiTestRequest request) {
@@ -172,6 +161,68 @@ public class SettingsTestService {
         return titles;
     }
 
+    private SettingsTestResponse testAutoSearch(long start, String query, String serperApiKey, String bangumiProxy) {
+        List<Map<String, Object>> attempts = new ArrayList<>();
+        List<String> serperTitles = trySearch("serper", query, serperApiKey, bangumiProxy, attempts);
+        if (!serperTitles.isEmpty()) {
+            return searchResponse(true, "搜索连接正常", start, "serper", serperTitles, attempts);
+        }
+        List<String> ddgTitles = trySearch("ddg", query, serperApiKey, bangumiProxy, attempts);
+        if (!ddgTitles.isEmpty()) {
+            return searchResponse(true, "搜索连接正常，已从 Serper 切换到 DuckDuckGo", start, "ddg", ddgTitles, attempts);
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("provider", "auto");
+        details.put("attempts", attempts);
+        return response(false, "Serper 与 DuckDuckGo 均不可用或无结果", start, details);
+    }
+
+    private SettingsTestResponse testSingleSearch(long start, String provider, String query,
+                                                  String serperApiKey, String bangumiProxy) {
+        List<Map<String, Object>> attempts = new ArrayList<>();
+        List<String> titles = trySearch(provider, query, serperApiKey, bangumiProxy, attempts);
+        if (titles.isEmpty()) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("provider", provider);
+            details.put("attempts", attempts);
+            return response(false, "搜索不可用或无结果", start, details);
+        }
+        return searchResponse(true, "搜索连接正常", start, provider, titles, attempts);
+    }
+
+    private List<String> trySearch(String provider, String query, String serperApiKey,
+                                   String bangumiProxy, List<Map<String, Object>> attempts) {
+        long start = System.nanoTime();
+        Map<String, Object> attempt = new LinkedHashMap<>();
+        attempt.put("provider", provider);
+        try {
+            List<String> titles = "serper".equals(provider)
+                    ? testSerperSearch(query, serperApiKey)
+                    : testDdgSearch(query, bangumiProxy);
+            attempt.put("ok", !titles.isEmpty());
+            attempt.put("count", titles.size());
+            attempt.put("elapsedMs", (System.nanoTime() - start) / 1_000_000);
+            attempts.add(attempt);
+            return titles;
+        } catch (Exception e) {
+            attempt.put("ok", false);
+            attempt.put("error", sanitize(e.getMessage(), serperApiKey));
+            attempt.put("elapsedMs", (System.nanoTime() - start) / 1_000_000);
+            attempts.add(attempt);
+            return List.of();
+        }
+    }
+
+    private SettingsTestResponse searchResponse(boolean ok, String message, long start, String provider,
+                                                List<String> titles, List<Map<String, Object>> attempts) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("provider", provider);
+        details.put("count", titles.size());
+        details.put("titles", titles.stream().limit(5).toList());
+        details.put("attempts", attempts);
+        return response(ok, message, start, details);
+    }
+
     private List<String> extractSerperTitles(String json) throws Exception {
         if (json == null || json.isBlank()) return List.of();
         JsonNode organic = objectMapper.readTree(json).get("organic");
@@ -200,6 +251,16 @@ public class SettingsTestService {
 
     private static String blankToEmpty(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String normalizeProvider(String value) {
+        String normalized = blankToEmpty(value);
+        if (normalized.isBlank()) {
+            normalized = settingsService.getString(SettingsService.SEARCH_PROVIDER);
+        }
+        if ("serper".equalsIgnoreCase(normalized)) return "serper";
+        if ("ddg".equalsIgnoreCase(normalized)) return "ddg";
+        return "auto";
     }
 
     private String valueOrCurrent(String value, String key) {
