@@ -28,7 +28,7 @@ public class CachedHttpClient {
      * @param ttlSeconds 缓存有效期，单位秒
      * @return 响应正文；失败或非 2xx 返回 null
      */
-    @CaffeineRequestCache(key = "'GET:' + #url", ttlSeconds = "#ttlSeconds")
+    @CaffeineRequestCache(key = "T(com.nonu1l.media.cache.RequestCacheKeys).get(#url)", ttlSeconds = "#ttlSeconds")
     public String get(String url, long ttlSeconds) {
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -51,7 +51,7 @@ public class CachedHttpClient {
      * @param ttlSeconds 缓存有效期，单位秒
      * @return 响应正文；失败或非 2xx 返回 null
      */
-    @CaffeineRequestCache(key = "'POST:' + #url + ':' + #body", ttlSeconds = "#ttlSeconds")
+    @CaffeineRequestCache(key = "T(com.nonu1l.media.cache.RequestCacheKeys).post(#url, #body)", ttlSeconds = "#ttlSeconds")
     public String post(String url, String body, long ttlSeconds) {
         try {
             HttpHeaders headers = new HttpHeaders();
