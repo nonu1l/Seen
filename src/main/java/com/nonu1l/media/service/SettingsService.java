@@ -21,6 +21,8 @@ public class SettingsService {
 
     public static final String AI_ENABLED = "ai.enabled";
     public static final String AI_TOKEN_USAGE_ENABLED = "ai.token-usage.enabled";
+    public static final String AI_MEMORY_ENABLED = "ai.memory.enabled";
+    public static final String AI_MEMORY_AUTO_UPDATE_ENABLED = "ai.memory.auto-update.enabled";
     public static final String AI_BASE_URL = "ai.base-url";
     public static final String AI_API_KEY = "ai.api-key";
     public static final String AI_MODEL = "ai.model";
@@ -52,6 +54,10 @@ public class SettingsService {
         return new SettingsResponse(
                 getBoolean(AI_ENABLED),
                 getBoolean(AI_TOKEN_USAGE_ENABLED),
+                new SettingsResponse.AiMemorySettings(
+                        getBoolean(AI_MEMORY_ENABLED),
+                        getBoolean(AI_MEMORY_AUTO_UPDATE_ENABLED)
+                ),
                 getAiProviderSettingResponse(),
                 new SettingsResponse.SourceSettings(
                         getString(SEARCH_PROVIDER),
@@ -286,6 +292,8 @@ public class SettingsService {
         LinkedHashMap<String, SettingDefinition> map = new LinkedHashMap<>();
         map.put(AI_ENABLED, new SettingDefinition(AI_ENABLED, "AI 助手", "boolean", false, true));
         map.put(AI_TOKEN_USAGE_ENABLED, new SettingDefinition(AI_TOKEN_USAGE_ENABLED, "Token 记录", "boolean", false, true));
+        map.put(AI_MEMORY_ENABLED, new SettingDefinition(AI_MEMORY_ENABLED, "AI 长期记忆", "boolean", false, true));
+        map.put(AI_MEMORY_AUTO_UPDATE_ENABLED, new SettingDefinition(AI_MEMORY_AUTO_UPDATE_ENABLED, "AI 长期记忆自动更新", "boolean", false, true));
         map.put(AI_BASE_URL, new SettingDefinition(AI_BASE_URL, "AI Base URL", "string", false, ""));
         map.put(AI_API_KEY, new SettingDefinition(AI_API_KEY, "AI API Key", "string", true, ""));
         map.put(AI_MODEL, new SettingDefinition(AI_MODEL, "AI 模型", "string", false, ""));

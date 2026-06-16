@@ -35,6 +35,7 @@ public class WorkService {
     private final BangumiService            bangumiService;
     private final TransactionTemplate       transactionTemplate;
     private final SettingsService           settingsService;
+    private final AiPreferenceMemoryService preferenceMemoryService;
     private final ObjectMapper              objectMapper;
 
     /**
@@ -47,6 +48,7 @@ public class WorkService {
      * @param bangumiService Bangumi API 服务
      * @param transactionTemplate 事务模板，用于把远程请求和数据库写入分离
      * @param settingsService 设置读取服务
+     * @param preferenceMemoryService AI 长期偏好记忆服务
      * @param objectMapper JSON 映射工具
      */
     public WorkService(WorkRepository workRepo, RecordRepository recordRepo,
@@ -54,6 +56,7 @@ public class WorkService {
                        BangumiService bangumiService,
                        TransactionTemplate transactionTemplate,
                        SettingsService settingsService,
+                       AiPreferenceMemoryService preferenceMemoryService,
                        ObjectMapper objectMapper) {
         this.workRepo          = workRepo;
         this.recordRepo        = recordRepo;
@@ -62,6 +65,7 @@ public class WorkService {
         this.bangumiService    = bangumiService;
         this.transactionTemplate = transactionTemplate;
         this.settingsService   = settingsService;
+        this.preferenceMemoryService = preferenceMemoryService;
         this.objectMapper      = objectMapper;
     }
 
@@ -216,7 +220,9 @@ public class WorkService {
         if (id == null) throw new IllegalArgumentException("invalid id");
 
         WorkSearchResult meta = resolveMetaForInsert(id, req.getMeta());
-        return Objects.requireNonNull(transactionTemplate.execute(tx -> markInTransaction(req, id, meta)));
+        WorkListItem item = Objects.requireNonNull(transactionTemplate.execute(tx -> markInTransaction(req, id, meta)));
+        preferenceMemoryService.recordChanged(id);
+        return item;
     }
 
     private WorkListItem markInTransaction(MarkRequest req, Long id, WorkSearchResult meta) {
@@ -252,6 +258,7 @@ public class WorkService {
     public void unmark(Long workId) {
         recordRepo.deleteAllByWorkId(workId);
         workRepo.deleteById(workId);
+        preferenceMemoryService.recordChanged(workId);
     }
 
     /**
@@ -271,7 +278,9 @@ public class WorkService {
         if (id == null) throw new IllegalArgumentException("invalid id");
 
         WorkSearchResult meta = resolveMetaForInsert(id, req.getMeta());
-        return Objects.requireNonNull(transactionTemplate.execute(tx -> markNewInTransaction(req, rating, review, id, meta)));
+        MarkResult result = Objects.requireNonNull(transactionTemplate.execute(tx -> markNewInTransaction(req, rating, review, id, meta)));
+        preferenceMemoryService.recordChanged(id);
+        return result;
     }
 
     private MarkResult markNewInTransaction(MarkRequest req, Double rating, String review, Long id, WorkSearchResult meta) {
@@ -308,6 +317,7 @@ public class WorkService {
     public void undoLastRecord(Long workId) {
         recordRepo.findLatestIdByWorkId(workId)
                 .ifPresent(recordRepo::deleteRecordById);
+        preferenceMemoryService.recordChanged(workId);
     }
 
     /**
@@ -328,7 +338,9 @@ public class WorkService {
         r.setReview(review);
         recordRepo.save(r);
         Work w = workRepo.findById(workId).orElse(null);
-        return buildListItem(w, r);
+        WorkListItem item = buildListItem(w, r);
+        preferenceMemoryService.recordChanged(workId);
+        return item;
     }
 
     /**

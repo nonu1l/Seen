@@ -38,6 +38,13 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     List<Record> findLatestByWorkIds(@Param("workIds") Set<Long> workIds);
 
     /**
+     * 查询最近更新的记录，用于长期偏好画像提取近期变化。
+     *
+     * @return 最近 30 条记录，按更新时间和主键倒序
+     */
+    List<Record> findTop30ByOrderByUpdatedAtDescIdDesc();
+
+    /**
      * 查询单个作品最近两条记录，用于新增/覆盖前后版本对比。
      *
      * @param workId 作品 ID
