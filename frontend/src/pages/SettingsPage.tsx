@@ -6,6 +6,7 @@ import { SettingsRow } from '../components/settings/SettingsRow';
 import { TestResult } from '../components/settings/TestResult';
 import { ToggleRow } from '../components/settings/ToggleRow';
 import type {
+  AiMemoryResponse,
   AiProviderSettingRequest,
   SettingsResponse,
   SettingsTestResult,
@@ -16,6 +17,7 @@ type TestKey = 'ai' | 'search' | 'bangumi';
 interface EditableAiConfig {
   aiEnabled: boolean;
   tokenUsageEnabled: boolean;
+  memoryEnabled: boolean;
   baseUrl: string;
   model: string;
   temperature: number;
@@ -40,6 +42,7 @@ const GROUPS = [
 const EMPTY_AI_CONFIG: EditableAiConfig = {
   aiEnabled: true,
   tokenUsageEnabled: true,
+  memoryEnabled: true,
   baseUrl: '',
   model: '',
   temperature: 0,
@@ -63,6 +66,7 @@ function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
   return {
     aiEnabled: settings?.aiEnabled ?? true,
     tokenUsageEnabled: settings?.tokenUsageEnabled ?? true,
+    memoryEnabled: settings?.aiMemory?.enabled ?? true,
     baseUrl: profile.baseUrl,
     model: profile.model ?? '',
     temperature: Number.isFinite(profile.temperature) ? profile.temperature : 0,
@@ -85,11 +89,47 @@ function toSourceValues(settings: SettingsResponse | null): SourceValues {
 function sameAiConfig(a: EditableAiConfig, b: EditableAiConfig) {
   return a.aiEnabled === b.aiEnabled
     && a.tokenUsageEnabled === b.tokenUsageEnabled
+    && a.memoryEnabled === b.memoryEnabled
     && a.baseUrl === b.baseUrl
     && a.model === b.model
     && String(a.temperature) === String(b.temperature)
     && isSecretUnchanged(a.apiKey, b.apiKey)
     && a.clearApiKey === b.clearApiKey;
+}
+
+/** 将长期记忆 JSON 字段压平成可展示的短文本列表。 */
+function parseMemoryItems(value: string | null) {
+  if (!value?.trim()) return [];
+  try {
+    return normalizeMemoryItems(JSON.parse(value)).filter(Boolean).slice(0, 12);
+  } catch {
+    return [value.trim()].filter(Boolean);
+  }
+}
+
+/** 从数组、对象或字符串中提取长期记忆条目，兼容模型输出的小幅格式波动。 */
+function normalizeMemoryItems(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(item => normalizeMemoryItems(item));
+  }
+  if (typeof value === 'string') {
+    return value.trim() ? [value.trim()] : [];
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [String(value)];
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap(item => normalizeMemoryItems(item));
+  }
+  return [];
+}
+
+/** 格式化后端返回的长期记忆更新时间，解析失败时保留原始文本。 */
+function formatMemoryTime(value: string | null) {
+  if (!value) return '未知';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
 }
 
 function sameSources(a: SourceValues, b: SourceValues) {
@@ -106,9 +146,13 @@ export default function SettingsPage() {
   const [aiInitial, setAiInitial] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
   const [sourceValues, setSourceValues] = useState<SourceValues>(() => toSourceValues(null));
   const [sourceInitial, setSourceInitial] = useState<SourceValues>(() => toSourceValues(null));
+  const [aiMemory, setAiMemory] = useState<AiMemoryResponse | null>(null);
   const [showAiSecret, setShowAiSecret] = useState(false);
   const [showSerperSecret, setShowSerperSecret] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [memoryLoading, setMemoryLoading] = useState(true);
+  const [memoryRebuilding, setMemoryRebuilding] = useState(false);
+  const [memoryDetailsOpen, setMemoryDetailsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testLoading, setTestLoading] = useState<TestKey | null>(null);
   const [testResults, setTestResults] = useState<Record<TestKey, SettingsTestResult | null>>({
@@ -142,6 +186,7 @@ export default function SettingsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setMemoryLoading(true);
     api.getSettings()
       .then(next => {
         if (!cancelled) {
@@ -159,6 +204,20 @@ export default function SettingsPage() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    api.getAiMemory()
+      .then(next => {
+        if (!cancelled) {
+          setAiMemory(next);
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : '读取长期记忆失败');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMemoryLoading(false);
       });
     return () => {
       cancelled = true;
@@ -202,6 +261,7 @@ export default function SettingsPage() {
         settings: {
           'ai.enabled': aiDraft.aiEnabled,
           'ai.token-usage.enabled': aiDraft.tokenUsageEnabled,
+          'ai.memory.enabled': aiDraft.memoryEnabled,
         },
       });
       await reload();
@@ -210,6 +270,20 @@ export default function SettingsPage() {
       toast.error(err instanceof Error ? err.message : '保存 AI 设置失败');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const rebuildMemory = async () => {
+    if (!aiDraft.memoryEnabled) return;
+    setMemoryRebuilding(true);
+    try {
+      const next = await api.rebuildAiMemory();
+      setAiMemory(next);
+      toast.success(next.exists ? '长期记忆已重建' : '长期记忆已重建，暂无可用画像');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '重建长期记忆失败');
+    } finally {
+      setMemoryRebuilding(false);
     }
   };
 
@@ -269,6 +343,86 @@ export default function SettingsPage() {
       setTestLoading(null);
     }
   };
+
+  const renderMemoryItemGroup = (title: string, json: string | null) => {
+    const items = parseMemoryItems(json);
+    return (
+      <div className="settings-memory-detail-section">
+        <h5>{title}</h5>
+        {items.length > 0 ? (
+          <div className="settings-memory-tags">
+            {items.map((item, index) => <span key={`${title}-${index}`} className="settings-memory-tag">{item}</span>)}
+          </div>
+        ) : (
+          <p>暂无</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderMemoryPreview = () => {
+    if (memoryLoading && !aiMemory) {
+      return <div className="settings-memory-empty">读取长期记忆中...</div>;
+    }
+    if (!aiMemory?.exists) {
+      return <div className="settings-memory-empty">还没有生成长期记忆</div>;
+    }
+    return (
+      <div className="settings-memory-preview">
+        <div className="settings-memory-meta">
+          <span className="settings-memory-pill">版本 v{aiMemory.version ?? '-'}</span>
+          <span className="settings-memory-pill">更新 {formatMemoryTime(aiMemory.updatedAt)}</span>
+          {memoryLoading && <span className="settings-memory-pill">刷新中...</span>}
+          {!aiDraft.memoryEnabled && <span className="settings-memory-pill is-disabled">当前未启用</span>}
+        </div>
+        <p className="settings-memory-summary">{aiMemory.summary || '暂无摘要'}</p>
+        <button
+          type="button"
+          className="btn-ghost settings-memory-detail-toggle"
+          onClick={() => setMemoryDetailsOpen(open => !open)}
+        >
+          {memoryDetailsOpen ? '收起偏好细节' : '查看偏好细节'}
+        </button>
+        {memoryDetailsOpen && (
+          <div className="settings-memory-details">
+            {renderMemoryItemGroup('喜欢', aiMemory.likesJson)}
+            {renderMemoryItemGroup('不喜欢', aiMemory.dislikesJson)}
+            {renderMemoryItemGroup('近期变化', aiMemory.recentShiftJson)}
+            {renderMemoryItemGroup('推荐规则', aiMemory.recommendationRulesJson)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMemorySettings = () => (
+    <div className="settings-subsection">
+      <div className="settings-subsection-head">
+        <div>
+          <h4>长期记忆</h4>
+          <p>从本地标记、评分和影评生成可重建的长期偏好画像。</p>
+        </div>
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={!aiDraft.memoryEnabled || memoryRebuilding}
+          title={!aiDraft.memoryEnabled ? '开启长期记忆后可重建' : undefined}
+          onClick={rebuildMemory}
+        >
+          {memoryRebuilding ? '重建中...' : '重建长期记忆'}
+        </button>
+      </div>
+
+      <ToggleRow
+        title="AI 长期记忆"
+        description="开启后自动更新偏好画像，并用于推荐与分析；当前请求和明确条件始终优先。"
+        checked={aiDraft.memoryEnabled}
+        onChange={value => setAiConfig('memoryEnabled', value)}
+      />
+
+      {renderMemoryPreview()}
+    </div>
+  );
 
   const renderAiSettings = () => (
     <>
@@ -338,6 +492,8 @@ export default function SettingsPage() {
             </div>
           </SettingsRow>
         </div>
+
+        {renderMemorySettings()}
       </div>
 
       <div className="settings-results"><TestResult result={testResults.ai} /></div>

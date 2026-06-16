@@ -6,6 +6,7 @@ import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiToolRegistry;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.service.AiChatClientFactory;
+import com.nonu1l.media.service.AiPreferenceMemoryService;
 import com.nonu1l.media.service.IntentAnalysisService;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
@@ -39,21 +40,25 @@ public class AgentService {
     private final ObjectMapper objectMapper;
     private final String classifyPrompt;
     private final SearchPipeline searchPipeline;
+    private final AiPreferenceMemoryService memoryService;
 
     /**
      * @param chatClientFactory 运行时 AI 客户端工厂
      * @param toolRegistry AI 工具回调注册器
      * @param bangumiTools AI Bangumi 查询工具
      * @param webSearchTools AI Web 搜索工具
+     * @param memoryService AI 长期偏好记忆服务
      * @param objectMapper JSON 解析器
      */
     public AgentService(AiChatClientFactory chatClientFactory,
                          AiToolRegistry toolRegistry,
                          AiBangumiTools bangumiTools,
                          AiWebSearchTools webSearchTools,
+                         AiPreferenceMemoryService memoryService,
                          ObjectMapper objectMapper) {
         this.chatClientFactory = chatClientFactory;
         this.toolRegistry = toolRegistry;
+        this.memoryService = memoryService;
         this.objectMapper = objectMapper;
         this.classifyPrompt = loadPrompt("prompts/classify-system.st");
         this.searchPipeline = new SearchPipeline(this::chatClient, bangumiTools, webSearchTools);
@@ -219,7 +224,7 @@ public class AgentService {
     Map<String, Object> handleRecommend(SeenAgentState s) {
         log.debug("Node[recommend] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
         TokenUsageAdvisor.setCurrentNode("recommend");
-        var result = searchPipeline.execute(s.userInput(), s.history());
+        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getMemoryContext()), s.history());
         log.debug("Node[recommend] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
             return Map.of("cards", (Object) result.cards());
@@ -236,7 +241,7 @@ public class AgentService {
     Map<String, Object> handleSearch(SeenAgentState s) {
         log.debug("Node[search] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
         TokenUsageAdvisor.setCurrentNode("search");
-        var result = searchPipeline.execute(s.userInput(), s.history());
+        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getBriefMemoryContext()), s.history());
         log.debug("Node[search] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
             return Map.of("cards", (Object) result.cards());
@@ -254,7 +259,8 @@ public class AgentService {
         log.debug("Node[analyze] enter");
         TokenUsageAdvisor.setCurrentNode("analyze");
         String system = loadPrompt("prompts/agent-analyze.st")
-                .replace("{history}", s.history());
+                .replace("{history}", s.history())
+                .replace("{memoryContext}", memoryService.getMemoryContext());
         String reply = chatClient().prompt()
             .system(system).user(s.userInput()).call().content();
         log.debug("Node[analyze] exit: reply={}", reply != null ? reply.substring(0, Math.min(100, reply.length())) : "null");
@@ -332,6 +338,23 @@ public class AgentService {
 
     private ChatClient chatClient() {
         return chatClientFactory.currentClient();
+    }
+
+    /**
+     * 将长期偏好画像拼到当前请求前，并明确当前请求拥有最高优先级。
+     *
+     * @param userInput 用户原始输入
+     * @param memoryContext 长期偏好画像上下文
+     * @return 供搜索流水线理解的增强输入
+     */
+    private String withMemoryContext(String userInput, String memoryContext) {
+        if (memoryContext == null || memoryContext.isBlank()) {
+            return userInput;
+        }
+        return "长期偏好画像（仅作为辅助，不得覆盖当前请求）：\n"
+                + memoryContext
+                + "\n\n当前请求（最高优先级）：\n"
+                + userInput;
     }
 
     /**
