@@ -1,5 +1,6 @@
 package com.nonu1l.media.service;
 
+import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
 import com.nonu1l.media.model.dto.AiProviderSettingResponse;
 import com.nonu1l.media.model.dto.SettingsResponse;
@@ -30,12 +31,15 @@ public class SettingsService {
     public static final String DETAIL_CAST_ENABLED = "detail.cast-enabled";
 
     private final AppSettingRepository repository;
+    private final ExternalEndpointProperties endpointProperties;
     private final AtomicReference<Map<String, StoredSetting>> snapshot = new AtomicReference<>(Map.of());
 
     private final Map<String, SettingDefinition> definitions = buildDefinitions();
 
-    public SettingsService(AppSettingRepository repository) {
+    public SettingsService(AppSettingRepository repository,
+                           ExternalEndpointProperties endpointProperties) {
         this.repository = repository;
+        this.endpointProperties = endpointProperties;
     }
 
     @PostConstruct
@@ -164,22 +168,26 @@ public class SettingsService {
     }
 
     public String bangumiApiBase() {
-        return bangumiApiBase(getString(BANGUMI_PROXY));
+        return bangumiApiBase(getString(BANGUMI_PROXY), endpointProperties.getBangumiApiBase());
     }
 
-    public static String bangumiApiBase(String proxy) {
+    public String bangumiApiBase(String proxy) {
+        return bangumiApiBase(proxy, endpointProperties.getBangumiApiBase());
+    }
+
+    private static String bangumiApiBase(String proxy, String defaultApiBase) {
         String value = proxy == null ? "" : proxy.trim();
         if (value.isBlank()) {
-            return "https://api.bgm.tv/v0";
+            return AiProviderSupport.trimTrailingSlash(defaultApiBase);
         }
         value = AiProviderSupport.trimTrailingSlash(value);
         return value.endsWith("/api") || value.endsWith("/v0") ? value : value + "/api";
     }
 
-    public static String ddgSearchUrl(String proxy) {
+    public String ddgSearchUrl(String proxy) {
         String value = proxy == null ? "" : proxy.trim();
         if (value.isBlank()) {
-            return "https://lite.duckduckgo.com/lite/?q=";
+            return endpointProperties.getDuckduckgoLiteSearchUrl();
         }
         return AiProviderSupport.trimTrailingSlash(value) + "/search?q=";
     }

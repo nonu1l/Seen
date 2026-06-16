@@ -58,7 +58,7 @@ public class DDGSearchService implements SearchProvider {
         try {
             int searchCount = 0;
             while (results.isEmpty() && searchCount < 3) {
-                String searchUrl = SettingsService.ddgSearchUrl(settingsService.getString(SettingsService.BANGUMI_PROXY));
+                String searchUrl = settingsService.ddgSearchUrl(settingsService.getString(SettingsService.BANGUMI_PROXY));
                 String html = restTemplate.getForObject(
                         searchUrl + URLEncoder.encode(query, StandardCharsets.UTF_8), String.class);
                 if (html == null) break;

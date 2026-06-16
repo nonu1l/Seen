@@ -1,5 +1,6 @@
 package com.nonu1l.media.service;
 
+import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
 import com.nonu1l.media.model.dto.SettingsTestRequests;
 import com.nonu1l.media.model.dto.SettingsTestResponse;
@@ -31,13 +32,16 @@ public class SettingsTestService {
     private static final String TEST_QUERY = "孤独摇滚";
 
     private final SettingsService settingsService;
+    private final ExternalEndpointProperties endpointProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
     public SettingsTestService(SettingsService settingsService,
+                               ExternalEndpointProperties endpointProperties,
                                RestTemplateBuilder builder,
                                ObjectMapper objectMapper) {
         this.settingsService = settingsService;
+        this.endpointProperties = endpointProperties;
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(10))
                 .readTimeout(Duration.ofSeconds(20))
@@ -118,7 +122,7 @@ public class SettingsTestService {
             headers.set("User-Agent", "seen-app/1.0");
             headers.setAccept(List.of(MediaType.APPLICATION_JSON));
             ResponseEntity<String> resp = restTemplate.exchange(
-                    SettingsService.bangumiApiBase(proxy) + "/subjects/1",
+                    settingsService.bangumiApiBase(proxy) + "/subjects/1",
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
                     String.class
@@ -149,12 +153,12 @@ public class SettingsTestService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-API-KEY", apiKey);
         String body = objectMapper.writeValueAsString(Map.of("q", query, "gl", "cn", "hl", "zh-cn"));
-        String json = restTemplate.postForObject("https://google.serper.dev/search", new HttpEntity<>(body, headers), String.class);
+        String json = restTemplate.postForObject(endpointProperties.getSerperSearchUrl(), new HttpEntity<>(body, headers), String.class);
         return extractSerperTitles(json);
     }
 
     private List<String> testDdgSearch(String query, String proxy) {
-        String url = SettingsService.ddgSearchUrl(proxy) + URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String url = settingsService.ddgSearchUrl(proxy) + URLEncoder.encode(query, StandardCharsets.UTF_8);
         String html = restTemplate.getForObject(url, String.class);
         if (html == null || html.isBlank()) return List.of();
         List<String> titles = new ArrayList<>();
