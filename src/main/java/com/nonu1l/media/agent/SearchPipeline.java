@@ -35,6 +35,7 @@ public class SearchPipeline {
     private final AiWebSearchTools webSearchTools;
     private final static int maxCards = 5;
     private final static int maxPages = 10;
+    private final static int maxDirectUrls = 3;
     private final String promptKeywords;
     private final String promptTitles;
     private final String promptValidate;
@@ -109,13 +110,14 @@ public class SearchPipeline {
 
             // 2a. 搜索
             List<WebSearchItem> webResults = webSearchTools.searchWeb(kw);
-            if (webResults.isEmpty()) continue;
 
             // 2b. 多线程抓取 + 清洗
-            List<String> pageTexts = webResults.stream().limit(maxPages).parallel()
-                    .map(r -> webSearchTools.fetchWeb(r.url()))
-                    .filter(t -> t != null && !t.isBlank())
-                    .toList();
+            List<String> pageTexts = webResults.isEmpty()
+                    ? fetchDirectUrls(context, kw)
+                    : webResults.stream().limit(maxPages).parallel()
+                            .map(r -> webSearchTools.fetchWeb(r.url()))
+                            .filter(t -> t != null && !t.isBlank())
+                            .toList();
             if (pageTexts.isEmpty()) continue;
 
             // 2c. LLM 提炼片名
@@ -223,6 +225,41 @@ public class SearchPipeline {
         String result = chatClient().prompt().system(prompt).user(userInput).call().content();
         if (result == null || result.isBlank()) return List.of(userInput);
         return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
+    }
+
+    /**
+     * 搜索引擎无结果时，让 LLM 选择公开影视榜单或资料 URL 并直接抓取。
+     *
+     * @param context 用户请求与历史上下文
+     * @param keyword 当前失败的搜索关键词
+     * @return 可用于标题提炼的页面文本
+     */
+    List<String> fetchDirectUrls(String context, String keyword) {
+        TokenUsageAdvisor.setCurrentNode("pipeline-directFetchUrls");
+        String system = """
+                你是影视资料检索助手。当前 Serper / DuckDuckGo 搜索没有可用结果。
+                请根据用户需求和你的知识，选择最多 3 个公开 HTTP(S) URL，用于直接获取影视榜单、热门列表或资料页面。
+                优先考虑 Bangumi、豆瓣、IMDb、AniList、Jikan/MyAnimeList、TMDb、公开视频平台榜单或公开 API。
+                只输出 URL，每行一个；不要输出解释文字。
+                今日日期: %s
+                """.formatted(LocalDate.now());
+        String user = "用户上下文：\n" + context + "\n\n失败关键词：\n" + keyword;
+        String result = chatClient().prompt().system(system).user(user).call().content();
+        if (result == null || result.isBlank()) return List.of();
+        List<String> urls = result.lines()
+                .map(String::trim)
+                .filter(line -> line.startsWith("http://") || line.startsWith("https://"))
+                .distinct()
+                .limit(maxDirectUrls)
+                .toList();
+        if (urls.isEmpty()) return List.of();
+        log.info("Pipeline: direct fetch fallback urls={}", urls);
+        return urls.stream()
+                .map(url -> webSearchTools.fetchUrl(url, "search-source-fallback", 6000))
+                .filter(resultItem -> resultItem != null && resultItem.error() == null)
+                .map(resultItem -> resultItem.text())
+                .filter(text -> text != null && !text.isBlank())
+                .toList();
     }
 
     /**

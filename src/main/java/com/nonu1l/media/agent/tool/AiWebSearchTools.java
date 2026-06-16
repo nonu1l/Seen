@@ -1,6 +1,8 @@
 package com.nonu1l.media.agent.tool;
 
+import com.nonu1l.media.model.dto.FetchUrlResult;
 import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.service.WebFetchService;
 import com.nonu1l.media.service.WebSearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,12 +19,15 @@ public class AiWebSearchTools {
     private static final Logger log = LoggerFactory.getLogger(AiWebSearchTools.class);
 
     private final WebSearchService webSearchService;
+    private final WebFetchService webFetchService;
 
     /**
      * @param webSearchService Web 搜索聚合服务
+     * @param webFetchService 独立 URL 抓取服务
      */
-    public AiWebSearchTools(WebSearchService webSearchService) {
+    public AiWebSearchTools(WebSearchService webSearchService, WebFetchService webFetchService) {
         this.webSearchService = webSearchService;
+        this.webFetchService = webFetchService;
     }
 
     /**
@@ -44,6 +49,19 @@ public class AiWebSearchTools {
      */
     public String fetchWeb(String url) {
         log.debug("Tool: fetchWeb url='{}'", url);
-        return webSearchService.fetch(url);
+        return webFetchService.fetchText(url);
+    }
+
+    /**
+     * 抓取任意公开 HTTP(S) URL，并返回结构化状态与正文。
+     *
+     * @param url 要抓取的 URL
+     * @param purpose 抓取目的，便于日志和模型自我约束
+     * @param maxChars 最大返回字符数
+     * @return URL 抓取结果
+     */
+    public FetchUrlResult fetchUrl(String url, String purpose, Integer maxChars) {
+        log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
+        return webFetchService.fetch(url, maxChars);
     }
 }

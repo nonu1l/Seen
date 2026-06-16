@@ -25,7 +25,7 @@ interface EditableAiConfig {
 }
 
 interface SourceValues {
-  searchProvider: 'serper' | 'ddg';
+  searchProvider: 'auto' | 'serper' | 'ddg';
   serperApiKey: string;
   serperApiKeySet: boolean;
   bangumiProxy: string;
@@ -74,7 +74,7 @@ function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
 
 function toSourceValues(settings: SettingsResponse | null): SourceValues {
   return {
-    searchProvider: settings?.sources.searchProvider ?? 'ddg',
+    searchProvider: settings?.sources.searchProvider ?? 'auto',
     serperApiKey: settings?.sources.serperApiKey ?? '',
     serperApiKeySet: settings?.sources.serperApiKeySet ?? false,
     bangumiProxy: settings?.sources.bangumiProxy ?? '',
@@ -367,6 +367,7 @@ export default function SettingsPage() {
       <div className="settings-form">
         <SettingsRow title="搜索源">
           <div className="settings-segmented">
+            <button type="button" className={sourceValues.searchProvider === 'auto' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'auto')}>智能选择</button>
             <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
             <button type="button" className={sourceValues.searchProvider === 'ddg' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'ddg')}>DuckDuckGo</button>
           </div>

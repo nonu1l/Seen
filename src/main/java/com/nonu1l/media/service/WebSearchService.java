@@ -3,6 +3,7 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.model.dto.WebSearchItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
@@ -21,6 +22,8 @@ public class WebSearchService implements SearchProvider {
     private final DDGSearchService ddg;
     private final SerperSearchService serper;
     private final SettingsService settingsService;
+    private final WebFetchService webFetchService;
+    private final boolean searchEnabled;
 
     /**
      * 注入底层搜索实现，实际请求时按当前设置动态选择。
@@ -28,12 +31,18 @@ public class WebSearchService implements SearchProvider {
      * @param ddg DDG 备选实现
      * @param serper Serper 实现
      * @param settingsService 设置读取服务
+     * @param webFetchService 独立网页抓取服务
+     * @param searchEnabled 是否启用外部搜索源
      */
     public WebSearchService(DDGSearchService ddg, SerperSearchService serper,
-                            SettingsService settingsService) {
+                            SettingsService settingsService,
+                            WebFetchService webFetchService,
+                            @Value("${app.search.enabled:true}") boolean searchEnabled) {
         this.ddg = ddg;
         this.serper = serper;
         this.settingsService = settingsService;
+        this.webFetchService = webFetchService;
+        this.searchEnabled = searchEnabled;
     }
 
     /**
@@ -44,7 +53,18 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItem> search(String query) {
-        return delegate().search(query);
+        if (!isSearchEnabled()) {
+            log.warn("Web search disabled by app.search.enabled=false");
+            return List.of();
+        }
+        String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
+        if ("auto".equalsIgnoreCase(provider)) {
+            return searchAuto(query);
+        }
+        if ("serper".equalsIgnoreCase(provider)) {
+            return serper.isAvailable() ? searchWithProvider("serper", serper, query) : List.of();
+        }
+        return searchWithProvider("ddg", ddg, query);
     }
 
     /**
@@ -55,19 +75,42 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public String fetch(String url) {
-        String raw = delegate().fetch(url);
-        return cleanFetchedText(raw);
+        return cleanFetchedText(webFetchService.fetchText(url));
     }
 
-    private SearchProvider delegate() {
-        String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
-        if ("serper".equalsIgnoreCase(provider)) {
-            if (serper.isAvailable()) {
-                return serper;
+    private List<WebSearchItem> searchAuto(String query) {
+        if (serper.isAvailable()) {
+            List<WebSearchItem> serperResults = searchWithProvider("serper", serper, query);
+            if (!serperResults.isEmpty()) {
+                return serperResults;
             }
-            log.warn("Search provider is serper but API key is missing, falling back to DuckDuckGo");
+            log.info("Serper returned no usable results for '{}', falling back to DuckDuckGo", query);
+        } else {
+            log.info("Serper API key is missing, using DuckDuckGo for '{}'", query);
         }
-        return ddg;
+        return searchWithProvider("ddg", ddg, query);
+    }
+
+    private List<WebSearchItem> searchWithProvider(String providerName, SearchProvider provider, String query) {
+        long start = System.nanoTime();
+        try {
+            List<WebSearchItem> results = provider.search(query);
+            log.info("Web search provider={} query='{}' results={} elapsedMs={}",
+                    providerName, query, results.size(), (System.nanoTime() - start) / 1_000_000);
+            return results;
+        } catch (Exception e) {
+            log.warn("Web search provider={} failed query='{}': {}", providerName, query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 判断外部搜索源是否启用，用于在联调或测试中模拟搜索源整体不可用。
+     *
+     * @return 配置允许外部搜索时返回 true
+     */
+    private boolean isSearchEnabled() {
+        return searchEnabled;
     }
 
     // ── 抓取文本清洗 ──
