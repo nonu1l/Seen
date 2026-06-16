@@ -9,6 +9,11 @@ import java.util.Map;
 /**
  * 暴露应用运行时开关配置给前端使用，如 AI 功能是否启用。
  */
+
+
+/**
+ * TODO 这个可以合并到 SettingsController.java
+ */
 @RestController
 public class AppConfigController {
 
