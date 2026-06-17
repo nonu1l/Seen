@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ArrowLeft, RotateCcw, Settings, X } from 'lucide-react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useConfirm } from './ConfirmProvider';
 
 export interface AppLayoutContext {
   registerReset: (fn: (() => void) | null) => void;
@@ -13,6 +14,7 @@ export interface AppLayoutContext {
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const isAi = location.pathname === '/ai';
   const isSettings = location.pathname === '/settings';
 
@@ -26,6 +28,18 @@ export default function AppLayout() {
     if (location.key === 'default') navigate('/');
     else navigate(-1);
   }, [location.key, navigate]);
+
+  /** 确认后清空 AI 对话历史，避免用户误触重置按钮。 */
+  const handleReset = useCallback(async () => {
+    if (!onReset) return;
+    const confirmed = await confirm({
+      title: '重置 AI 对话？',
+      message: '这会清空当前 AI 对话消息、卡片和运行状态。',
+      confirmLabel: '重置对话',
+      variant: 'danger',
+    });
+    if (confirmed) onReset();
+  }, [confirm, onReset]);
 
   const context: AppLayoutContext = { registerReset };
 
@@ -57,7 +71,7 @@ export default function AppLayout() {
                       className="btn-icon" title="退出" aria-label="退出">
                       <X size={18} strokeWidth={2} />
                     </button>
-                    <button type="button" onClick={() => onReset?.()}
+                    <button type="button" onClick={handleReset}
                       className="btn-icon" title="重置" aria-label="重置">
                       <RotateCcw size={18} strokeWidth={2} />
                     </button>
