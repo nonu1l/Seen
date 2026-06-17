@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Status, WorkDetailDTO } from '../api/types';
 import { Cover } from './Cover';
@@ -13,8 +13,12 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [review, setReview] = useState('');
+  const [savedRating, setSavedRating] = useState<number | null>(null);
+  const [savedReview, setSavedReview] = useState('');
   const [saving, setSaving] = useState(false);
   const [changed, setChanged] = useState(false);
+  const changedRef = useRef(false);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [cnNames, setCnNames] = useState<Record<number, string>>({});
   const [cnLoading, setCnLoading] = useState<Set<number>>(new Set());
   const [actorNames, setActorNames] = useState<Record<number, string>>({});
@@ -22,7 +26,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(changed); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(changedRef.current || changed); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [changed, onClose]);
@@ -33,7 +37,15 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     setCnLoading(new Set());
     setActorNames({});
     setPlotExpanded(false);
-    try { const r = await api.getDetail(String(id), platform); setD(r); setRating(r.myRating); setReview(r.myReview ?? ''); }
+    try {
+      const r = await api.getDetail(String(id), platform);
+      const nextReview = r.myReview ?? '';
+      setD(r);
+      setRating(r.myRating);
+      setReview(nextReview);
+      setSavedRating(r.myRating);
+      setSavedReview(nextReview);
+    }
     catch (e: any) { setError(e?.message || '加载失败'); }
     finally { setLoading(false); }
   };
@@ -76,23 +88,55 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     try {
       const updated = await api.mark({ id: String(d.id ?? id), platform: d.platform ?? platform, status,
         meta: d.id == null ? { id, platform, nameCn: d.nameCn, nameOrig: d.nameOrig, coverUrl: d.coverUrl, year: d.year, tags: d.tags, plot: d.plot, score: d.score, source: 'bangumi' } : undefined });
+      changedRef.current = true;
       setChanged(true);
       // 仅更新标记相关状态，避免 refresh() 导致角色信息重新获取
       setD(prev => prev ? { ...prev, status, id: prev.id ?? updated.id } : prev);
       setRating(updated.myRating);
+      setSavedRating(updated.myRating);
     } catch (e: any) { setError(e?.message || '标记失败'); }
   };
 
-  const saveReview = async () => {
-    if (!d?.id) return; setSaving(true);
-    try { await api.updateReview(d.id, rating, review.trim() || null); setChanged(true); }
-    catch (e: any) { setError(e?.message || '保存失败'); }
-    finally { setSaving(false); }
+  const saveProgress = (nextRating: number | null, nextReview: string) => {
+    if (!d?.id) return;
+    const workId = d.id;
+    const normalizedReview = nextReview.trim();
+    setSaving(true);
+    setError(null);
+    changedRef.current = true;
+    setChanged(true);
+
+    const job = saveQueueRef.current.catch(() => undefined).then(async () => {
+      const updated = await api.updateReview(workId, nextRating, normalizedReview || null);
+      setSavedRating(updated.myRating);
+      setSavedReview(updated.myReview ?? '');
+    });
+    saveQueueRef.current = job;
+    job.catch((e: any) => setError(e?.message || '保存失败'))
+      .finally(() => {
+        if (saveQueueRef.current === job) {
+          setSaving(false);
+        }
+      });
   };
+
+  const handleRatingChange = (nextRating: number | null) => {
+    setRating(nextRating);
+    if (nextRating !== savedRating || review.trim() !== savedReview.trim()) {
+      saveProgress(nextRating, review);
+    }
+  };
+
+  const handleReviewBlur = () => {
+    if (rating !== savedRating || review.trim() !== savedReview.trim()) {
+      saveProgress(rating, review);
+    }
+  };
+
   const unmark = async () => {
     if (!d?.id) return;
     if (!window.confirm('确定要删除该记录吗？将同时删除作品信息和所有标记记录。')) return;
-    try { await api.unmark(d.id); setChanged(true); onClose(true); }
+    try { await api.unmark(d.id); changedRef.current = true; setChanged(true); onClose(true); }
     catch (e: any) { setError(e?.message || '操作失败'); }
   };
 
@@ -100,7 +144,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] pb-[5vh] bg-black/75 overflow-y-auto"
-         onClick={() => onClose(changed)}>
+         onClick={() => onClose(changedRef.current || changed)}>
       <div className="record-panel mobile-fullscreen w-full max-w-3xl my-auto sm:m-4 anim-in"
            onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
 
@@ -110,11 +154,25 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
             <h2 className="text-lg font-semibold text-[color:var(--text-primary)] truncate">{d?.nameCn || '加载中...'}</h2>
             {d && pLabel && <span className="badge badge-outline flex-shrink-0">{pLabel}</span>}
           </div>
-          <button onClick={() => onClose(changed)} className="btn-icon" aria-label="关闭">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {d?.id != null && (
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={unmark}
+                className="inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md text-[color:var(--text-muted)] transition-colors hover:bg-white/[0.04] hover:text-[color:var(--text-primary)]"
+                aria-label="删除记录"
+                title="删除记录">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-7 0l.7 12A2 2 0 0010.7 21h2.6a2 2 0 002-1.9L16 7M10 11v6M14 11v6" />
+                </svg>
+              </button>
+            )}
+            <button onClick={() => onClose(changedRef.current || changed)} className="btn-icon" aria-label="关闭">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4">
@@ -230,20 +288,15 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">评分</p>
                   <div className="flex items-center gap-3">
-                    <StarRating value={rating} onChange={setRating} size={24} />
+                    <StarRating value={rating} onChange={handleRatingChange} size={24} />
                     <span className="text-[13px] text-[color:var(--text-muted)]">{rating != null ? `${rating} / 10` : '未评分'}</span>
+                    {saving && <span className="text-[12px] text-[color:var(--text-muted)]">保存中...</span>}
                   </div>
                 </div>
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">评价</p>
-                  <textarea value={review} onChange={e => setReview(e.target.value)} rows={2}
+                  <textarea value={review} onChange={e => setReview(e.target.value)} onBlur={handleReviewBlur} rows={2}
                     className="dark-textarea" placeholder="写下你的感想..." />
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button onClick={unmark} className="btn-ghost" style={{height:32,fontSize:12,padding:'0 12px'}}>删除记录</button>
-                  <button onClick={saveReview} disabled={saving} className="btn-primary" style={{height:32,fontSize:12,padding:'0 14px'}}>
-                    {saving ? '保存中...' : '保存'}
-                  </button>
                 </div>
               </>)}
             </div>
