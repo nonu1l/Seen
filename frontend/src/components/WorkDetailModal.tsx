@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type FocusEvent, type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { Status, WorkDetailDTO } from '../api/types';
 import { Cover } from './Cover';
@@ -18,6 +18,8 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [changed, setChanged] = useState(false);
   const changedRef = useRef(false);
+  const reviewRef = useRef('');
+  const saveSignatureRef = useRef('');
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [cnNames, setCnNames] = useState<Record<number, string>>({});
   const [cnLoading, setCnLoading] = useState<Set<number>>(new Set());
@@ -43,6 +45,8 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
       setD(r);
       setRating(r.myRating);
       setReview(nextReview);
+      reviewRef.current = nextReview;
+      saveSignatureRef.current = `${r.myRating ?? ''}\n${nextReview.trim()}`;
       setSavedRating(r.myRating);
       setSavedReview(nextReview);
     }
@@ -101,6 +105,9 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     if (!d?.id) return;
     const workId = d.id;
     const normalizedReview = nextReview.trim();
+    const signature = `${nextRating ?? ''}\n${normalizedReview}`;
+    if (signature === saveSignatureRef.current) return;
+    saveSignatureRef.current = signature;
     setSaving(true);
     setError(null);
     changedRef.current = true;
@@ -112,7 +119,10 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
       setSavedReview(updated.myReview ?? '');
     });
     saveQueueRef.current = job;
-    job.catch((e: any) => setError(e?.message || '保存失败'))
+    job.catch((e: any) => {
+      saveSignatureRef.current = `${savedRating ?? ''}\n${savedReview.trim()}`;
+      setError(e?.message || '保存失败');
+    })
       .finally(() => {
         if (saveQueueRef.current === job) {
           setSaving(false);
@@ -122,14 +132,36 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
 
   const handleRatingChange = (nextRating: number | null) => {
     setRating(nextRating);
-    if (nextRating !== savedRating || review.trim() !== savedReview.trim()) {
-      saveProgress(nextRating, review);
+    const currentReview = reviewRef.current;
+    if (nextRating !== savedRating || currentReview.trim() !== savedReview.trim()) {
+      saveProgress(nextRating, currentReview);
     }
   };
 
-  const handleReviewBlur = () => {
-    if (rating !== savedRating || review.trim() !== savedReview.trim()) {
-      saveProgress(rating, review);
+  const handleReviewChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const nextReview = event.target.value;
+    reviewRef.current = nextReview;
+    setReview(nextReview);
+  };
+
+  const handleReviewBlur = (event: FocusEvent<HTMLTextAreaElement>) => {
+    const nextReview = event.currentTarget.value;
+    reviewRef.current = nextReview;
+    if (rating !== savedRating || nextReview.trim() !== savedReview.trim()) {
+      saveProgress(rating, nextReview);
+    }
+  };
+
+  const handlePanelMouseDownCapture = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('textarea') || target.closest('[data-delete-record="true"]')) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLTextAreaElement && active.placeholder === '写下你的感想...') {
+      const nextReview = active.value;
+      reviewRef.current = nextReview;
+      if (rating !== savedRating || nextReview.trim() !== savedReview.trim()) {
+        saveProgress(rating, nextReview);
+      }
     }
   };
 
@@ -146,6 +178,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] pb-[5vh] bg-black/75 overflow-y-auto"
          onClick={() => onClose(changedRef.current || changed)}>
       <div className="record-panel mobile-fullscreen w-full max-w-3xl my-auto sm:m-4 anim-in"
+           onMouseDownCapture={handlePanelMouseDownCapture}
            onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
 
         {/* Header */}
@@ -159,6 +192,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={unmark}
+                data-delete-record="true"
                 className="inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md text-[color:var(--text-muted)] transition-colors hover:bg-white/[0.04] hover:text-[color:var(--text-primary)]"
                 aria-label="删除记录"
                 title="删除记录">
@@ -295,7 +329,7 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                 </div>
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-muted)]">评价</p>
-                  <textarea value={review} onChange={e => setReview(e.target.value)} onBlur={handleReviewBlur} rows={2}
+                  <textarea value={review} onChange={handleReviewChange} onBlur={handleReviewBlur} rows={2}
                     className="dark-textarea" placeholder="写下你的感想..." />
                 </div>
               </>)}
