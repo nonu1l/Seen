@@ -40,7 +40,8 @@ public class ConversationCard {
     @Column(length = 30)
     private String platform;
 
-    private Integer rating;
+    /** 用户评分，10 分制，支持 0.5 分小数。 */
+    private Double rating;
 
     /** Bangumi 条目评分 */
     private Double score;

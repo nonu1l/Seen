@@ -473,7 +473,7 @@ public class ConversationService {
             log.warn("Failed to fetch Bangumi meta for subjectId={}: {}", card.getSubjectId(), e.getMessage());
         }
 
-        Double rating = card.getRating() != null ? card.getRating().doubleValue() : null;
+        Double rating = card.getRating() != null ? card.getRating() : null;
         WorkService.MarkResult mr = workService.markNew(markReq, rating, card.getReview());
 
         card.setCardState("SAVED");
@@ -504,7 +504,7 @@ public class ConversationService {
                 card.getPlatform(),
                 card.getRating(), card.getScore(), card.getReview(), card.getStatus(), card.getCardState(),
                 deserializeTags(card.getTags()), card.getPlot(),
-                previous != null ? (previous.getRating() != null ? previous.getRating().intValue() : null) : null,
+                previous != null ? previous.getRating() : null,
                 previous != null ? previous.getReview() : null,
                 previous != null ? previous.getStatus() : null
         );
@@ -551,7 +551,7 @@ public class ConversationService {
             StringBuilder sb = new StringBuilder();
             sb.append("已匹配《").append(e.nameCn()).append("》");
             if (e.rating() != null) {
-                sb.append("，评分 ").append(e.rating()).append(" 分");
+                sb.append("，评分 ").append(formatRating(e.rating())).append(" 分");
             }
             if (e.status() != null) {
                 String label = switch (e.status()) {
@@ -576,12 +576,12 @@ public class ConversationService {
         // 统计评分差异
         List<MatchedEntryDTO> withRating = entries.stream().filter(e -> e.rating() != null).toList();
         if (!withRating.isEmpty()) {
-            int min = withRating.stream().mapToInt(MatchedEntryDTO::rating).min().orElse(0);
-            int max = withRating.stream().mapToInt(MatchedEntryDTO::rating).max().orElse(0);
-            if (min == max) {
-                sb.append("，均分 ").append(min).append(" 分");
+            double min = withRating.stream().mapToDouble(MatchedEntryDTO::rating).min().orElse(0);
+            double max = withRating.stream().mapToDouble(MatchedEntryDTO::rating).max().orElse(0);
+            if (Double.compare(min, max) == 0) {
+                sb.append("，均分 ").append(formatRating(min)).append(" 分");
             } else {
-                sb.append("，评分从 ").append(min).append(" 到 ").append(max).append(" 分不等");
+                sb.append("，评分从 ").append(formatRating(min)).append(" 到 ").append(formatRating(max)).append(" 分不等");
             }
         }
         sb.append("。确认无误可逐张保存。");
@@ -711,6 +711,22 @@ public class ConversationService {
     }
 
     /**
+     * 格式化 10 分制评分：整数不显示小数，小数保留 1 位。
+     *
+     * @param rating 评分，可为空
+     * @return 适合展示给用户的评分文本
+     */
+    private static String formatRating(Double rating) {
+        if (rating == null) {
+            return "";
+        }
+        if (Math.rint(rating) == rating) {
+            return String.valueOf(rating.intValue());
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f", rating);
+    }
+
+    /**
      * 将已经生成好的回复按小块发送，用于结构化节点无法直接流式输出的场景。
      *
      * @param replyText 完整回复文本
@@ -758,7 +774,7 @@ public class ConversationService {
             card.setYear(w.getYear());
             card.setPlatform(w.getPlatform());
             card.setStatus(r != null ? r.getStatus() : null);
-            card.setRating(r != null ? (r.getRating() != null ? r.getRating().intValue() : null) : null);
+            card.setRating(r != null ? r.getRating() : null);
             card.setReview(r != null ? r.getReview() : null);
             card.setCardState("UNMARKED");
             return cardRepo.save(card);

@@ -61,7 +61,7 @@
     {
       "subjectId": 数字,
       "nameCn": "中文名",
-      "rating": "整数或null(1-10)",
+      "rating": "数字或null(1-10，允许0.5分小数，例如9.5)",
       "comment": "字符串或null",
       "status": "collect/wish/doing/on_hold/dropped 或 null"
     }

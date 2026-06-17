@@ -82,7 +82,7 @@ public class SearchResultPreprocessor {
             if (intent.season() != null) {
                 parts.add(intent.season() == -1 ? "最终季" : "第" + intent.season() + "季");
             }
-            if (intent.rating() != null) parts.add("评分" + intent.rating() + "分");
+            if (intent.rating() != null) parts.add("评分" + formatRating(intent.rating()) + "分");
             if (intent.comment() != null) parts.add("评价: " + intent.comment());
             if (intent.scope() != null) {
                 String scopeLabel = switch (intent.scope()) {
@@ -190,5 +190,18 @@ public class SearchResultPreprocessor {
     private String normalizeDate(String d) {
         if (d == null || d.isBlank() || d.startsWith("0000")) return null;
         return d;
+    }
+
+    /**
+     * 格式化用户意图中的 10 分制评分。
+     *
+     * @param rating 用户评分
+     * @return 整数不带小数，小数保留 1 位
+     */
+    private String formatRating(Double rating) {
+        if (Math.rint(rating) == rating) {
+            return String.valueOf(rating.intValue());
+        }
+        return String.format(Locale.ROOT, "%.1f", rating);
     }
 }

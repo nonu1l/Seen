@@ -53,7 +53,7 @@ public class AiLocalLibraryTools {
             r.ifPresent(record -> results.add(new LocalRecordDTO(
                     w.getId(), w.getNameCn() != null ? w.getNameCn() : w.getName(),
                     record.getStatus(),
-                    record.getRating() != null ? record.getRating().intValue() : null,
+                    record.getRating(),
                     record.getReview())));
         }
         return results;

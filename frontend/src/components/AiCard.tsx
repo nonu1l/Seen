@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { ConversationCardDTO, Status } from '../api/types';
 import { Cover } from './Cover';
+import { StarRating } from './StarRating';
 import { STATUS_OPTIONS, statusLabel } from '../utils/statusMeta';
 
 interface Props {
@@ -17,7 +18,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
   const unmarked = card.cardState === 'UNMARKED';
   const restored = card.cardState === 'RESTORED';
 
-  const [rating, setRating] = useState<number | null>(() => card.rating ? Math.round(card.rating / 2) : null);
+  const [rating, setRating] = useState<number | null>(() => card.rating ?? null);
   const [status, setStatus] = useState<Status | null>(card.status ?? null);
   const [review, setReview] = useState(card.review ?? '');
   const [saving, setSaving] = useState(false);
@@ -26,8 +27,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const tenScale = rating != null ? rating * 2 : null;
-      await onSave(card.id, tenScale, review || null, status);
+      await onSave(card.id, rating, review || null, status);
     } catch {
       // ignore
     } finally {
@@ -53,7 +53,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
           </div>
           <div className="flex-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</p>
-            <p className="mt-0.5">本次输入：{status ? statusLabel(status) : '未指定'} · {rating ? rating + '星' : '未评分'}</p>
+            <p className="mt-0.5">本次输入：{status ? statusLabel(status) : '未指定'} · {rating != null ? formatRating(rating) + '分' : '未评分'}</p>
           </div>
         </div>
         <div className="flex justify-end gap-2">
@@ -85,7 +85,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
             <p className="mt-0.5">
               已取消标记
               {card.status && <> · {statusLabel(card.status)}</>}
-              {card.rating != null && <> · {card.rating}分</>}
+              {card.rating != null && <> · {formatRating(card.rating)}分</>}
               {card.review && <> · 「{card.review}」</>}
             </p>
           </div>
@@ -171,21 +171,8 @@ export function AiCard({ card, onSave, onUndo }: Props) {
         {/* 我的评分 */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-[color:var(--text-muted)] flex-shrink-0">评分</span>
-          <span className="inline-flex gap-0.5" role="group">
-          {[1, 2, 3, 4, 5].map(i => (
-            <button key={i} type="button" disabled={readOnly}
-              className={readOnly ? '' : 'cursor-pointer hover:scale-110 bg-transparent p-0 transition-colors'}
-              style={{
-                width: 22, height: 22, border: 0, background: 'transparent',
-                color: rating != null && i <= rating ? 'var(--amber)' : 'rgba(255,255,255,0.12)',
-              }}
-              onClick={() => !readOnly && setRating(prev => (prev === i ? null : i))}>
-              <svg width={22} height={22} viewBox="0 0 20 20" fill={rating != null && i <= rating ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.2}>
-                <path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15l-5.3 2.8 1-5.9L1.5 7.7l5.9-.9L10 1.5z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          ))}
-        </span>
+          <StarRating value={rating} onChange={setRating} readOnly={readOnly} size={22} step={0.5} />
+          <span className="text-[11px] text-[color:var(--text-muted)]">{rating != null ? `${formatRating(rating)} / 10` : '未评分'}</span>
         </div>
 
         {/* 状态 */}
@@ -254,10 +241,14 @@ function formatHistory(card: ConversationCardDTO) {
     parts.push(statusLabel(card.previousStatus));
   }
   if (card.previousRating != null) {
-    parts.push(card.previousRating + '分');
+    parts.push(formatRating(card.previousRating) + '分');
   }
   if (card.previousReview) {
     parts.push('"' + card.previousReview + '"');
   }
   return parts.join(' · ') || '已记录';
+}
+
+function formatRating(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

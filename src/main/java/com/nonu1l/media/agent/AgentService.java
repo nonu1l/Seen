@@ -178,7 +178,7 @@ public class AgentService {
                         cards.add(new MatchedEntryDTO(
                             c.has("subjectId") ? c.get("subjectId").asLong() : null,
                             c.has("nameCn") ? c.get("nameCn").asText() : null,
-                            c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asInt() : null,
+                            c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asDouble() : null,
                             c.has("comment") && !c.get("comment").isNull() ? c.get("comment").asText() : null,
                             c.has("status") && !c.get("status").isNull() ? c.get("status").asText() : null,
                             null));
@@ -341,7 +341,7 @@ public class AgentService {
                         cardList.add(new com.nonu1l.media.model.dto.MatchedEntryDTO(
                             c.has("subjectId") ? c.get("subjectId").asLong() : null,
                             c.has("nameCn") ? c.get("nameCn").asText() : null,
-                            c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asInt() : null,
+                            c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asDouble() : null,
                             c.has("comment") && !c.get("comment").isNull() ? c.get("comment").asText() : null,
                             c.has("status") && !c.get("status").isNull() ? c.get("status").asText() : null,
                             null));

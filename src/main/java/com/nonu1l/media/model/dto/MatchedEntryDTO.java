@@ -12,8 +12,8 @@ public record MatchedEntryDTO(
         Long subjectId,
         /** 中文名 */
         String nameCn,
-        /** 推断的评分 1-10，null=未评分 */
-        Integer rating,
+        /** 推断的评分 1-10，支持 0.5 分小数，null=未评分 */
+        Double rating,
         /** 评价文本 */
         String comment,
         /** 状态标记 */
@@ -28,12 +28,12 @@ public record MatchedEntryDTO(
      *
      * @param subjectId Bangumi 条目 ID。
      * @param nameCn 中文名称。
-     * @param rating 用户评分（1-10）。
+     * @param rating 用户评分（1-10，支持 0.5 分小数）。
      * @param comment 用户评价文本。
      * @param status 标记状态。
      * @param confidence 匹配置信度（0-1）。
      */
-    public MatchedEntryDTO(Long subjectId, String nameCn, Integer rating, String comment,
+    public MatchedEntryDTO(Long subjectId, String nameCn, Double rating, String comment,
                         String status, Double confidence) {
         this(subjectId, nameCn, rating, comment, status, confidence, null);
     }

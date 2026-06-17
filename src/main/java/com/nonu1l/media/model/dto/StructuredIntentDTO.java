@@ -11,8 +11,8 @@ public record StructuredIntentDTO(
         String keywords,
         /** 指定季数，null=未指定，-1=最终季 */
         Integer season,
-        /** 用户显式打分 1-10，null=未指定 */
-        Integer rating,
+        /** 用户显式打分 1-10，支持 0.5 分小数，null=未指定 */
+        Double rating,
         /** 评价文本原文 */
         String comment,
         /** 状态标记：collect/wish/doing/on_hold/dropped，null=需推断 */

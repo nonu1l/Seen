@@ -14,14 +14,14 @@ import java.util.List;
  * @param coverUrl 封面图链接。
  * @param year 年份信息。
  * @param platform 来源平台。
- * @param rating 用户评分。
+ * @param rating 用户评分，10 分制，支持 0.5 分小数。
  * @param score 平均评分。
  * @param review 用户评价内容。
  * @param status 观看状态。
  * @param cardState 卡片状态。
  * @param tags 标签列表。
  * @param plot 简介文本。
- * @param previousRating 历史记录中的评分。
+ * @param previousRating 历史记录中的评分，10 分制，支持 0.5 分小数。
  * @param previousReview 历史记录中的评价。
  * @param previousStatus 历史记录中的状态。
  */
@@ -34,7 +34,7 @@ public record ConversationCardDTO(
         String coverUrl,
         String year,
         String platform,
-        Integer rating,
+        Double rating,
         Double score,
         String review,
         String status,
@@ -42,7 +42,7 @@ public record ConversationCardDTO(
         List<String> tags,
         String plot,
         /** 以下为 AI 新增记录时的历史对比信息 */
-        Integer previousRating,
+        Double previousRating,
         String previousReview,
         String previousStatus
 ) {
@@ -56,7 +56,7 @@ public record ConversationCardDTO(
      * @param coverUrl 封面图链接。
      * @param year 年份信息。
      * @param platform 来源平台。
-     * @param rating 用户评分。
+     * @param rating 用户评分，10 分制，支持 0.5 分小数。
      * @param score 平均评分。
      * @param review 用户评价内容。
      * @param status 观看状态。
@@ -66,7 +66,7 @@ public record ConversationCardDTO(
      */
     public ConversationCardDTO(Long id, Long messageId, Long subjectId,
                                String nameCn, String coverUrl, String year, String platform,
-                               Integer rating, Double score, String review, String status, String cardState,
+                               Double rating, Double score, String review, String status, String cardState,
                                List<String> tags, String plot) {
         this(id, messageId, subjectId, nameCn, coverUrl, year, platform,
                 rating, score, review, status, cardState, tags, plot,
