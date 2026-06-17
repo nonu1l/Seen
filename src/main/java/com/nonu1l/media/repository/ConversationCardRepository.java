@@ -33,6 +33,26 @@ public interface ConversationCardRepository extends JpaRepository<ConversationCa
     List<ConversationCard> findAllBySessionIdAndCardStateInOrderByIdAsc(Long sessionId, List<String> cardStates);
 
     /**
+     * 查询某轮 AI 请求创建的全部卡片。
+     *
+     * @param sessionId 会话 ID
+     * @param requestId AI 请求 ID
+     * @return 本轮请求产生的卡片列表
+     */
+    List<ConversationCard> findAllBySessionIdAndRequestIdOrderByIdAsc(Long sessionId, String requestId);
+
+    /**
+     * 查询某轮请求中指定作品的最后一张卡片。
+     *
+     * @param sessionId 会话 ID
+     * @param requestId AI 请求 ID
+     * @param subjectId 作品 ID
+     * @return 匹配卡片列表，按 ID 倒序
+     */
+    List<ConversationCard> findAllBySessionIdAndRequestIdAndSubjectIdOrderByIdDesc(
+            Long sessionId, String requestId, Long subjectId);
+
+    /**
      * 删除指定会话下全部卡片。
      *
      * <p>关键副作用：会直接从数据库移除所有匹配会话的卡片记录，操作不可恢复。</p>

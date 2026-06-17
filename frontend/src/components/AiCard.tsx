@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { ConversationCardDTO, Status } from '../api/types';
 import { Cover } from './Cover';
 import { StarRating } from './StarRating';
@@ -14,7 +13,6 @@ interface Props {
 export function AiCard({ card, onSave, onUndo }: Props) {
   const saved = card.cardState === 'SAVED';
   const editable = card.cardState === 'EDITABLE';
-  const conflict = card.cardState === 'CONFLICT';
   const unmarked = card.cardState === 'UNMARKED';
   const restored = card.cardState === 'RESTORED';
 
@@ -36,39 +34,6 @@ export function AiCard({ card, onSave, onUndo }: Props) {
   };
 
   const readOnly = saved && !editable;
-
-  // ── 冲突 UI ──
-  if (conflict) {
-    return (
-      <div className="flex flex-col gap-2 rounded-lg p-3" style={{
-        background: 'var(--bg-card)', border: '1px solid #f59e0b',
-      }}>
-        <div className="flex items-center gap-1.5 text-[12px] font-medium" style={{ color: '#f59e0b' }}>
-          <AlertTriangle size={14} strokeWidth={2} />
-          与本地记录冲突
-        </div>
-        <div className="flex gap-3">
-          <div className="flex-shrink-0 self-start overflow-hidden rounded-md" style={{ width: 64, aspectRatio: '2/3', background: 'var(--bg-card)' }}>
-            <Cover src={card.coverUrl} alt={card.nameCn} />
-          </div>
-          <div className="flex-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-            <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{card.nameCn}</p>
-            <p className="mt-0.5">本次输入：{status ? statusLabel(status) : '未指定'} · {rating != null ? formatRating(rating) + '分' : '未评分'}</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={() => onUndo(card.id)}
-            className="rounded-md px-3 py-1 text-[12px]" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            放弃本次
-          </button>
-          <button type="button" onClick={handleSave} disabled={saving}
-            className="rounded-md px-3 py-1 text-[12px] font-medium text-white" style={{ background: 'var(--accent)' }}>
-            {saving ? '...' : '覆盖'}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // ── 已取消 / 已撤回卡片 ──
   if (unmarked || restored) {
@@ -92,7 +57,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
         </div>
         <div className="flex justify-end">
           {unmarked ? (
-            <button type="button" onClick={() => onSave(card.id, card.rating, card.review, card.status)}
+            <button type="button" onClick={() => onUndo(card.id)}
               className="rounded-md px-3 py-1 text-[12px] transition-colors hover:opacity-80"
               style={{ color: 'var(--accent)', border: '1px solid var(--accent)', background: 'transparent' }}>
               撤回

@@ -61,6 +61,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 - 处理 MiniMax 思考模式将 `<think>` 内容混入正文的问题，避免影响 Agent 意图识别和 JSON 解析。
 - 拆分 AI 标记与取消标记专用提示词，减少正常 mark / unmark 分支的无关规则和提示词 token。
 - AI 意图识别加入最近对话历史，提升对“我都看过了”等上下文修正类表达的判断准确性。
+- 重构为自主 Agent 工具执行架构：取消固定意图图编排，由 Agent 自主调用搜索、推荐、记忆、标记和取消标记工具；工具执行直接生成可撤销卡片，并通过 requestId 串联会话、记录、快照和 Token 用量。
 
 ---
 
@@ -77,21 +78,22 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 用户输入
     │
     ▼
-┌──────────┐
-│ classify │ ← 识别意图：mark / unmark / recommend / search / analyze
-└────┬─────┘
+┌────────────────────┐
+│ Autonomous Agent   │ ← 读取历史与当前请求，自主选择工具
+└────┬───────────────┘
      │
-     ├─ mark ─────────→ 标记专用提示词（搜索+匹配+评分推断+状态推断）
-     ├─ unmark ───────→ 取消标记专用提示词（searchLocal+提取 unmarkIds）
-     ├─ recommend ────→ SearchPipeline 多步搜索管道
-     ├─ search ───────→ SearchPipeline（同上）
-     └─ analyze ──────→ 轻量 LLM 直接问答
+     ├─ searchBangumi / searchLocal / getWorkState
+     ├─ findWorks → SearchPipeline 多步搜索管道
+     ├─ presentWorks → 生成 PENDING 展示卡片
+     ├─ markWork → 快照 → 写入 record → 生成 SAVED 卡片
+     ├─ unmarkWork → 快照 → 删除本地记录 → 生成 UNMARKED 卡片
+     └─ readUserMemory / searchWeb / fetch_url
                          │
                          ▼
-                   ┌──────────┐
-                   │  output  │ → 三层降级：透传replyText / 卡片生成文案 / 全工具兜底
-                   └──────────┘
+             最终自然语言回复 + 本轮 requestId 下的卡片
 ```
+
+AI 会话每轮生成一个 `requestId`，并写入消息、卡片、record、快照和 Token 用量。标记、修改评分影评和取消标记都由工具直接执行；撤销时按 `ai_work_snapshot` 恢复本轮操作前的完整作品状态。
 
 ### SearchPipeline 搜索管道
 
@@ -112,7 +114,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 
 | 层 | 技术 |
 |---|---|
-| 后端 | Java 21, Spring Boot 3.5, Spring AI, LangGraph4j, JPA, SQLite |
+| 后端 | Java 21, Spring Boot 4, Spring AI, JPA, SQLite |
 | 前端 | React 18, TypeScript, Tailwind CSS, Vite |
 | 数据源 | Bangumi API (CF Worker 反代) |
 | AI | Spring AI + OpenAI 兼容模型 |

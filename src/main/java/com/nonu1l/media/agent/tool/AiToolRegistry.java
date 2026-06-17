@@ -11,20 +11,20 @@ import org.springframework.stereotype.Component;
 public class AiToolRegistry {
 
     private final AiBangumiTools bangumiTools;
-    private final AiLocalLibraryTools localLibraryTools;
     private final AiWebSearchTools webSearchTools;
+    private final AiAutonomousTools autonomousTools;
 
     /**
      * @param bangumiTools Bangumi 查询工具
-     * @param localLibraryTools 本地媒体库工具
      * @param webSearchTools Web 搜索工具
+     * @param autonomousTools 自主 Agent 工具门面
      */
     public AiToolRegistry(AiBangumiTools bangumiTools,
-                          AiLocalLibraryTools localLibraryTools,
-                          AiWebSearchTools webSearchTools) {
+                          AiWebSearchTools webSearchTools,
+                          AiAutonomousTools autonomousTools) {
         this.bangumiTools = bangumiTools;
-        this.localLibraryTools = localLibraryTools;
         this.webSearchTools = webSearchTools;
+        this.autonomousTools = autonomousTools;
     }
 
     /**
@@ -39,9 +39,33 @@ public class AiToolRegistry {
                 .description("搜索 Bangumi 影视数据库")
                 .inputType(SearchReq.class).build(),
             FunctionToolCallback.builder("searchLocal",
-                    (SearchReq req) -> localLibraryTools.searchLocal(req.keyword()))
+                    (SearchReq req) -> autonomousTools.searchLocal(req.keyword()))
                 .description("查询本地已标记的作品记录")
                 .inputType(SearchReq.class).build(),
+            FunctionToolCallback.builder("getWorkState",
+                    (WorkStateReq req) -> autonomousTools.getWorkState(req.subjectId()))
+                .description("按 Bangumi subjectId 查询单个本地作品当前状态")
+                .inputType(WorkStateReq.class).build(),
+            FunctionToolCallback.builder("findWorks",
+                    (FindWorksReq req) -> autonomousTools.findWorks(req.query(), req.mode()))
+                .description("根据推荐、搜索或描述找片需求查找影视作品候选")
+                .inputType(FindWorksReq.class).build(),
+            FunctionToolCallback.builder("presentWorks",
+                    (PresentWorksReq req) -> autonomousTools.presentWorks(req.subjectIds(), req.reason()))
+                .description("把候选作品保存为 AI 页面 PENDING 展示卡片，不写入用户观看记录")
+                .inputType(PresentWorksReq.class).build(),
+            FunctionToolCallback.builder("markWork",
+                    (MarkWorkReq req) -> autonomousTools.markWork(req.subjectId(), req.status(), req.rating(), req.review(), req.reason()))
+                .description("直接标记、评分或修改影评；会保存记录并生成可撤销 SAVED 卡片")
+                .inputType(MarkWorkReq.class).build(),
+            FunctionToolCallback.builder("unmarkWork",
+                    (UnmarkWorkReq req) -> autonomousTools.unmarkWork(req.subjectId(), req.reason()))
+                .description("取消本地已有作品标记；会删除作品记录并生成可撤回 UNMARKED 卡片")
+                .inputType(UnmarkWorkReq.class).build(),
+            FunctionToolCallback.builder("readUserMemory",
+                    (MemoryReq req) -> autonomousTools.readUserMemory(req.query()))
+                .description("按需读取用户长期偏好记忆；推荐时可参考但当前用户请求优先")
+                .inputType(MemoryReq.class).build(),
             FunctionToolCallback.builder("searchWeb",
                     (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
                 .description("搜索引擎")
@@ -62,6 +86,12 @@ public class AiToolRegistry {
     }
 
     public record SearchReq(String keyword) {}
+    public record WorkStateReq(Long subjectId) {}
+    public record FindWorksReq(String query, String mode) {}
+    public record PresentWorksReq(java.util.List<Long> subjectIds, String reason) {}
+    public record MarkWorkReq(Long subjectId, String status, Double rating, String review, String reason) {}
+    public record UnmarkWorkReq(Long subjectId, String reason) {}
+    public record MemoryReq(String query) {}
     public record FetchReq(String url) {}
     public record FetchUrlReq(String url, String purpose, Integer maxChars) {}
 }

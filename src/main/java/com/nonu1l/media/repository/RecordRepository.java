@@ -29,6 +29,14 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     Optional<Record> findLatestByWorkId(@Param("workId") Long workId);
 
     /**
+     * 查询某个作品的全部历史记录，按创建顺序返回。
+     *
+     * @param workId 作品 ID
+     * @return 该作品的完整记录历史
+     */
+    List<Record> findAllByWorkIdOrderByIdAsc(Long workId);
+
+    /**
      * 批量查询多个作品各自的最新记录（按每个作品最新 ID 反推）。
      *
      * @param workIds 作品 ID 集合

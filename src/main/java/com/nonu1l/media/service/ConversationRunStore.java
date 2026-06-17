@@ -28,14 +28,15 @@ public class ConversationRunStore {
      * 尝试占用全局 AI 运行槽位。
      *
      * @param sessionId 会话 ID
+     * @param requestId 本轮请求 ID
      * @param startedAt 本轮开始时间
      * @return 成功占用返回 true；已有未停止任务时返回 false
      */
-    public boolean reserve(Long sessionId, Instant startedAt) {
-        if (sessionId == null) {
+    public boolean reserve(Long sessionId, String requestId, Instant startedAt) {
+        if (sessionId == null || requestId == null || requestId.isBlank()) {
             return false;
         }
-        ActiveRun next = new ActiveRun(sessionId, startedAt != null ? startedAt : Instant.now());
+        ActiveRun next = new ActiveRun(sessionId, requestId, startedAt != null ? startedAt : Instant.now());
         while (true) {
             ActiveRun current = activeRun.get();
             if (current != null && !current.isStopped()) {
@@ -103,6 +104,20 @@ public class ConversationRunStore {
         ActiveRun run = run(sessionId);
         if (run != null) {
             run.assistantSaved(assistantMessageId, content, updatedAt);
+        }
+    }
+
+    /**
+     * 记录助手消息已预创建但尚未生成最终内容。
+     *
+     * @param sessionId 会话 ID
+     * @param assistantMessageId 助手消息 ID
+     * @param updatedAt 更新时间
+     */
+    public void assistantReserved(Long sessionId, Long assistantMessageId, Instant updatedAt) {
+        ActiveRun run = run(sessionId);
+        if (run != null) {
+            run.assistantReserved(assistantMessageId, updatedAt);
         }
     }
 
@@ -218,13 +233,15 @@ public class ConversationRunStore {
      *
      * @param sessionId 会话 ID
      * @param userMessageId 用户消息 ID
+     * @param requestId 本轮请求 ID
      * @param assistantMessageId 已保存助手消息 ID
      */
-    public record StoppedRun(Long sessionId, Long userMessageId, Long assistantMessageId) {
+    public record StoppedRun(Long sessionId, String requestId, Long userMessageId, Long assistantMessageId) {
     }
 
     private static final class ActiveRun {
         private final Long sessionId;
+        private final String requestId;
         private final Instant startedAt;
         private final List<String> statuses = new ArrayList<>();
         private Long userMessageId;
@@ -236,8 +253,9 @@ public class ConversationRunStore {
         private SseEmitter emitter;
         private boolean stopped;
 
-        private ActiveRun(Long sessionId, Instant startedAt) {
+        private ActiveRun(Long sessionId, String requestId, Instant startedAt) {
             this.sessionId = sessionId;
+            this.requestId = requestId;
             this.startedAt = startedAt;
             this.updatedAt = startedAt;
         }
@@ -283,6 +301,11 @@ public class ConversationRunStore {
             this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
         }
 
+        private synchronized void assistantReserved(Long assistantMessageId, Instant updatedAt) {
+            this.assistantMessageId = assistantMessageId;
+            this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
+        }
+
         private synchronized void error(String message) {
             if (message == null || message.isBlank() || stopped) {
                 return;
@@ -314,7 +337,7 @@ public class ConversationRunStore {
                     // The client may already be gone.
                 }
             }
-            return new StoppedRun(sessionId, stoppedUserMessageId, stoppedAssistantMessageId);
+            return new StoppedRun(sessionId, requestId, stoppedUserMessageId, stoppedAssistantMessageId);
         }
 
         private synchronized ConversationRunStateDTO snapshot() {

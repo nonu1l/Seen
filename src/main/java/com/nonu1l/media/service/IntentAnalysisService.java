@@ -2,7 +2,7 @@ package com.nonu1l.media.service;
 
 /**
  * JSON 提取与修复工具 — Agent 调用中 LLM 输出解析的公共方法。
- * analyze() 等编排逻辑已迁移至 {@link com.nonu1l.media.agent.AgentService}。
+ * 目前保留 JSON 对象提取能力，供长期记忆等结构化 LLM 输出解析复用。
  */
 public class IntentAnalysisService {
 

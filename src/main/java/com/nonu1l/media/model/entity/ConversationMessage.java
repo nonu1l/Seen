@@ -24,6 +24,10 @@ public class ConversationMessage {
     @Column(name = "session_id", nullable = false)
     private Long sessionId;
 
+    /** 同一轮 AI 请求的追踪 ID；用户消息和助手消息共享。 */
+    @Column(name = "request_id", length = 80)
+    private String requestId;
+
     @Column(nullable = false, length = 10)
     private String role;
 

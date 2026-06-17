@@ -24,6 +24,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
 
     private static final Logger log = LoggerFactory.getLogger(TokenUsageAdvisor.class);
     private static final ThreadLocal<Long> currentSession = new ThreadLocal<>();
+    private static final ThreadLocal<String> currentRequest = new ThreadLocal<>();
     private static final ThreadLocal<String> currentNode = new ThreadLocal<>();
     private static final ThreadLocal<Integer> currentTurn = new ThreadLocal<>();
 
@@ -76,6 +77,18 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      */
     public static void clearSession() {
         currentSession.remove();
+        currentRequest.remove();
+        currentNode.remove();
+        currentTurn.remove();
+    }
+
+    /**
+     * 设置当前 AI 请求 ID，用于把多次模型调用归属到同一轮 Agent 执行。
+     *
+     * @param requestId 请求 ID。
+     */
+    public static void setRequestId(String requestId) {
+        currentRequest.set(requestId);
     }
 
     /**
@@ -133,6 +146,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
         return new UsageContext(
                 request.prompt().getContents(),
                 currentSession.get(),
+                currentRequest.get(),
                 currentNode.get(),
                 currentTurn.get(),
                 settingSupplier.get()
@@ -156,6 +170,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                             : "";
                     TokenUsage tu = new TokenUsage();
                     tu.setSessionId(context.sessionId());
+                    tu.setRequestId(context.requestId());
                     tu.setNodeName(context.nodeName());
                     tu.setTurn(context.turn());
                     tu.setProfileId(context.setting().id());
@@ -204,6 +219,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
     private record UsageContext(
             String inputText,
             Long sessionId,
+            String requestId,
             String nodeName,
             Integer turn,
             SettingsService.AiRuntimeSetting setting

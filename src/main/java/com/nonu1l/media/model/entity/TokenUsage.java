@@ -43,7 +43,11 @@ public class TokenUsage {
     @Column(name = "session_id")
     private Long sessionId;
 
-    /** Agent 节点名称（classify/mark/search/recommend/analyze/output/pipeline-*） */
+    /** 同一轮 AI 请求的追踪 ID。 */
+    @Column(name = "request_id", length = 80)
+    private String requestId;
+
+    /** Agent 节点名称（autonomous-agent、tool、pipeline 等） */
     @Column(name = "node_name", length = 30)
     private String nodeName;
 

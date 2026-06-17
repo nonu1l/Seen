@@ -279,6 +279,7 @@ async function loadDetail(sid, turn, node, label) {
       html += `<div class="call-card-head">`;
       html += `<span class="cc-index">#${i+1}</span>`;
       html += `<span class="cc-model">${esc(`${c.profileName||'default'} / ${c.modelName||'unknown'}`)}</span>`;
+      if (c.requestId) html += `<span class="cc-model">${esc(c.requestId)}</span>`;
       html += `<span class="cc-tokens">${(c.totalTokens||0).toLocaleString()} tokens</span>`;
       html += `</div>`;
       html += `<div class="call-card-body">`;

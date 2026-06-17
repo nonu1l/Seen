@@ -131,6 +131,7 @@ public class TokenUsageController {
                 .map(t -> new TokenUsageDetailDTO(t.getId(),
                         t.getProfileName(),
                         t.getModelName(),
+                        t.getRequestId(),
                         t.getTotalTokens() != null ? t.getTotalTokens().longValue() : 0L,
                         t.getInputText(),
                         t.getOutputText()))

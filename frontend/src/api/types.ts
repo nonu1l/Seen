@@ -106,7 +106,9 @@ export interface ConversationMessageDTO {
 export interface ConversationCardDTO {
   id: number;
   messageId: number;
+  requestId: string | null;
   subjectId: number;
+  actionType: CardActionType | null;
   nameCn: string;
   coverUrl: string | null;
   year: string | null;
@@ -122,9 +124,12 @@ export interface ConversationCardDTO {
   previousRating: number | null;
   previousReview: string | null;
   previousStatus: Status | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
-export type CardState = 'PENDING' | 'SAVED' | 'EXCLUDED' | 'EDITABLE' | 'CONFLICT' | 'UNMARKED' | 'RESTORED';
+export type CardState = 'PENDING' | 'SAVED' | 'EDITABLE' | 'UNMARKED' | 'RESTORED';
+export type CardActionType = 'PRESENT' | 'MARK' | 'UPDATE' | 'UNMARK' | 'MANUAL_SAVE';
 
 export type AiStreamEventType = 'user_saved' | 'status' | 'assistant_saved' | 'cards' | 'done' | 'error';
 

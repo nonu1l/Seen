@@ -237,6 +237,7 @@ public class WorkService {
         } else if (latest.isEmpty()) {
             Record r = new Record();
             r.setWorkId(id);
+            r.setCreatedBy("USER");
             r.setStatus(req.getStatus());
             r.setCreatedAt(Instant.now());
             saved = recordRepo.save(r);
@@ -298,6 +299,7 @@ public class WorkService {
 
         Record rec = new Record();
         rec.setWorkId(id);
+        rec.setCreatedBy("AI");
         rec.setStatus(status);
         if (r != null) rec.setRating(r);
         if (rv != null && !rv.isEmpty()) rec.setReview(rv);
@@ -453,7 +455,7 @@ public class WorkService {
         if (meta.getScore() != null) w.setScore(meta.getScore());
         if (meta.getTags() != null && !meta.getTags().isEmpty()) {
             try {
-                List<String> cleaned = ConversationService.cleanTags(meta.getTags(), meta.getPlatform());
+                List<String> cleaned = cleanTags(meta.getTags(), meta.getPlatform());
                 if (!cleaned.isEmpty()) {
                     w.setTagsCache(objectMapper.writeValueAsString(cleaned));
                 }
@@ -467,6 +469,17 @@ public class WorkService {
         String q = query.toLowerCase();
         return (w.getName() != null && w.getName().toLowerCase().contains(q))
             || (w.getNameCn() != null && w.getNameCn().toLowerCase().contains(q));
+    }
+
+    private static List<String> cleanTags(List<String> tags, String platform) {
+        if (tags == null || tags.isEmpty()) return List.of();
+        String plat = platform != null ? platform.trim() : "";
+        return tags.stream()
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .filter(t -> plat.isEmpty() || !t.equalsIgnoreCase(plat))
+                .distinct()
+                .toList();
     }
 
     private static Long parseId(String s) {

@@ -24,6 +24,18 @@ public class Record {
     @Column(name = "work_id", nullable = false)
     private Long workId;
 
+    /** AI 请求 ID；手动操作可为空。 */
+    @Column(name = "request_id", length = 80)
+    private String requestId;
+
+    /** 触发该记录的会话卡片 ID；非 AI 卡片操作可为空。 */
+    @Column(name = "card_id")
+    private Long cardId;
+
+    /** 创建来源：USER / AI / SYSTEM。 */
+    @Column(name = "created_by", length = 20)
+    private String createdBy;
+
     @Column(nullable = false)
     private String status;
 
