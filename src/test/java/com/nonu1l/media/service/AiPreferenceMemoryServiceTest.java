@@ -70,6 +70,27 @@ class AiPreferenceMemoryServiceTest {
     }
 
     @Test
+    void buildPreferenceSnapshotTreatsZeroRatingAsUnrated() {
+        Work work = work(300L, "未评分科幻剧");
+        Record record = record(3L, 300L, "collect", 0.0d, null);
+
+        WorkRepository workRepo = mock(WorkRepository.class);
+        RecordRepository recordRepo = mock(RecordRepository.class);
+        when(workRepo.findAllOrderByLatestRecord()).thenReturn(List.of(work));
+        when(recordRepo.findLatestByWorkIds(any(Set.class))).thenReturn(List.of(record));
+        when(recordRepo.findTop30ByOrderByUpdatedAtDescIdDesc()).thenReturn(List.of(record));
+
+        AiPreferenceMemoryService service = newService(mock(UserPreferenceMemoryRepository.class),
+                mock(UserPreferenceEvidenceRepository.class), workRepo, recordRepo, mock(SettingsService.class));
+
+        AiPreferenceMemoryService.PreferenceSnapshot snapshot = service.buildPreferenceSnapshot();
+
+        assertTrue(snapshot.evidences().stream().noneMatch(e -> "low_rating".equals(e.getEvidenceType())));
+        assertTrue(snapshot.evidences().stream().noneMatch(e -> e.getText().contains("用户评分=0")));
+        assertTrue(snapshot.evidences().stream().anyMatch(e -> "recent".equals(e.getEvidenceType())));
+    }
+
+    @Test
     void buildPreferenceSnapshotHashIsStableForSameEvidence() {
         Work work = work(100L, "稳定画像样本");
         Record record = record(1L, 100L, "collect", 9.0d, "喜欢克制的叙事。");

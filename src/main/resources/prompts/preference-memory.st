@@ -3,6 +3,7 @@
 要求：
 - 只输出一个 JSON 对象，不要输出 Markdown。
 - 不要虚构证据中没有体现的偏好。
+- 未评分、缺失评分或评分为 0 只表示用户没有打分，不代表低分、不喜欢或负面评价。
 - 当前请求优先级永远高于长期偏好，因此推荐规则只能作为辅助。
 - 如果证据不足，summary 写成空字符串，各数组保持为空。
 - JSON 字段固定为 summary、likes、dislikes、recentShift、recommendationRules。

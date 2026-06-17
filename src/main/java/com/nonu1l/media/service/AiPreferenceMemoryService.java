@@ -272,7 +272,7 @@ public class AiPreferenceMemoryService {
 
     private void addCandidateIfUseful(List<EvidenceCandidate> candidates, Work work, Record record, boolean recent) {
         boolean hasReview = hasText(record.getReview());
-        Double rating = record.getRating();
+        Double rating = meaningfulRating(record.getRating());
         String status = record.getStatus();
 
         if (rating != null && rating >= 8.0d) {
@@ -315,8 +315,9 @@ public class AiPreferenceMemoryService {
         if (!tags.isEmpty()) {
             sb.append("，标签=").append(String.join("/", tags));
         }
-        if (record.getRating() != null) {
-            sb.append("，用户评分=").append(formatRating(record.getRating()));
+        Double rating = meaningfulRating(record.getRating());
+        if (rating != null) {
+            sb.append("，用户评分=").append(formatRating(rating));
         }
         if (hasText(record.getStatus())) {
             sb.append("，状态=").append(statusLabel(record.getStatus()));
@@ -498,6 +499,16 @@ public class AiPreferenceMemoryService {
             return String.valueOf(rating.intValue());
         }
         return String.valueOf(rating);
+    }
+
+    /**
+     * 将旧数据或模型误写入的 0 分视为未评分，避免长期记忆把“没打分”误判成负面偏好。
+     *
+     * @param rating 原始用户评分
+     * @return 有效评分；未评分或非正数返回 {@code null}
+     */
+    private Double meaningfulRating(Double rating) {
+        return rating != null && rating > 0.0d ? rating : null;
     }
 
     private double reviewWeight(String review) {
