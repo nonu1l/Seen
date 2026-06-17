@@ -4,6 +4,8 @@ import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
 import com.nonu1l.media.model.dto.SettingsTestRequests;
 import com.nonu1l.media.model.dto.SettingsTestResponse;
+import com.nonu1l.media.service.thinking.ThinkingMode;
+import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -35,11 +37,13 @@ public class SettingsTestService {
     private final ExternalEndpointProperties endpointProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
 
     public SettingsTestService(SettingsService settingsService,
                                ExternalEndpointProperties endpointProperties,
                                RestTemplateBuilder builder,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               ThinkingStrategyRegistry thinkingStrategyRegistry) {
         this.settingsService = settingsService;
         this.endpointProperties = endpointProperties;
         this.restTemplate = builder
@@ -47,6 +51,7 @@ public class SettingsTestService {
                 .readTimeout(Duration.ofSeconds(20))
                 .build();
         this.objectMapper = objectMapper;
+        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
     }
 
     public SettingsTestResponse testAiProfile(SettingsTestRequests.AiTestRequest request) {
@@ -67,9 +72,7 @@ public class SettingsTestService {
             body.put("temperature", Math.max(0.0d, Math.min(2.0d, setting.temperature())));
             body.put("max_tokens", 8);
             body.put("messages", List.of(Map.of("role", "user", "content", "ping")));
-            if (AiProviderSupport.usesThinkingToggle(setting.providerKind())) {
-                body.put("thinking", Map.of("type", "disabled"));
-            }
+            body.putAll(thinkingStrategyRegistry().extraBody(setting, ThinkingMode.DISABLED));
 
             ResponseEntity<String> resp = restTemplate.exchange(
                     AiProviderSupport.chatCompletionsUrl(setting.baseUrl()),
@@ -131,6 +134,12 @@ public class SettingsTestService {
                 request != null ? request.temperature() : null,
                 request != null ? request.apiKey() : null
         ));
+    }
+
+    private ThinkingStrategyRegistry thinkingStrategyRegistry() {
+        return thinkingStrategyRegistry != null
+                ? thinkingStrategyRegistry
+                : ThinkingStrategyRegistry.defaultRegistry();
     }
 
     private List<String> testSerperSearch(String query, String apiKey) throws Exception {

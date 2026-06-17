@@ -94,9 +94,24 @@ public class SearchPipeline {
      * @return 命中卡片或失败原因
      */
     public PipelineResult execute(String userInput, String history) {
+        return execute(userInput, history, AgentRunEvents.noop());
+    }
+
+    /**
+     * 执行一次推荐/搜索流水线，并在关键步骤发送简洁状态。
+     *
+     * @param userInput 当前用户输入
+     * @param history 会话历史（用于提升标题提炼准确率）
+     * @param listener 单轮 Agent 监听器
+     * @return 命中卡片或失败原因
+     */
+    public PipelineResult execute(String userInput, String history, AgentRunListener listener) {
+        AgentRunListener runListener = listener != null ? listener : AgentRunEvents.noop();
         String context = history.isEmpty() ? userInput : "对话历史：\n" + history + "\n当前请求：" + userInput;
+        runListener.status("正在生成搜索关键词");
         List<String> keywords = generateKeywords(context);
         if (keywords.isEmpty()) {
+            runListener.status("正在生成失败说明");
             return new PipelineResult(List.of(), failMessage(userInput, "关键词生成失败"));
         }
 
@@ -106,12 +121,14 @@ public class SearchPipeline {
 
         for (String kw : keywords) {
             log.info("Pipeline: trying keyword '{}'", kw);
+            runListener.status("正在搜索作品资料");
             tried++;
 
             // 2a. 搜索
             List<WebSearchItem> webResults = webSearchTools.searchWeb(kw);
 
             // 2b. 多线程抓取 + 清洗
+            runListener.status("正在读取搜索结果");
             List<String> pageTexts = webResults.isEmpty()
                     ? fetchDirectUrls(context, kw)
                     : webResults.stream().limit(maxPages).parallel()
@@ -121,6 +138,7 @@ public class SearchPipeline {
             if (pageTexts.isEmpty()) continue;
 
             // 2c. LLM 提炼片名
+            runListener.status("正在整理候选片名");
             List<String> titles = extractTitles(String.join("\n---\n", pageTexts), context);
             if (titles.isEmpty()) continue;
 
@@ -133,6 +151,7 @@ public class SearchPipeline {
                             t -> t, t -> CompletableFuture.supplyAsync(() ->
                                     searchBangumiWithRetry(t, 3))));
 
+            runListener.status("正在查询 Bangumi");
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
             var cardMap = new java.util.LinkedHashMap<String, MatchedEntry>();
             futures.forEach((t, f) -> { var c = f.join(); if (c != null) cardMap.put(t, c); });
@@ -144,6 +163,7 @@ public class SearchPipeline {
 
             // 校验匹配结果
             if (!cardMap.isEmpty()) {
+                runListener.status("正在校验候选作品");
                 var validIds = validateMatchIds(cardMap, context);
                 cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
             }
@@ -155,6 +175,7 @@ public class SearchPipeline {
         }
 
         if (allCards.isEmpty()) {
+            runListener.status("正在生成失败说明");
             return new PipelineResult(List.of(),
                     failMessage(context, "已尝试 " + tried + " 组关键词，均未找到匹配的影视作品"));
         }

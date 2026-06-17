@@ -3,20 +3,24 @@ package com.nonu1l.media.config;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
+import org.springframework.ai.chat.client.ChatClientMessageAggregator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.metadata.Usage;
+import reactor.core.publisher.Flux;
 
 import java.util.function.Supplier;
 
 /**
  * Spring AI 调用拦截器：记录每次 LLM 调用产生的 token 用量到数据库，并提供会话级上下文注入能力。
  */
-public class TokenUsageAdvisor implements CallAdvisor {
+public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
 
     private static final Logger log = LoggerFactory.getLogger(TokenUsageAdvisor.class);
     private static final ThreadLocal<Long> currentSession = new ThreadLocal<>();
@@ -101,32 +105,66 @@ public class TokenUsageAdvisor implements CallAdvisor {
      */
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        String inputText = request.prompt().getContents();
+        UsageContext context = captureContext(request);
 
         ChatClientResponse response = chain.nextCall(request);
+        persistUsage(response, context);
+        return response;
+    }
+
+    /**
+     * 在流式调用完成后聚合最终响应并记录 token 用量。
+     *
+     * @param request 原始聊天请求。
+     * @param chain   下游流式调用链。
+     * @return 透传给上游的流式响应。
+     */
+    @Override
+    public Flux<ChatClientResponse> adviseStream(ChatClientRequest request, StreamAdvisorChain chain) {
+        UsageContext context = captureContext(request);
+        Flux<ChatClientResponse> responses = chain.nextStream(request);
+        return new ChatClientMessageAggregator().aggregateChatClientResponse(
+                responses,
+                response -> persistUsage(response, context)
+        );
+    }
+
+    private UsageContext captureContext(ChatClientRequest request) {
+        return new UsageContext(
+                request.prompt().getContents(),
+                currentSession.get(),
+                currentNode.get(),
+                currentTurn.get(),
+                settingSupplier.get()
+        );
+    }
+
+    private void persistUsage(ChatClientResponse response, UsageContext context) {
         if (!settingsService.getBoolean(SettingsService.AI_TOKEN_USAGE_ENABLED)) {
-            return response;
+            return;
         }
 
         var chatResponse = response.chatResponse();
         if (chatResponse != null && chatResponse.getMetadata() != null) {
             Usage usage = chatResponse.getMetadata().getUsage();
             if (usage != null) {
-                String model = chatResponse.getMetadata().getModel();
-                String outputText = chatResponse.getResult().getOutput().getText();
                 try {
-                    SettingsService.AiRuntimeSetting setting = settingSupplier.get();
+                    String model = chatResponse.getMetadata().getModel();
+                    String outputText = chatResponse.getResult() != null
+                            && chatResponse.getResult().getOutput() != null
+                            ? chatResponse.getResult().getOutput().getText()
+                            : "";
                     TokenUsage tu = new TokenUsage();
-                    tu.setSessionId(currentSession.get());
-                    tu.setNodeName(currentNode.get());
-                    tu.setTurn(currentTurn.get());
-                    tu.setProfileId(setting.id());
-                    tu.setProfileName(setting.providerKind());
+                    tu.setSessionId(context.sessionId());
+                    tu.setNodeName(context.nodeName());
+                    tu.setTurn(context.turn());
+                    tu.setProfileId(context.setting().id());
+                    tu.setProfileName(context.setting().providerKind());
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
                     tu.setTotalTokens(usage.getTotalTokens() > 0 ? (int) usage.getTotalTokens() : null);
-                    tu.setInputText(inputText);
+                    tu.setInputText(context.inputText());
                     tu.setOutputText(outputText);
                     repo.save(tu);
                     log.debug("Token: profile={} node={} turn={} model={} prompt={} completion={} total={}",
@@ -141,7 +179,6 @@ public class TokenUsageAdvisor implements CallAdvisor {
                 }
             }
         }
-        return response;
     }
 
     /**
@@ -162,5 +199,14 @@ public class TokenUsageAdvisor implements CallAdvisor {
     @Override
     public String getName() {
         return "token-usage-advisor";
+    }
+
+    private record UsageContext(
+            String inputText,
+            Long sessionId,
+            String nodeName,
+            Integer turn,
+            SettingsService.AiRuntimeSetting setting
+    ) {
     }
 }

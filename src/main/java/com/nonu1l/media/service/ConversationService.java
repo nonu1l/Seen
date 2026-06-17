@@ -1,6 +1,8 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.agent.AgentService;
+import com.nonu1l.media.agent.AgentRunEvents;
+import com.nonu1l.media.agent.AgentRunListener;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.*;
 import com.nonu1l.media.model.entity.ConversationCard;
@@ -13,18 +15,24 @@ import com.nonu1l.media.repository.ConversationMessageRepository;
 import com.nonu1l.media.repository.ConversationSessionRepository;
 import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * 对话服务：管理会话状态，组织用户消息到 Agent 的处理链路，并持久化 AI 回复与卡片动作。
@@ -33,6 +41,7 @@ import java.util.Map;
 public class ConversationService {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
+    private static final long STREAM_TIMEOUT_MILLIS = 10 * 60 * 1000L;
 
     private final ConversationSessionRepository sessionRepo;
     private final ConversationMessageRepository messageRepo;
@@ -44,6 +53,7 @@ public class ConversationService {
     private final WorkRepository workRepo;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
+    private volatile ExecutorService streamExecutor;
 
     /**
      * @param sessionRepo 会话数据仓储
@@ -143,6 +153,82 @@ public class ConversationService {
     }
 
     /**
+     * 启动一轮 SSE 流式对话，后台执行 Agent 链路并持续推送事件。
+     *
+     * @param userInput 用户输入文本
+     * @return 已启动的 SSE emitter
+     */
+    public SseEmitter sendMessageStream(String userInput) {
+        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
+        streamExecutor().execute(() -> doSendMessageStream(userInput, emitter));
+        return emitter;
+    }
+
+    /**
+     * 关闭流式对话线程池。
+     */
+    @PreDestroy
+    public void shutdownStreamExecutor() {
+        ExecutorService executor = streamExecutor;
+        if (executor != null) {
+            executor.shutdownNow();
+        }
+    }
+
+    private ExecutorService streamExecutor() {
+        ExecutorService executor = streamExecutor;
+        if (executor == null) {
+            synchronized (this) {
+                executor = streamExecutor;
+                if (executor == null) {
+                    executor = Executors.newCachedThreadPool(new StreamThreadFactory());
+                    streamExecutor = executor;
+                }
+            }
+        }
+        return executor;
+    }
+
+    private void doSendMessageStream(String userInput, SseEmitter emitter) {
+        SseEventSender sender = new SseEventSender(emitter);
+        AgentRunListener listener = AgentRunEvents.streaming(sender::send);
+        ConversationSession session = getOrCreateSession();
+        Instant now = Instant.now();
+
+        try {
+            ConversationMessage userMsg = transactionTemplate.execute(
+                    tx -> saveUserMessage(session, userInput, now));
+            if (userMsg != null) {
+                sender.send(AiStreamEvent.userSaved(userMsg.getId(), userMsg.getCreatedAt()));
+            }
+
+            String history = buildHistory(session.getId());
+            IntentAnalysisResult result = invokeAgent(userInput, history, listener);
+            String replyText = result.replyText() != null && !result.replyText().isBlank()
+                    ? result.replyText()
+                    : generateReplyText(result);
+            if (!listener.hasDelta()) {
+                streamReplyText(replyText, listener);
+            }
+
+            AiChatResponse response = transactionTemplate.execute(
+                    tx -> saveAssistantResponse(session, result, userMsg, now));
+            if (response != null) {
+                sender.send(AiStreamEvent.assistantSaved(response.messageId(), response.replyText(), now));
+                if (response.cards() != null && !response.cards().isEmpty()) {
+                    sender.send(AiStreamEvent.cards(response.cards()));
+                }
+            }
+            sender.send(AiStreamEvent.done());
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("sendMessageStream failed", e);
+            sender.trySend(AiStreamEvent.error("抱歉，处理出错了，请重试。"));
+            emitter.complete();
+        }
+    }
+
+    /**
      * 调用 Agent 进行意图识别与结果归一化；失败时返回友好降级结果。
      *
      * @param userInput 用户输入
@@ -150,11 +236,23 @@ public class ConversationService {
      * @return 归一化后的意图分析结果（reply、推荐卡片、取消标记 id）
      */
     private IntentAnalysisResult invokeAgent(String userInput, String history) {
+        return invokeAgent(userInput, history, AgentRunEvents.noop());
+    }
+
+    /**
+     * 调用 Agent 并在需要时转发运行状态。
+     *
+     * @param userInput 用户输入
+     * @param history 会话历史
+     * @param listener 单轮运行监听器
+     * @return 归一化后的意图分析结果
+     */
+    private IntentAnalysisResult invokeAgent(String userInput, String history, AgentRunListener listener) {
         Long sessionId = getOrCreateSession().getId();
         TokenUsageAdvisor.setSession(sessionId);
         TokenUsageAdvisor.setCurrentTurn((int) messageRepo.countBySessionIdAndRole(sessionId, "user"));
         try {
-            var agentState = agentService.invoke(userInput, history);
+            var agentState = agentService.invoke(userInput, history, listener);
             String replyText = agentState.replyText();
             if (replyText == null || replyText.isBlank()) {
                 replyText = "正在处理你的请求...";
@@ -582,6 +680,30 @@ public class ConversationService {
     }
 
     /**
+     * 将已经生成好的回复按小块发送，用于结构化节点无法直接流式输出的场景。
+     *
+     * @param replyText 完整回复文本
+     * @param listener 单轮运行监听器
+     */
+    private void streamReplyText(String replyText, AgentRunListener listener) {
+        if (replyText == null || replyText.isBlank()) {
+            return;
+        }
+        listener.status("正在生成回复");
+        int chunkSize = 12;
+        for (int i = 0; i < replyText.length(); i += chunkSize) {
+            int end = Math.min(replyText.length(), i + chunkSize);
+            listener.delta(replyText.substring(i, end));
+            try {
+                Thread.sleep(12);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /**
      * 取消标记前生成快照卡片：读取作品和最近一条记录，用于前端撤回与回显。
      *
      * @param sessionId 会话 ID
@@ -612,6 +734,39 @@ public class ConversationService {
         } catch (Exception e) {
             log.warn("Failed to snapshot work before unmark subjectId={}: {}", subjectId, e.getMessage());
             return null;
+        }
+    }
+
+    private static final class SseEventSender {
+        private final SseEmitter emitter;
+
+        private SseEventSender(SseEmitter emitter) {
+            this.emitter = emitter;
+        }
+
+        private synchronized void send(AiStreamEvent event) {
+            try {
+                emitter.send(SseEmitter.event().name(event.type()).data(event));
+            } catch (IOException | IllegalStateException e) {
+                throw new IllegalStateException("SSE send failed", e);
+            }
+        }
+
+        private synchronized void trySend(AiStreamEvent event) {
+            try {
+                send(event);
+            } catch (Exception ignored) {
+                // Client may have disconnected; nothing else to do for this stream.
+            }
+        }
+    }
+
+    private static final class StreamThreadFactory implements ThreadFactory {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "conversation-sse-stream");
+            thread.setDaemon(true);
+            return thread;
         }
     }
 }

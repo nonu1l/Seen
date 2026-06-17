@@ -2,10 +2,12 @@ package com.nonu1l.media.controller;
 
 import com.nonu1l.media.model.dto.*;
 import com.nonu1l.media.service.ConversationService;
+import org.springframework.http.MediaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -58,6 +60,25 @@ public class ConversationController {
             return ResponseEntity.ok(conversationService.sendMessage(req.userInput().trim()));
         } catch (Exception e) {
             log.error("send failed", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 发送一条用户输入并以 SSE 形式流式返回 AI 处理进度和回复。
+     *
+     * @param req 用户输入请求，{@code userInput} 不能为空或空白。
+     * @return 成功返回 SSE emitter；输入无效返回 400；启动失败返回 500。
+     */
+    @PostMapping(value = "/send-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> sendStream(@RequestBody AiChatRequest req) {
+        try {
+            if (req.userInput() == null || req.userInput().isBlank()) {
+                return ResponseEntity.badRequest().build();
+            }
+            return ResponseEntity.ok(conversationService.sendMessageStream(req.userInput().trim()));
+        } catch (Exception e) {
+            log.error("sendStream failed", e);
             return ResponseEntity.internalServerError().build();
         }
     }

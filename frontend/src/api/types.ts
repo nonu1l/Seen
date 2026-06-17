@@ -127,6 +127,16 @@ export interface AiChatResponse {
   cards: ConversationCardVO[];
 }
 
+export type AiStreamEventType = 'user_saved' | 'status' | 'delta' | 'assistant_saved' | 'cards' | 'done' | 'error';
+
+export interface AiStreamEvent {
+  type: AiStreamEventType;
+  messageId: number | null;
+  content: string | null;
+  createdAt: string | null;
+  cards: ConversationCardVO[] | null;
+}
+
 export interface ConversationState {
   sessionId: number;
   messages: ConversationMessageVO[];

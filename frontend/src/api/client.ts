@@ -6,6 +6,7 @@ import type {
   DictResponse,
   ConversationState,
   AiChatResponse,
+  AiStreamEvent,
   ConversationCardVO,
   SettingsResponse,
   UpdateSettingsRequest,
@@ -17,6 +18,10 @@ import type {
 } from './types';
 
 const BASE = '/api';
+
+export interface AiStreamHandlers {
+  onEvent?: (event: AiStreamEvent) => void;
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
@@ -45,6 +50,48 @@ async function errorMessage(res: Response) {
   } catch {
     return fallback;
   }
+}
+
+async function readSseStream(res: Response, handlers?: AiStreamHandlers) {
+  if (!res.body) throw new Error('浏览器不支持流式响应');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    buffer = consumeSseBuffer(buffer, handlers);
+  }
+  buffer += decoder.decode();
+  consumeSseBuffer(buffer, handlers, true);
+}
+
+function consumeSseBuffer(buffer: string, handlers?: AiStreamHandlers, flush = false) {
+  let normalized = buffer.replace(/\r\n/g, '\n');
+  let boundary = normalized.indexOf('\n\n');
+  while (boundary >= 0) {
+    const block = normalized.slice(0, boundary);
+    normalized = normalized.slice(boundary + 2);
+    handleSseBlock(block, handlers);
+    boundary = normalized.indexOf('\n\n');
+  }
+  if (flush && normalized.trim()) {
+    handleSseBlock(normalized, handlers);
+    return '';
+  }
+  return normalized;
+}
+
+function handleSseBlock(block: string, handlers?: AiStreamHandlers) {
+  const data = block.split('\n')
+    .filter(line => line.startsWith('data:'))
+    .map(line => line.slice(5).trimStart())
+    .join('\n');
+  if (!data.trim()) return;
+  const event = JSON.parse(data) as AiStreamEvent;
+  handlers?.onEvent?.(event);
 }
 
 export const api = {
@@ -82,6 +129,18 @@ export const api = {
 
   sendMessage: (userInput: string) =>
     request<AiChatResponse>('/conversation/send', { method: 'POST', body: JSON.stringify({ userInput }) }),
+
+  sendMessageStream: async (userInput: string, handlers?: AiStreamHandlers) => {
+    const res = await fetch(`${BASE}/conversation/send-stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userInput }),
+    });
+    if (!res.ok) {
+      throw new Error(await errorMessage(res));
+    }
+    await readSseStream(res, handlers);
+  },
 
   saveCard: (cardId: number, rating?: number | null, review?: string | null, status?: string | null) =>
     request<ConversationCardVO>(`/conversation/cards/${cardId}/save`, {

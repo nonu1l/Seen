@@ -73,14 +73,28 @@ public class AgentService {
      * @throws GraphStateException 图执行异常
      */
     public SeenAgentState invoke(String userInput, String history) throws GraphStateException {
+        return invoke(userInput, history, AgentRunEvents.noop());
+    }
+
+    /**
+     * 按 LangGraph4j 图执行一次 Agent 对话，并将运行状态发送给监听器。
+     *
+     * @param userInput 用户输入
+     * @param history 会话历史文本（用于消解“上条/第一个”等指代）
+     * @param listener 单轮运行监听器
+     * @return 解析后的状态对象，包含 intent、replyText、cards、unmarkIds
+     * @throws GraphStateException 图执行异常
+     */
+    public SeenAgentState invoke(String userInput, String history, AgentRunListener listener) throws GraphStateException {
+        AgentRunListener runListener = listener != null ? listener : AgentRunEvents.noop();
         var graph = new StateGraph<>(SeenAgentState.SCHEMA, SeenAgentState::new)
-            .addNode("classify",         node_async(this::classifyIntent))
-            .addNode("mark",             node_async(this::handleMark))
-            .addNode("unmark",           node_async(this::handleUnmark))
-            .addNode("recommend",        node_async(this::handleRecommend))
-            .addNode("search",           node_async(this::handleSearch))
-            .addNode("analyze",          node_async(this::handleAnalyze))
-            .addNode("output",           node_async(this::handleOutput))
+            .addNode("classify",         node_async(s -> classifyIntent(s, runListener)))
+            .addNode("mark",             node_async(s -> handleMark(s, runListener)))
+            .addNode("unmark",           node_async(s -> handleUnmark(s, runListener)))
+            .addNode("recommend",        node_async(s -> handleRecommend(s, runListener)))
+            .addNode("search",           node_async(s -> handleSearch(s, runListener)))
+            .addNode("analyze",          node_async(s -> handleAnalyze(s, runListener)))
+            .addNode("output",           node_async(s -> handleOutput(s, runListener)))
 
             .addEdge(START, "classify")
             .addConditionalEdges("classify",
@@ -120,8 +134,9 @@ public class AgentService {
      * @param s 当前状态
      * @return intent 键值 map，值仅限 mark/unmark/recommend/search/analyze
      */
-    Map<String, Object> classifyIntent(SeenAgentState s) {
+    Map<String, Object> classifyIntent(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[classify] enter: {}", s.userInput().length() > 100 ? s.userInput().substring(0, 100) + "..." : s.userInput());
+        listener.status("正在理解需求");
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
         TokenUsageAdvisor.setCurrentNode("classify");
         String intent = chatClient().prompt().system(system).user(s.userInput()).call().content();
@@ -139,16 +154,19 @@ public class AgentService {
      * @param s 当前状态
      * @return 包含 replyText、cards、unmarkIds 的 map；解析失败则返回提示文案
      */
-    Map<String, Object> handleMark(SeenAgentState s) {
+    Map<String, Object> handleMark(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[mark] enter");
+        listener.status("正在解析标记请求");
         TokenUsageAdvisor.setCurrentNode("mark");
         // 使用完整 agent prompt + 工具回调来处理标记类请求（提取片名 + 搜索匹配）
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
+        listener.status("正在查询作品信息");
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolRegistry.callbacks()).call().content();
+        listener.status("正在整理标记结果");
         if (content != null && !content.isBlank()) {
             try {
                 String json = IntentAnalysisService.extractJsonObject(content);
@@ -186,15 +204,18 @@ public class AgentService {
      * @param s 当前状态
      * @return 包含 replyText 与 unmarkIds 的 map；解析失败返回兜底提示文案
      */
-    Map<String, Object> handleUnmark(SeenAgentState s) {
+    Map<String, Object> handleUnmark(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[unmark] enter");
+        listener.status("正在解析取消标记请求");
         TokenUsageAdvisor.setCurrentNode("unmark");
         String system = loadPrompt("prompts/agent-system.st")
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
+        listener.status("正在查询本地记录");
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolRegistry.callbacks()).call().content();
+        listener.status("正在整理取消标记结果");
         if (content != null && !content.isBlank()) {
             try {
                 String json = IntentAnalysisService.extractJsonObject(content);
@@ -221,10 +242,11 @@ public class AgentService {
      * @param s 当前状态
      * @return 有结果返回 cards；无结果返回 failReason 或默认提示
      */
-    Map<String, Object> handleRecommend(SeenAgentState s) {
+    Map<String, Object> handleRecommend(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[recommend] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
+        listener.status("正在寻找适合的作品");
         TokenUsageAdvisor.setCurrentNode("recommend");
-        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getMemoryContext()), s.history());
+        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getMemoryContext()), s.history(), listener);
         log.debug("Node[recommend] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
             return Map.of("cards", (Object) result.cards());
@@ -238,10 +260,11 @@ public class AgentService {
      * @param s 当前状态
      * @return 有结果返回 cards；否则返回 failReason 或默认提示
      */
-    Map<String, Object> handleSearch(SeenAgentState s) {
+    Map<String, Object> handleSearch(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[search] enter: {}", s.userInput().length() > 80 ? s.userInput().substring(0, 80) : s.userInput());
+        listener.status("正在搜索作品");
         TokenUsageAdvisor.setCurrentNode("search");
-        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getBriefMemoryContext()), s.history());
+        var result = searchPipeline.execute(withMemoryContext(s.userInput(), memoryService.getBriefMemoryContext()), s.history(), listener);
         log.debug("Node[search] exit: cards={}, fail={}", result.cards().size(), result.failReason());
         if (!result.cards().isEmpty()) {
             return Map.of("cards", (Object) result.cards());
@@ -255,14 +278,14 @@ public class AgentService {
      * @param s 当前状态
      * @return 仅含 replyText 的 map
      */
-    Map<String, Object> handleAnalyze(SeenAgentState s) {
+    Map<String, Object> handleAnalyze(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[analyze] enter");
+        listener.status("正在分析你的记录");
         TokenUsageAdvisor.setCurrentNode("analyze");
         String system = loadPrompt("prompts/agent-analyze.st")
                 .replace("{history}", s.history())
                 .replace("{memoryContext}", memoryService.getMemoryContext());
-        String reply = chatClient().prompt()
-            .system(system).user(s.userInput()).call().content();
+        String reply = generateReply(system, s.userInput(), listener);
         log.debug("Node[analyze] exit: reply={}", reply != null ? reply.substring(0, Math.min(100, reply.length())) : "null");
         return Map.of("replyText", reply != null ? reply : "抱歉，无法回答。");
     }
@@ -273,7 +296,7 @@ public class AgentService {
      * @param s 当前状态
      * @return 包含 replyText，必要时包含 cards 的 map
      */
-    Map<String, Object> handleOutput(SeenAgentState s) {
+    Map<String, Object> handleOutput(SeenAgentState s, AgentRunListener listener) {
         log.debug("Node[output] enter: intent={}", s.intent());
         TokenUsageAdvisor.setCurrentNode("output");
         // 如果前面节点已经生成了 replyText（如 pipeline 失败），直接透传
@@ -290,10 +313,8 @@ public class AgentService {
                 var c = existingCards.get(i);
                 cardInfo.append(String.format("[%d] %s\n", i + 1, c.nameCn()));
             }
-            String reply = chatClient().prompt()
-                .system(loadPrompt("prompts/agent-output-reply.st"))
-                .user(s.userInput() + "\n\n卡片列表：\n" + cardInfo)
-                .call().content();
+            String reply = generateReply(loadPrompt("prompts/agent-output-reply.st"),
+                    s.userInput() + "\n\n卡片列表：\n" + cardInfo, listener);
             log.debug("Node[output] generated reply for {} cards", existingCards.size());
             return Map.of("replyText", reply != null ? reply : "推荐如下：");
         }
@@ -335,6 +356,43 @@ public class AgentService {
     }
 
     // ── helpers ─────────────────────────────────────────────
+
+    /**
+     * 生成最终面向用户的自然语言回复；流式监听器会逐段接收 delta。
+     *
+     * @param system system prompt
+     * @param user user prompt
+     * @param listener 单轮运行监听器
+     * @return 聚合后的完整回复文本
+     */
+    private String generateReply(String system, String user, AgentRunListener listener) {
+        listener.status("正在生成回复");
+        if (!listener.streamDeltas()) {
+            return chatClient().prompt().system(system).user(user).call().content();
+        }
+
+        StringBuilder reply = new StringBuilder();
+        try {
+            chatClient().prompt()
+                    .system(system)
+                    .user(user)
+                    .stream()
+                    .content()
+                    .doOnNext(delta -> {
+                        reply.append(delta);
+                        listener.delta(delta);
+                    })
+                    .blockLast();
+        } catch (Exception e) {
+            log.warn("Stream reply failed, falling back to call: {}", e.getMessage());
+            String fallback = chatClient().prompt().system(system).user(user).call().content();
+            if (fallback != null && reply.isEmpty()) {
+                listener.delta(fallback);
+            }
+            return fallback;
+        }
+        return reply.toString();
+    }
 
     private ChatClient chatClient() {
         return chatClientFactory.currentClient();

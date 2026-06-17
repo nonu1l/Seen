@@ -28,7 +28,7 @@ export default function AiPage() {
       el.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 200);
     return () => clearTimeout(timer);
-  }, [ai.messages]);
+  }, [ai.messages, ai.runStatuses]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -71,7 +71,15 @@ export default function AiPage() {
           })}
 
           {ai.loading && (
-            <div className="text-[13px]">
+            <div className="text-[13px] space-y-2">
+              {ai.runStatuses.length > 0 && (
+                <div className="inline-flex max-w-[85%] flex-col gap-1 rounded-lg px-3 py-2"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
+                  {ai.runStatuses.map((status, index) => (
+                    <span key={`${status}-${index}`} className="text-xs">{status}</span>
+                  ))}
+                </div>
+              )}
               <span className="inline-block rounded-lg" style={{ background: 'var(--bg-card)' }}>
                 <span className="ai-typing">
                   <span /><span /><span />
