@@ -1,13 +1,12 @@
 package com.nonu1l.media.controller;
 
+import com.nonu1l.media.model.dto.AppConfigDTO;
 import com.nonu1l.media.service.SettingsService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 /**
- * 暴露应用运行时开关配置给前端使用，如 AI 功能是否启用。
+ * 暴露首页启动时需要的轻量运行配置。
  */
 
 
@@ -31,10 +30,13 @@ public class AppConfigController {
     /**
      * 读取应用运行配置。
      *
-     * @return 包含 {@code aiEnabled} 标记的只读配置结果。
+     * @return 包含 AI 开关与 Bangumi 代理地址的只读配置 DTO。
      */
     @GetMapping("/api/app-config")
-    public Map<String, Object> getConfig() {
-        return Map.of("aiEnabled", settingsService.getBoolean(SettingsService.AI_ENABLED));
+    public AppConfigDTO getConfig() {
+        return new AppConfigDTO(
+                settingsService.getBoolean(SettingsService.AI_ENABLED),
+                settingsService.getString(SettingsService.BANGUMI_PROXY)
+        );
     }
 }

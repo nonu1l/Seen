@@ -23,8 +23,10 @@ export default function HomePage() {
   const [displayQuery, setDisplayQuery] = useState('');
 
   useEffect(() => {
-    api.getDict().then(d => setBangumiProxy(d.bangumiProxy));
-    api.getAppConfig().then(c => setAiEnabled(c.aiEnabled)).catch(() => {});
+    api.getAppConfig().then(c => {
+      setAiEnabled(c.aiEnabled);
+      setBangumiProxy(c.bangumiProxy);
+    }).catch(() => {});
   }, []);
 
   /** 同步 displayQuery ← query（外部重置或 hooks 变化时） */

@@ -17,6 +17,11 @@ export interface DictResponse {
   bangumiProxy: string;
 }
 
+export interface AppConfigDTO {
+  aiEnabled: boolean;
+  bangumiProxy: string;
+}
+
 export interface CastMember {
   id: number | null;
   name: string;

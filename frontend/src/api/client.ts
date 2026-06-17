@@ -4,6 +4,7 @@ import type {
   WorkDetailDTO,
   MarkRequest,
   DictResponse,
+  AppConfigDTO,
   ConversationStateDTO,
   AiChatDTO,
   AiStreamEventDTO,
@@ -155,7 +156,7 @@ export const api = {
     request<{ ok: boolean }>('/conversation/reset', { method: 'POST' }),
 
   getAppConfig: () =>
-    request<{ aiEnabled: boolean }>('/app-config'),
+    request<AppConfigDTO>('/app-config'),
 
   // ── Settings ──
 
