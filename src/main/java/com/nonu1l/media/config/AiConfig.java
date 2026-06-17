@@ -14,15 +14,15 @@ import tools.jackson.databind.ObjectMapper;
 public class AiConfig {
 
     /**
-     * 为所有 RestClient 注册 DeepSeek 请求拦截器，用于统一关闭思考模式。
+     * 为所有 RestClient 注册通用 thinking 禁用拦截器。
      *
      * @param objectMapper JSON 序列化工具。
      * @return RestClient 自定义器 Bean。
      */
     @Bean
-    public RestClientCustomizer deepSeekThinkingDisableCustomizer(ObjectMapper objectMapper) {
+    public RestClientCustomizer thinkingDisableCustomizer(ObjectMapper objectMapper) {
         return restClientBuilder -> restClientBuilder
-                .requestInterceptor(new DeepSeekThinkingDisableInterceptor(objectMapper));
+                .requestInterceptor(new ThinkingDisableInterceptor(objectMapper));
     }
 
     /**

@@ -14,12 +14,12 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * 拦截 DeepSeek 类 LLM 的聊天完成请求，为请求体补齐
- * {@code thinking: {type: disabled}}，避免返回推理链路内容导致的兼容问题。
+ * 拦截 OpenAI-compatible 聊天完成请求，为支持扩展参数的 provider 补齐
+ * {@code thinking: {type: disabled}}，避免思考内容污染结构化输出。
  */
-public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInterceptor {
+public class ThinkingDisableInterceptor implements ClientHttpRequestInterceptor {
 
-    private static final Logger log = LoggerFactory.getLogger(DeepSeekThinkingDisableInterceptor.class);
+    private static final Logger log = LoggerFactory.getLogger(ThinkingDisableInterceptor.class);
 
     private final ObjectMapper objectMapper;
 
@@ -28,22 +28,22 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
      *
      * @param objectMapper JSON 反序列化与序列化工具。
      */
-    public DeepSeekThinkingDisableInterceptor(ObjectMapper objectMapper) {
+    public ThinkingDisableInterceptor(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     /**
-     * 在发送 HTTP 请求前尝试增强 DeepSeek 请求体。
+     * 在发送 HTTP 请求前尝试增强聊天完成请求体。
      *
      * @param request 当前请求。
      * @param body    原始请求内容。
      * @param execution 下游执行器。
-     * @return 拦截器返回的响应体；仅在 DeepSeek chat completion 且未包含 thinking 时才修改 body。
+     * @return 拦截器返回的响应体；仅在非 OpenAI 官方 chat completion 且未包含 thinking 时才修改 body。
      * @throws IOException 读取或写入请求体异常。
      */
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
-        if (!isDeepSeekChatCompletion(request)) {
+        if (!isPatchableChatCompletion(request)) {
             return execution.execute(request, body);
         }
 
@@ -60,7 +60,7 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
                 patched = objectMapper.writeValueAsBytes(json);
             }
         } catch (Exception e) {
-            log.warn("Failed to patch DeepSeek request body, sending as-is: {}", e.getMessage());
+            log.warn("Failed to patch thinking request body, sending as-is: {}", e.getMessage());
         }
         return execution.execute(request, patched);
     }
@@ -89,23 +89,22 @@ public class DeepSeekThinkingDisableInterceptor implements ClientHttpRequestInte
     }
 
     /**
-     * 判断当前请求是否为 DeepSeek 聊天完成接口。
+     * 判断当前请求是否为可补充 thinking 参数的聊天完成接口。
      *
      * @param request 当前请求对象。
-     * @return host 与 path 命中规则返回 true。
+     * @return 非 OpenAI 官方的 chat completions 请求返回 true。
      */
-    private static boolean isDeepSeekChatCompletion(HttpRequest request) {
+    private static boolean isPatchableChatCompletion(HttpRequest request) {
         String host = request.getURI().getHost();
         String path = request.getURI().getPath();
+        return host != null
+                && !isOpenAiOfficialHost(host)
+                && path != null
+                && path.endsWith("/chat/completions");
+    }
 
-
-        /**
-         * TODO 优化此项，不应该硬判断某个模型
-         */
-        return host != null && (host.contains("deepseek.com")
-                || host.contains("bigmodel.cn")
-                || host.contains("localhost")
-                || host.contains("192.168.67.124"))
-                && path != null && (path.endsWith("/chat/completions"));
+    private static boolean isOpenAiOfficialHost(String host) {
+        String value = host.toLowerCase();
+        return value.equals("api.openai.com") || value.endsWith(".openai.com");
     }
 }
