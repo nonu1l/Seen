@@ -6,6 +6,7 @@ import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,8 @@ public class AiChatClientFactory {
     private final TokenUsageAdvisor tokenUsageAdvisor;
     private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final ConcurrentHashMap<String, ChatClient> cache = new ConcurrentHashMap<>();
+    @Value("${app.ai.thinking-mode:enabled}")
+    private String defaultThinkingMode;
 
     public AiChatClientFactory(SettingsService settingsService,
                                TokenUsageAdvisor tokenUsageAdvisor,
@@ -35,12 +38,12 @@ public class AiChatClientFactory {
     }
 
     /**
-     * 使用业务默认思考模式创建当前 AI 客户端，优先启用 provider 支持的推理能力。
+     * 使用配置的业务默认思考模式创建当前 AI 客户端。
      *
      * @return 当前运行时配置对应的 ChatClient
      */
     public ChatClient currentClient() {
-        return currentClient(ThinkingMode.ENABLED);
+        return currentClient(defaultThinkingMode());
     }
 
     /**
@@ -61,6 +64,17 @@ public class AiChatClientFactory {
         return thinkingStrategyRegistry != null
                 ? thinkingStrategyRegistry
                 : ThinkingStrategyRegistry.defaultRegistry();
+    }
+
+    private ThinkingMode defaultThinkingMode() {
+        if (defaultThinkingMode == null || defaultThinkingMode.isBlank()) {
+            return ThinkingMode.ENABLED;
+        }
+        try {
+            return ThinkingMode.valueOf(defaultThinkingMode.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return ThinkingMode.ENABLED;
+        }
     }
 
     private ChatClient buildClient(SettingsService.AiRuntimeSetting setting, Map<String, Object> extraBody) {
