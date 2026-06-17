@@ -12,4 +12,4 @@ import java.io.Serializable;
  * @param url 链接地址。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record WebSearchItem(String title, String snippet, String url) implements Serializable {}
+public record WebSearchItemDTO(String title, String snippet, String url) implements Serializable {}

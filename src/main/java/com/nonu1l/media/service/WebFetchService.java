@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.FetchUrlResult;
+import com.nonu1l.media.model.dto.FetchUrlResultDTO;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
@@ -42,7 +42,7 @@ public class WebFetchService {
      * @param maxChars 返回给模型的最大字符数，可为空
      * @return 抓取结果；失败时包含错误原因
      */
-    public FetchUrlResult fetch(String url, Integer maxChars) {
+    public FetchUrlResultDTO fetch(String url, Integer maxChars) {
         int limit = clampMaxChars(maxChars);
         try {
             URI uri = normalizeAndValidate(url);
@@ -60,11 +60,11 @@ public class WebFetchService {
      * @return 清洗后的文本，失败时为空字符串
      */
     public String fetchText(String url) {
-        FetchUrlResult result = fetch(url, DEFAULT_MAX_CHARS);
+        FetchUrlResultDTO result = fetch(url, DEFAULT_MAX_CHARS);
         return result.error() == null ? result.text() : "";
     }
 
-    private FetchUrlResult fetchFollowingRedirects(URI uri, int maxChars, int redirects) throws Exception {
+    private FetchUrlResultDTO fetchFollowingRedirects(URI uri, int maxChars, int redirects) throws Exception {
         validateResolvedAddress(uri);
         HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
         conn.setInstanceFollowRedirects(false);
@@ -98,7 +98,7 @@ public class WebFetchService {
         boolean truncated = byteTruncated || cleaned.truncated();
         log.info("fetch_url status={} chars={} truncated={} url={}",
                 status, cleaned.text().length(), truncated, uri);
-        return new FetchUrlResult(uri.toString(), status, contentType, cleaned.title(), cleaned.text(), truncated,
+        return new FetchUrlResultDTO(uri.toString(), status, contentType, cleaned.title(), cleaned.text(), truncated,
                 status >= 400 ? "HTTP " + status : null);
     }
 
@@ -200,8 +200,8 @@ public class WebFetchService {
         return Math.min(value, MAX_CHARS);
     }
 
-    private FetchUrlResult failure(String url, int status, String contentType, String error) {
-        return new FetchUrlResult(url, status, contentType != null ? contentType : "", "", "", false, error);
+    private FetchUrlResultDTO failure(String url, int status, String contentType, String error) {
+        return new FetchUrlResultDTO(url, status, contentType != null ? contentType : "", "", "", false, error);
     }
 
     private record CleanedText(String title, String text, boolean truncated) {

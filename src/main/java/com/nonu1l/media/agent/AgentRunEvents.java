@@ -1,6 +1,6 @@
 package com.nonu1l.media.agent;
 
-import com.nonu1l.media.model.dto.AiStreamEvent;
+import com.nonu1l.media.model.dto.AiStreamEventDTO;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,28 +38,28 @@ public final class AgentRunEvents {
     }
 
     /**
-     * 创建将 Agent 事件转为 {@link AiStreamEvent} 的监听器。
+     * 创建将 Agent 事件转为 {@link AiStreamEventDTO} 的监听器。
      *
      * @param sender SSE 事件发送函数
      * @return 可用于单轮流式对话的监听器
      */
-    public static AgentRunListener streaming(Consumer<AiStreamEvent> sender) {
+    public static AgentRunListener streaming(Consumer<AiStreamEventDTO> sender) {
         Objects.requireNonNull(sender, "sender must not be null");
         return new StreamingAgentRunListener(sender);
     }
 
     private static final class StreamingAgentRunListener implements AgentRunListener {
-        private final Consumer<AiStreamEvent> sender;
+        private final Consumer<AiStreamEventDTO> sender;
         private final AtomicBoolean hasDelta = new AtomicBoolean(false);
 
-        private StreamingAgentRunListener(Consumer<AiStreamEvent> sender) {
+        private StreamingAgentRunListener(Consumer<AiStreamEventDTO> sender) {
             this.sender = sender;
         }
 
         @Override
         public void status(String message) {
             if (message != null && !message.isBlank()) {
-                sender.accept(AiStreamEvent.status(message));
+                sender.accept(AiStreamEventDTO.status(message));
             }
         }
 
@@ -67,14 +67,14 @@ public final class AgentRunEvents {
         public void delta(String content) {
             if (content != null && !content.isEmpty()) {
                 hasDelta.set(true);
-                sender.accept(AiStreamEvent.delta(content));
+                sender.accept(AiStreamEventDTO.delta(content));
             }
         }
 
         @Override
         public void error(String message) {
             if (message != null && !message.isBlank()) {
-                sender.accept(AiStreamEvent.error(message));
+                sender.accept(AiStreamEventDTO.error(message));
             }
         }
 

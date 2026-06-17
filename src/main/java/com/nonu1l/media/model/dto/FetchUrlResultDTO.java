@@ -11,7 +11,7 @@ package com.nonu1l.media.model.dto;
  * @param truncated 返回文本是否被截断
  * @param error 失败原因；成功时为空
  */
-public record FetchUrlResult(
+public record FetchUrlResultDTO(
         String url,
         int status,
         String contentType,

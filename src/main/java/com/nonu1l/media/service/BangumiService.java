@@ -1,8 +1,8 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.CastMember;
-import com.nonu1l.media.model.dto.DetailedWork;
-import com.nonu1l.media.model.dto.WorkSearchResult;
+import com.nonu1l.media.model.dto.CastMemberDTO;
+import com.nonu1l.media.model.dto.DetailedWorkDTO;
+import com.nonu1l.media.model.dto.WorkSearchResultDTO;
 import com.nonu1l.media.model.entity.SubjectType;
 import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.util.CachedHttpClient;
@@ -52,9 +52,9 @@ public class BangumiService {
     /** 搜索 bangumi，默认返回 20 条结果。
      *
      * @param query 查询关键字
-     * @return 映射后的 {@link WorkSearchResult} 列表
+     * @return 映射后的 {@link WorkSearchResultDTO} 列表
      */
-    public List<WorkSearchResult> search(String query) {
+    public List<WorkSearchResultDTO> search(String query) {
         return  search(query,20);
     }
 
@@ -66,10 +66,10 @@ public class BangumiService {
      *
      * @param query 查询关键字
      * @param limit 返回条数上限
-     * @return 映射后的 {@link WorkSearchResult} 列表
+     * @return 映射后的 {@link WorkSearchResultDTO} 列表
      */
-    public List<WorkSearchResult> search(String query, int limit) {
-        List<WorkSearchResult> results = new ArrayList<>();
+    public List<WorkSearchResultDTO> search(String query, int limit) {
+        List<WorkSearchResultDTO> results = new ArrayList<>();
         List<Integer> types = getSearchTypes();
         if (types.isEmpty()) return results;
         String base = settingsService.bangumiApiBase();
@@ -92,7 +92,7 @@ public class BangumiService {
             }
 
             List<Long> ids = results.stream()
-                    .map(WorkSearchResult::getId)
+                    .map(WorkSearchResultDTO::getId)
                     .filter(Objects::nonNull)
                     .toList();
             if (!ids.isEmpty()) preCacheService.preCache(ids);
@@ -111,8 +111,8 @@ public class BangumiService {
      * @return 指定条件下的榜单结果
      */
     @Deprecated
-    public List<WorkSearchResult> trending(int type, Integer year) {
-        List<WorkSearchResult> results = new ArrayList<>();
+    public List<WorkSearchResultDTO> trending(int type, Integer year) {
+        List<WorkSearchResultDTO> results = new ArrayList<>();
         String base = settingsService.bangumiApiBase();
         try {
             var filter = new java.util.LinkedHashMap<String, Object>();
@@ -146,7 +146,7 @@ public class BangumiService {
      * @param subjectId 条目ID
      * @return 条目基础字段映射结果，异常或未命中返回 {@code null}
      */
-    public WorkSearchResult getById(String subjectId) {
+    public WorkSearchResultDTO getById(String subjectId) {
         String base = settingsService.bangumiApiBase();
         try {
             String json = get(base + "/subjects/" + subjectId, 1800);
@@ -164,9 +164,9 @@ public class BangumiService {
      * <p>角色与基础信息并行请求，提高首屏响应速度。</p>
      *
      * @param subjectId 条目ID
-     * @return 组合后的 {@link DetailedWork}，无数据返回 {@code null}
+     * @return 组合后的 {@link DetailedWorkDTO}，无数据返回 {@code null}
      */
-    public DetailedWork getDetailed(String subjectId) {
+    public DetailedWorkDTO getDetailed(String subjectId) {
         String base = settingsService.bangumiApiBase();
         boolean castEnabled = settingsService.getBoolean(SettingsService.DETAIL_CAST_ENABLED);
         try {
@@ -181,7 +181,7 @@ public class BangumiService {
             if (json == null) return null;
             JsonNode item = objectMapper.readTree(json);
 
-            DetailedWork d = new DetailedWork();
+            DetailedWorkDTO d = new DetailedWorkDTO();
             d.setBase(mapSubject(item));
 
             // 从 infobox 提取地区/国家信息
@@ -212,7 +212,7 @@ public class BangumiService {
                 try {
                     String charJson = charFuture.join();
                     if (charJson != null) {
-                        List<CastMember> cast = parseCast(charJson, st);
+                        List<CastMemberDTO> cast = parseCast(charJson, st);
                         d.setCast(cast);
                     }
                 } catch (Exception e) {
@@ -227,26 +227,26 @@ public class BangumiService {
     }
 
     /**
-     * 解析角色信息为内部 CastMember 结构。
+     * 解析角色信息为内部 CastMemberDTO 结构。
      *
      * @param charJson Bangumi /subjects/{id}/characters 返回内容
      * @param subjectType 条目类型：2=动画，6=真人
      * @return 最多 12 位角色的角色出演列表
      */
-    private List<CastMember> parseCast(String charJson, int subjectType) {
-        List<CastMember> cast = new ArrayList<>();
+    private List<CastMemberDTO> parseCast(String charJson, int subjectType) {
+        List<CastMemberDTO> cast = new ArrayList<>();
         try {
             JsonNode chars = objectMapper.readTree(charJson);
             if (!chars.isArray()) return cast;
             int max = Math.min(chars.size(), 12);
 
-            // 收集 JSON 节点并按 relation 排序，再构建 CastMember
+            // 收集 JSON 节点并按 relation 排序，再构建 CastMemberDTO
             List<JsonNode> nodes = new ArrayList<>();
             for (int i = 0; i < max; i++) nodes.add(chars.get(i));
             nodes.sort(Comparator.comparingInt(c -> relationOrder(text(c, "relation"))));
 
             for (JsonNode c : nodes) {
-                CastMember m = new CastMember();
+                CastMemberDTO m = new CastMemberDTO();
                 m.setId(c.has("id") && !c.get("id").isNull() ? c.get("id").asLong() : null);
                 m.setName(text(c, "name"));
                 JsonNode actors = c.get("actors");
@@ -305,10 +305,10 @@ public class BangumiService {
      * 将 Bangumi 搜索条目映射为统一 DTO。
      *
      * @param item Bangumi 原始条目节点
-     * @return 标准化后的 {@link WorkSearchResult}
+     * @return 标准化后的 {@link WorkSearchResultDTO}
      */
-    private WorkSearchResult mapSubject(JsonNode item) {
-        WorkSearchResult r = new WorkSearchResult();
+    private WorkSearchResultDTO mapSubject(JsonNode item) {
+        WorkSearchResultDTO r = new WorkSearchResultDTO();
         r.setId(Long.parseLong(String.valueOf(item.get("id"))));
         r.setPlatform(text(item, "platform"));
         r.setSource("bangumi");

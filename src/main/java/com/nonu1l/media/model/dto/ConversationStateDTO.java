@@ -10,9 +10,9 @@ import java.util.List;
  * @param cards 卡片列表。
  * @param activeRun 正在执行的对话轮次快照。
  */
-public record ConversationState(
+public record ConversationStateDTO(
         Long sessionId,
-        List<ConversationMessageVO> messages,
-        List<ConversationCardVO> cards,
-        ConversationRunState activeRun
+        List<ConversationMessageDTO> messages,
+        List<ConversationCardDTO> cards,
+        ConversationRunStateDTO activeRun
 ) {}

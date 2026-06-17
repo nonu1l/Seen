@@ -6,10 +6,10 @@ import { SettingsRow } from '../components/settings/SettingsRow';
 import { TestResult } from '../components/settings/TestResult';
 import { ToggleRow } from '../components/settings/ToggleRow';
 import type {
-  AdminOverviewResponse,
-  AiMemoryResponse,
+  AdminOverviewDTO,
+  AiMemoryDTO,
   AiProviderSettingRequest,
-  SettingsResponse,
+  SettingsDTO,
   SettingsTestResult,
 } from '../api/types';
 
@@ -63,7 +63,7 @@ function shouldSubmitAiSecret(current: string, initial: string) {
   return current !== initial;
 }
 
-function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
+function toAiConfigDraft(settings: SettingsDTO | null): EditableAiConfig {
   const profile = settings?.aiProfile ?? null;
   if (!profile) return { ...EMPTY_AI_CONFIG };
   return {
@@ -77,7 +77,7 @@ function toAiConfigDraft(settings: SettingsResponse | null): EditableAiConfig {
   };
 }
 
-function toSourceValues(settings: SettingsResponse | null): SourceValues {
+function toSourceValues(settings: SettingsDTO | null): SourceValues {
   return {
     searchProvider: settings?.sources.searchProvider ?? 'auto',
     serperApiKey: settings?.sources.serperApiKey ?? '',
@@ -158,8 +158,8 @@ export default function SettingsPage() {
   const [aiInitial, setAiInitial] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
   const [sourceValues, setSourceValues] = useState<SourceValues>(() => toSourceValues(null));
   const [sourceInitial, setSourceInitial] = useState<SourceValues>(() => toSourceValues(null));
-  const [aiMemory, setAiMemory] = useState<AiMemoryResponse | null>(null);
-  const [adminOverview, setAdminOverview] = useState<AdminOverviewResponse | null>(null);
+  const [aiMemory, setAiMemory] = useState<AiMemoryDTO | null>(null);
+  const [adminOverview, setAdminOverview] = useState<AdminOverviewDTO | null>(null);
   const [showAiSecret, setShowAiSecret] = useState(false);
   const [showSerperSecret, setShowSerperSecret] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -182,7 +182,7 @@ export default function SettingsPage() {
   const sourceDirty = useMemo(() => !sameSources(sourceValues, sourceInitial), [sourceValues, sourceInitial]);
   const dirty = activeGroup === 'ai' ? aiDirty : activeGroup === 'sources' ? sourceDirty : extraDirty;
 
-  const applySettings = (next: SettingsResponse) => {
+  const applySettings = (next: SettingsDTO) => {
     const nextSources = toSourceValues(next);
     setSourceValues(nextSources);
     setSourceInitial(nextSources);

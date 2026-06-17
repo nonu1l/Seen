@@ -12,8 +12,8 @@ import java.util.List;
  * @param unmarkIds 需要清空标记的条目 ID 集合。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record IntentAnalysisResult(
+public record IntentAnalysisResultDTO(
         String replyText,
-        List<MatchedEntry> entries,
+        List<MatchedEntryDTO> entries,
         List<Long> unmarkIds
 ) {}

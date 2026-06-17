@@ -1,4 +1,4 @@
-package com.nonu1l.media.model.dto;
+package com.nonu1l.media.model.dto.test;
 
 /**
  * 设置页连接测试请求 DTO 集合。

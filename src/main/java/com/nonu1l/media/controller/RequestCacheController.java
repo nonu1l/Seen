@@ -1,8 +1,8 @@
 package com.nonu1l.media.controller;
 
 import com.nonu1l.media.cache.RequestCacheStore;
-import com.nonu1l.media.model.dto.RequestCacheEntryDetail;
-import com.nonu1l.media.model.dto.RequestCacheEntrySummary;
+import com.nonu1l.media.model.dto.RequestCacheEntryDetailDTO;
+import com.nonu1l.media.model.dto.RequestCacheEntrySummaryDTO;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,7 +54,7 @@ public class RequestCacheController {
      * @return 缓存列表摘要，按 HTTP 方法和 URL 排序
      */
     @GetMapping("/api/admin/request-cache/entries")
-    public List<RequestCacheEntrySummary> entries() {
+    public List<RequestCacheEntrySummaryDTO> entries() {
         return cacheStore.snapshot().stream()
                 .sorted(Comparator.comparing(RequestCacheStore.SnapshotEntry::method)
                         .thenComparing(RequestCacheStore.SnapshotEntry::url))
@@ -69,15 +69,15 @@ public class RequestCacheController {
      * @return 缓存详情；未命中返回空详情
      */
     @GetMapping("/api/admin/request-cache/detail")
-    public RequestCacheEntryDetail detail(@RequestParam String key) {
+    public RequestCacheEntryDetailDTO detail(@RequestParam String key) {
         return cacheStore.find(key)
                 .map(this::toDetail)
-                .orElseGet(() -> new RequestCacheEntryDetail(key, "MISS", "", "", "",
+                .orElseGet(() -> new RequestCacheEntryDetailDTO(key, "MISS", "", "", "",
                         0L, 0L, 0L));
     }
 
-    private RequestCacheEntrySummary toSummary(RequestCacheStore.SnapshotEntry entry) {
-        return new RequestCacheEntrySummary(
+    private RequestCacheEntrySummaryDTO toSummary(RequestCacheStore.SnapshotEntry entry) {
+        return new RequestCacheEntrySummaryDTO(
                 entry.key(),
                 entry.method(),
                 entry.url(),
@@ -88,8 +88,8 @@ public class RequestCacheController {
         );
     }
 
-    private RequestCacheEntryDetail toDetail(RequestCacheStore.SnapshotEntry entry) {
-        return new RequestCacheEntryDetail(
+    private RequestCacheEntryDetailDTO toDetail(RequestCacheStore.SnapshotEntry entry) {
+        return new RequestCacheEntryDetailDTO(
                 entry.key(),
                 entry.method(),
                 entry.url(),

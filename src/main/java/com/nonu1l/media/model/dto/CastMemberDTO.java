@@ -8,7 +8,7 @@ import lombok.Data;
  * 用于返回作品的演员及相关展示字段。
  */
 @Data
-public class CastMember {
+public class CastMemberDTO {
     private Long id;
     private String name;
     /** CV 或演员名 */

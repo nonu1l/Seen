@@ -1,7 +1,7 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -104,8 +104,8 @@ public class SerperSearchService implements SearchProvider {
      * @return 结构化搜索结果
      */
     @Override
-    public List<WebSearchItem> search(String query) {
-        List<WebSearchItem> results = new ArrayList<>();
+    public List<WebSearchItemDTO> search(String query) {
+        List<WebSearchItemDTO> results = new ArrayList<>();
         String apiKey = settingsService.getString(SettingsService.SERPER_API_KEY);
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
@@ -132,7 +132,7 @@ public class SerperSearchService implements SearchProvider {
                 String snippet = r.has("snippet") ? r.get("snippet").asText() : "";
                 String link = r.has("link") ? r.get("link").asText() : null;
                 if (title != null && link != null) {
-                    results.add(new WebSearchItem(title, snippet, link));
+                    results.add(new WebSearchItemDTO(title, snippet, link));
                     if (results.size() >= MAX_RESULTS) break;
                 }
             }

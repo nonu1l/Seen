@@ -14,7 +14,7 @@
 //        var builder = new org.springframework.boot.web.client.RestTemplateBuilder();
 //        var svc = new WebSearchService(builder, "https://seen.slimrip.com");
 //
-//        List<com.nonu1l.media.model.dto.WebSearchItem> results = svc.search(query);
+//        List<com.nonu1l.media.model.dto.WebSearchItemDTO> results = svc.search(query);
 //        System.out.println("Found: " + results.size() + " results\n");
 //        for (int i = 0; i < results.size(); i++) {
 //            var r = results.get(i);

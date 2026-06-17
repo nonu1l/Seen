@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * LLM Phase 1 输出 — 从用户自然语言中提取的结构化意图。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record StructuredIntent(
+public record StructuredIntentDTO(
         /** 搜索关键词（去季号、去副标题） */
         String keywords,
         /** 指定季数，null=未指定，-1=最终季 */

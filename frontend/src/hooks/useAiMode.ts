@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
-import type { ConversationMessageVO, ConversationCardVO, AiStreamEvent, ConversationState } from '../api/types';
+import type { ConversationMessageDTO, ConversationCardDTO, AiStreamEventDTO, ConversationStateDTO } from '../api/types';
 
 const ACTIVE_ASSISTANT_ID = -900719925474000;
 
 export function useAiMode() {
   const [isOpen, setIsOpen] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<ConversationMessageVO[]>([]);
-  const [cards, setCards] = useState<ConversationCardVO[]>([]);
+  const [messages, setMessages] = useState<ConversationMessageDTO[]>([]);
+  const [cards, setCards] = useState<ConversationCardDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [runStatuses, setRunStatuses] = useState<string[]>([]);
   const [recoveringRun, setRecoveringRun] = useState(false);
   const restoredRef = useRef(false);
 
-  const applyConversationState = useCallback((state: ConversationState) => {
+  const applyConversationState = useCallback((state: ConversationStateDTO) => {
     const activeRun = state.activeRun;
     const nextMessages = [...state.messages];
     setSessionId(state.sessionId);
@@ -115,7 +115,7 @@ export function useAiMode() {
         }]);
       };
 
-      const handleStreamEvent = (event: AiStreamEvent) => {
+      const handleStreamEvent = (event: AiStreamEventDTO) => {
         switch (event.type) {
           case 'user_saved':
             userSaved = true;

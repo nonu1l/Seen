@@ -17,19 +17,19 @@ import java.io.Serializable;
  * @param rank Bangumi 排名。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record CompactResult(
+public record CompactResultDTO(
         Long id, String nameCn, String nameOrig,
         String category, String airDate,
         Integer epsCount, Double score, Integer rank
 ) implements Serializable {
     /**
-     * 将 {@link CompactSubject} 转换为压缩结果 DTO。
+     * 将 {@link CompactSubjectDTO} 转换为压缩结果 DTO。
      *
      * @param s 压缩条目对象。
      * @return 对应的紧凑返回对象。
      */
-    public static CompactResult from(CompactSubject s) {
-        return new CompactResult(s.id(), s.nameCn(), null,
+    public static CompactResultDTO from(CompactSubjectDTO s) {
+        return new CompactResultDTO(s.id(), s.nameCn(), null,
                 s.category(), s.airDate(), s.epsCount(), s.score(), s.rank());
     }
 }

@@ -10,7 +10,7 @@ import java.time.Instant;
  * @param content 消息正文。
  * @param createdAt 创建时间戳。
  */
-public record ConversationMessageVO(
+public record ConversationMessageDTO(
         Long id,
         String role,
         String content,

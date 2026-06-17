@@ -1,6 +1,6 @@
 package com.nonu1l.media.controller;
 
-import com.nonu1l.media.model.dto.AdminOverviewResponse;
+import com.nonu1l.media.model.dto.AdminOverviewDTO;
 import com.nonu1l.media.service.AdminOverviewService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +29,7 @@ public class AdminOverviewController {
      * @return 后台轻量汇总
      */
     @GetMapping("/api/admin/overview")
-    public AdminOverviewResponse overview() {
+    public AdminOverviewDTO overview() {
         return overviewService.overview();
     }
 
@@ -39,7 +39,7 @@ public class AdminOverviewController {
      * @return 清空后的后台轻量汇总
      */
     @PostMapping("/api/admin/request-cache/clear")
-    public AdminOverviewResponse clearRequestCache() {
+    public AdminOverviewDTO clearRequestCache() {
         return overviewService.clearRequestCache();
     }
 
@@ -49,7 +49,7 @@ public class AdminOverviewController {
      * @return 重置后的后台轻量汇总
      */
     @PostMapping("/api/admin/token-usage/reset")
-    public AdminOverviewResponse resetTokenUsage() {
+    public AdminOverviewDTO resetTokenUsage() {
         return overviewService.resetTokenUsage();
     }
 }

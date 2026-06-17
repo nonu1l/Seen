@@ -15,7 +15,7 @@ import java.time.Instant;
  * @param sourceHash 画像来源数据指纹
  * @param updatedAt 画像最后更新时间
  */
-public record AiMemoryResponse(
+public record AiMemoryDTO(
         boolean exists,
         Long version,
         String summary,

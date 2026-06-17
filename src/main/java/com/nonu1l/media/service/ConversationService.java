@@ -116,21 +116,21 @@ public class ConversationService {
      * @return 会话 ID、时间升序消息列表、卡片列表和活动轮次组成的状态对象
      */
     @Transactional(readOnly = true)
-    public ConversationState getState() {
+    public ConversationStateDTO getState() {
         ConversationSession session = getOrCreateSession();
 
         List<ConversationMessage> messages = messageRepo.findAllBySessionIdOrderByIdAsc(session.getId());
-        List<ConversationMessageVO> messageVOs = messages.stream()
-                .map(m -> new ConversationMessageVO(m.getId(), m.getRole(), m.getContent(), m.getCreatedAt()))
+        List<ConversationMessageDTO> messageDTOs = messages.stream()
+                .map(m -> new ConversationMessageDTO(m.getId(), m.getRole(), m.getContent(), m.getCreatedAt()))
                 .toList();
 
         List<ConversationCard> cards = cardRepo.findAllBySessionIdAndCardStateInOrderByIdAsc(
                 session.getId(), List.of("PENDING", "EDITABLE", "CONFLICT", "SAVED", "UNMARKED", "RESTORED"));
-        List<ConversationCardVO> cardVOs = cards.stream()
-                .map(this::toVO)
+        List<ConversationCardDTO> cardDTOs = cards.stream()
+                .map(this::toDTO)
                 .toList();
 
-        return new ConversationState(session.getId(), messageVOs, cardVOs, runStore.snapshot(session.getId()));
+        return new ConversationStateDTO(session.getId(), messageDTOs, cardDTOs, runStore.snapshot(session.getId()));
     }
 
     // ── 发送消息 ─────────────────────────────────────────────
@@ -143,14 +143,14 @@ public class ConversationService {
      * @param userInput 用户输入文本
      * @return 包含助手消息 ID、回复文本及本轮卡片列表的响应对象
      */
-    public AiChatResponse sendMessage(String userInput) {
+    public AiChatDTO sendMessage(String userInput) {
         ConversationSession session = getOrCreateSession();
         Instant now = Instant.now();
 
         ConversationMessage userMsg = transactionTemplate.execute(
                 tx -> saveUserMessage(session, userInput, now));
         String history = buildHistory(session.getId());
-        IntentAnalysisResult result = invokeAgent(userInput, history);
+        IntentAnalysisResultDTO result = invokeAgent(userInput, history);
 
         return transactionTemplate.execute(
                 tx -> saveAssistantResponse(session, result, userMsg, now));
@@ -205,11 +205,11 @@ public class ConversationService {
                     tx -> saveUserMessage(session, userInput, now));
             if (userMsg != null) {
                 runStore.start(sessionId, userMsg.getId(), userMsg.getCreatedAt());
-                publishRunEvent(sessionId, AiStreamEvent.userSaved(userMsg.getId(), userMsg.getCreatedAt()), sender);
+                publishRunEvent(sessionId, AiStreamEventDTO.userSaved(userMsg.getId(), userMsg.getCreatedAt()), sender);
             }
 
             String history = buildHistory(session.getId());
-            IntentAnalysisResult result = invokeAgent(userInput, history, listener);
+            IntentAnalysisResultDTO result = invokeAgent(userInput, history, listener);
             String replyText = result.replyText() != null && !result.replyText().isBlank()
                     ? result.replyText()
                     : generateReplyText(result);
@@ -217,20 +217,20 @@ public class ConversationService {
                 streamReplyText(replyText, listener);
             }
 
-            AiChatResponse response = transactionTemplate.execute(
+            AiChatDTO response = transactionTemplate.execute(
                     tx -> saveAssistantResponse(session, result, userMsg, now));
             if (response != null) {
-                publishRunEvent(sessionId, AiStreamEvent.assistantSaved(response.messageId(), response.replyText(), now), sender);
+                publishRunEvent(sessionId, AiStreamEventDTO.assistantSaved(response.messageId(), response.replyText(), now), sender);
                 if (response.cards() != null && !response.cards().isEmpty()) {
-                    publishRunEvent(sessionId, AiStreamEvent.cards(response.cards()), sender);
+                    publishRunEvent(sessionId, AiStreamEventDTO.cards(response.cards()), sender);
                 }
             }
-            publishRunEvent(sessionId, AiStreamEvent.done(), sender);
+            publishRunEvent(sessionId, AiStreamEventDTO.done(), sender);
             runStore.complete(sessionId);
             emitter.complete();
         } catch (Exception e) {
             log.error("sendMessageStream failed", e);
-            publishRunEvent(sessionId, AiStreamEvent.error("抱歉，处理出错了，请重试。"), sender);
+            publishRunEvent(sessionId, AiStreamEventDTO.error("抱歉，处理出错了，请重试。"), sender);
             runStore.complete(sessionId);
             emitter.complete();
         }
@@ -243,7 +243,7 @@ public class ConversationService {
      * @param event 流式事件
      * @param sender SSE 发送器
      */
-    private void publishRunEvent(Long sessionId, AiStreamEvent event, SseEventSender sender) {
+    private void publishRunEvent(Long sessionId, AiStreamEventDTO event, SseEventSender sender) {
         if (event == null) {
             return;
         }
@@ -265,7 +265,7 @@ public class ConversationService {
      * @param history 用于解析指代的最近会话历史文本
      * @return 归一化后的意图分析结果（reply、推荐卡片、取消标记 id）
      */
-    private IntentAnalysisResult invokeAgent(String userInput, String history) {
+    private IntentAnalysisResultDTO invokeAgent(String userInput, String history) {
         return invokeAgent(userInput, history, AgentRunEvents.noop());
     }
 
@@ -277,7 +277,7 @@ public class ConversationService {
      * @param listener 单轮运行监听器
      * @return 归一化后的意图分析结果
      */
-    private IntentAnalysisResult invokeAgent(String userInput, String history, AgentRunListener listener) {
+    private IntentAnalysisResultDTO invokeAgent(String userInput, String history, AgentRunListener listener) {
         Long sessionId = getOrCreateSession().getId();
         TokenUsageAdvisor.setSession(sessionId);
         TokenUsageAdvisor.setCurrentTurn((int) messageRepo.countBySessionIdAndRole(sessionId, "user"));
@@ -287,13 +287,13 @@ public class ConversationService {
             if (replyText == null || replyText.isBlank()) {
                 replyText = "正在处理你的请求...";
             }
-            var cards = agentState.<MatchedEntry>cards();
+            var cards = agentState.<MatchedEntryDTO>cards();
             var unmarkIds = agentState.<Long>unmarkIds();
-            return new IntentAnalysisResult(replyText, cards.isEmpty() ? null : cards,
+            return new IntentAnalysisResultDTO(replyText, cards.isEmpty() ? null : cards,
                     unmarkIds.isEmpty() ? null : unmarkIds);
         } catch (Exception e) {
             log.error("Agent invoke failed", e);
-            return new IntentAnalysisResult("抱歉，处理出错了，请重试。", List.of(), List.of());
+            return new IntentAnalysisResultDTO("抱歉，处理出错了，请重试。", List.of(), List.of());
         } finally {
             TokenUsageAdvisor.clearSession();
         }
@@ -325,9 +325,9 @@ public class ConversationService {
      * @param result Agent 解析结果
      * @param userMsg 本轮用户消息（用于关联回写）
      * @param now 统一时间戳
-     * @return AiChatResponse，含本轮助手消息 ID、文案、返回卡片列表
+     * @return AiChatDTO，含本轮助手消息 ID、文案、返回卡片列表
      */
-    private AiChatResponse saveAssistantResponse(ConversationSession session, IntentAnalysisResult result,
+    private AiChatDTO saveAssistantResponse(ConversationSession session, IntentAnalysisResultDTO result,
                                                   ConversationMessage userMsg, Instant now) {
         String replyText = result.replyText() != null && !result.replyText().isBlank()
                 ? result.replyText()
@@ -341,11 +341,11 @@ public class ConversationService {
         messageRepo.save(assistantMsg);
 
         // 保存卡片 + 自动保存
-        List<ConversationCardVO> cardVOs = new ArrayList<>();
+        List<ConversationCardDTO> cardDTOs = new ArrayList<>();
         if (result.entries() != null) {
             // 1) 先创建所有卡片实体
             List<ConversationCard> cards = new ArrayList<>();
-            for (MatchedEntry entry : result.entries()) {
+            for (MatchedEntryDTO entry : result.entries()) {
                 ConversationCard card = new ConversationCard();
                 card.setSessionId(session.getId());
                 card.setMessageId(assistantMsg.getId());
@@ -362,7 +362,7 @@ public class ConversationService {
             // 3) 保存并自动标记
             for (ConversationCard card : cards) {
                 cardRepo.save(card);
-                cardVOs.add(autoSaveCard(card));
+                cardDTOs.add(autoSaveCard(card));
             }
         }
 
@@ -373,7 +373,7 @@ public class ConversationService {
                     ConversationCard card = snapshotBeforeUnmark(session.getId(), assistantMsg.getId(), subjectId);
                     workService.unmark(subjectId);
                     log.info("Auto-unmarked subjectId={}", subjectId);
-                    if (card != null) cardVOs.add(toVO(card));
+                    if (card != null) cardDTOs.add(toDTO(card));
                 } catch (Exception e) {
                     log.warn("Auto-unmark failed subjectId={}: {}", subjectId, e.getMessage());
                 }
@@ -383,7 +383,7 @@ public class ConversationService {
         session.setUpdatedAt(now);
         sessionRepo.save(session);
 
-        return new AiChatResponse(assistantMsg.getId(), replyText, cardVOs);
+        return new AiChatDTO(assistantMsg.getId(), replyText, cardDTOs);
     }
 
     // ── 卡片操作 ─────────────────────────────────────────────
@@ -393,10 +393,10 @@ public class ConversationService {
      *
      * @param cardId 目标卡片 ID
      * @param req 入参可选字段：rating/review/status
-     * @return 更新后的卡片 VO（含历史对比信息）
+     * @return 更新后的卡片 DTO（含历史对比信息）
      */
     @Transactional
-    public ConversationCardVO saveCard(Long cardId, SaveCardRequest req) {
+    public ConversationCardDTO saveCard(Long cardId, SaveCardRequest req) {
         ConversationCard card = cardRepo.findById(cardId)
                 .orElseThrow(() -> new IllegalArgumentException("Card not found: " + cardId));
 
@@ -411,7 +411,7 @@ public class ConversationService {
             doSaveNew(card);
             card.setCardState("RESTORED");
             cardRepo.save(card);
-            return toVO(card);
+            return toDTO(card);
         }
 
         return doSaveNew(card);
@@ -421,10 +421,10 @@ public class ConversationService {
      * 撤销 AI 标记：仅回滚该作品最近一条标记记录，并把卡片状态置为可编辑。
      *
      * @param cardId 卡片 ID
-     * @return 撤销后的卡片 VO
+     * @return 撤销后的卡片 DTO
      */
     @Transactional
-    public ConversationCardVO undoCard(Long cardId) {
+    public ConversationCardDTO undoCard(Long cardId) {
         ConversationCard card = cardRepo.findById(cardId)
                 .orElseThrow(() -> new IllegalArgumentException("Card not found: " + cardId));
 
@@ -437,18 +437,18 @@ public class ConversationService {
         card.setCardState("EDITABLE");
         cardRepo.save(card);
         log.info("Card undone: cardId={} subjectId={}", cardId, card.getSubjectId());
-        return toVO(card);
+        return toDTO(card);
     }
 
     /**
      * 自动保存入口：仅当卡片有状态时才调用外部标记；无状态表示纯推荐不落库状态。
      *
      * @param card 会话卡片实体
-     * @return 卡片 VO
+     * @return 卡片 DTO
      */
-    private ConversationCardVO autoSaveCard(ConversationCard card) {
+    private ConversationCardDTO autoSaveCard(ConversationCard card) {
         if (card.getStatus() == null) {
-            return toVO(card);
+            return toDTO(card);
         }
         return doSaveNew(card);
     }
@@ -456,18 +456,18 @@ public class ConversationService {
     /**
      * 发起一次“AI 标记”保存动作：生成 Mark 请求、补充元数据、写入 record，并更新卡片状态。
      *
-     * <p>副作用：会创建新的标记记录，返回的 VO 包含历史评分/评论/状态用于前端对比。</p>
+     * <p>副作用：会创建新的标记记录，返回的 DTO 包含历史评分/评论/状态用于前端对比。</p>
      *
      * @param card 待保存卡片
-     * @return 带历史对比字段的卡片 VO
+     * @return 带历史对比字段的卡片 DTO
      */
-    private ConversationCardVO doSaveNew(ConversationCard card) {
+    private ConversationCardDTO doSaveNew(ConversationCard card) {
         MarkRequest markReq = new MarkRequest();
         markReq.setId(String.valueOf(card.getSubjectId()));
         markReq.setStatus(card.getStatus()); // null = 沿用旧记录
 
         try {
-            WorkSearchResult meta = bangumiService.getById(String.valueOf(card.getSubjectId()));
+            WorkSearchResultDTO meta = bangumiService.getById(String.valueOf(card.getSubjectId()));
             if (meta != null) markReq.setMeta(meta);
         } catch (Exception e) {
             log.warn("Failed to fetch Bangumi meta for subjectId={}: {}", card.getSubjectId(), e.getMessage());
@@ -479,7 +479,7 @@ public class ConversationService {
         card.setCardState("SAVED");
         cardRepo.save(card);
 
-        // 构建带历史对比的 VO
+        // 构建带历史对比的 DTO
         if (mr.previousRecord() != null) {
             Record p = mr.previousRecord();
             log.info("Card saved with history: subjectId={} old=[{} {}分 {}] new=[{} {}分 {}]",
@@ -487,7 +487,7 @@ public class ConversationService {
                     card.getStatus(), card.getRating(), card.getReview());
         }
         log.info("Card saved: cardId={} subjectId={}", card.getId(), card.getSubjectId());
-        return toVOWithHistory(card, mr.previousRecord());
+        return toDTOWithHistory(card, mr.previousRecord());
     }
 
     /**
@@ -495,10 +495,10 @@ public class ConversationService {
      *
      * @param card 当前卡片
      * @param previous 上一条标记记录，可为 null
-     * @return 含历史字段的卡片 VO
+     * @return 含历史字段的卡片 DTO
      */
-    private ConversationCardVO toVOWithHistory(ConversationCard card, Record previous) {
-        return new ConversationCardVO(
+    private ConversationCardDTO toDTOWithHistory(ConversationCard card, Record previous) {
+        return new ConversationCardDTO(
                 card.getId(), card.getMessageId(), card.getSubjectId(),
                 card.getNameCn(), card.getCoverUrl(), card.getYear(),
                 card.getPlatform(),
@@ -540,14 +540,14 @@ public class ConversationService {
      * @param result Agent 意图分析结果
      * @return 可直接返回给前端的提示文本
      */
-    static String generateReplyText(IntentAnalysisResult result) {
-        List<MatchedEntry> entries = result.entries();
+    static String generateReplyText(IntentAnalysisResultDTO result) {
+        List<MatchedEntryDTO> entries = result.entries();
         if (entries == null || entries.isEmpty()) {
             return "未找到匹配条目，请检查剧名后重试。";
         }
 
         if (entries.size() == 1) {
-            MatchedEntry e = entries.getFirst();
+            MatchedEntryDTO e = entries.getFirst();
             StringBuilder sb = new StringBuilder();
             sb.append("已匹配《").append(e.nameCn()).append("》");
             if (e.rating() != null) {
@@ -574,10 +574,10 @@ public class ConversationService {
         sb.append("已匹配 ").append(entries.size()).append(" 部作品");
 
         // 统计评分差异
-        List<MatchedEntry> withRating = entries.stream().filter(e -> e.rating() != null).toList();
+        List<MatchedEntryDTO> withRating = entries.stream().filter(e -> e.rating() != null).toList();
         if (!withRating.isEmpty()) {
-            int min = withRating.stream().mapToInt(MatchedEntry::rating).min().orElse(0);
-            int max = withRating.stream().mapToInt(MatchedEntry::rating).max().orElse(0);
+            int min = withRating.stream().mapToInt(MatchedEntryDTO::rating).min().orElse(0);
+            int max = withRating.stream().mapToInt(MatchedEntryDTO::rating).max().orElse(0);
             if (min == max) {
                 sb.append("，均分 ").append(min).append(" 分");
             } else {
@@ -635,13 +635,13 @@ public class ConversationService {
     }
 
     /**
-     * 将卡片实体转换为前端展示 VO。
+     * 将卡片实体转换为前端展示 DTO。
      *
      * @param card 卡片实体
      * @return 前端展示结构
      */
-    private ConversationCardVO toVO(ConversationCard card) {
-        return new ConversationCardVO(
+    private ConversationCardDTO toDTO(ConversationCard card) {
+        return new ConversationCardDTO(
                 card.getId(), card.getMessageId(), card.getSubjectId(),
                 card.getNameCn(), card.getCoverUrl(), card.getYear(),
                 card.getPlatform(),
@@ -658,7 +658,7 @@ public class ConversationService {
      */
     private void enrichCardMeta(ConversationCard card) {
         try {
-            WorkSearchResult w = bangumiService.getById(String.valueOf(card.getSubjectId()));
+            WorkSearchResultDTO w = bangumiService.getById(String.valueOf(card.getSubjectId()));
             if (w != null) {
                 if (w.getCoverUrl() != null) card.setCoverUrl(w.getCoverUrl());
                 if (w.getYear() != null) card.setYear(w.getYear());
@@ -775,7 +775,7 @@ public class ConversationService {
             this.emitter = emitter;
         }
 
-        private synchronized void send(AiStreamEvent event) {
+        private synchronized void send(AiStreamEventDTO event) {
             try {
                 emitter.send(SseEmitter.event().name(event.type()).data(event));
             } catch (IOException | IllegalStateException e) {
@@ -783,7 +783,7 @@ public class ConversationService {
             }
         }
 
-        private synchronized void trySend(AiStreamEvent event) {
+        private synchronized void trySend(AiStreamEventDTO event) {
             try {
                 send(event);
             } catch (Exception ignored) {

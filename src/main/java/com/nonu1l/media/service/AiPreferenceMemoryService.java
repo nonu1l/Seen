@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.AiMemoryResponse;
+import com.nonu1l.media.model.dto.AiMemoryDTO;
 import com.nonu1l.media.model.entity.Record;
 import com.nonu1l.media.model.entity.UserPreferenceEvidence;
 import com.nonu1l.media.model.entity.UserPreferenceMemory;
@@ -126,10 +126,10 @@ public class AiPreferenceMemoryService {
      *
      * @return 当前画像响应；没有画像时返回 exists=false
      */
-    public AiMemoryResponse currentMemory() {
+    public AiMemoryDTO currentMemory() {
         return memoryRepo.findById(SINGLE_USER_MEMORY_ID)
                 .map(this::toResponse)
-                .orElseGet(() -> new AiMemoryResponse(false, null, null, null, null,
+                .orElseGet(() -> new AiMemoryDTO(false, null, null, null, null,
                         null, null, null, null));
     }
 
@@ -138,7 +138,7 @@ public class AiPreferenceMemoryService {
      *
      * @return 重建后的画像；若无足够记录或 LLM 失败，返回当前可用画像
      */
-    public AiMemoryResponse rebuildMemory() {
+    public AiMemoryDTO rebuildMemory() {
         if (!settingsService.getBoolean(SettingsService.AI_MEMORY_ENABLED)) {
             return currentMemory();
         }
@@ -182,7 +182,7 @@ public class AiPreferenceMemoryService {
         } catch (Exception e) {
             log.warn("Preference memory rebuild failed, keep old memory: {}", e.getMessage());
             return existing.map(this::toResponse)
-                    .orElseGet(() -> new AiMemoryResponse(false, null, null, null, null,
+                    .orElseGet(() -> new AiMemoryDTO(false, null, null, null, null,
                             null, null, null, null));
         }
     }
@@ -392,8 +392,8 @@ public class AiPreferenceMemoryService {
         }
     }
 
-    private AiMemoryResponse toResponse(UserPreferenceMemory memory) {
-        return new AiMemoryResponse(true, memory.getVersion(), memory.getSummary(),
+    private AiMemoryDTO toResponse(UserPreferenceMemory memory) {
+        return new AiMemoryDTO(true, memory.getVersion(), memory.getSummary(),
                 memory.getLikesJson(), memory.getDislikesJson(), memory.getRecentShiftJson(),
                 memory.getRecommendationRulesJson(), memory.getSourceHash(), memory.getUpdatedAt());
     }

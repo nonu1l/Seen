@@ -1,4 +1,4 @@
-package com.nonu1l.media.model.dto;
+package com.nonu1l.media.model.dto.test;
 
 import java.util.Map;
 

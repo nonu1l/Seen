@@ -25,7 +25,7 @@ export interface CastMember {
   actorId: number | null;
 }
 
-export interface WorkSearchResult {
+export interface WorkSearchResultDTO {
   id: number;
   platform: string;
   nameCn: string;
@@ -38,7 +38,7 @@ export interface WorkSearchResult {
   source?: 'local' | 'bangumi';
 }
 
-export interface WorkListItem {
+export interface WorkListItemDTO {
   id: number;
   platform: string;
   nameCn: string;
@@ -55,12 +55,12 @@ export interface WorkListItem {
   latestRecordAt: string | null;
 }
 
-export interface SearchResponse {
-  local: WorkListItem[];
-  works: WorkSearchResult[];
+export interface SearchDTO {
+  local: WorkListItemDTO[];
+  works: WorkSearchResultDTO[];
 }
 
-export interface WorkDetail {
+export interface WorkDetailDTO {
   id: number | null;
   platform: string;
   nameCn: string;
@@ -86,19 +86,19 @@ export interface MarkRequest {
   id: string;
   platform: string;
   status: Status;
-  meta?: WorkSearchResult;
+  meta?: WorkSearchResultDTO;
 }
 
 // ── Conversation ──
 
-export interface ConversationMessageVO {
+export interface ConversationMessageDTO {
   id: number;
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
 }
 
-export interface ConversationCardVO {
+export interface ConversationCardDTO {
   id: number;
   messageId: number;
   subjectId: number;
@@ -121,23 +121,23 @@ export interface ConversationCardVO {
 
 export type CardState = 'PENDING' | 'SAVED' | 'EXCLUDED' | 'EDITABLE' | 'CONFLICT' | 'UNMARKED' | 'RESTORED';
 
-export interface AiChatResponse {
+export interface AiChatDTO {
   messageId: number;
   replyText: string;
-  cards: ConversationCardVO[];
+  cards: ConversationCardDTO[];
 }
 
 export type AiStreamEventType = 'user_saved' | 'status' | 'delta' | 'assistant_saved' | 'cards' | 'done' | 'error';
 
-export interface AiStreamEvent {
+export interface AiStreamEventDTO {
   type: AiStreamEventType;
   messageId: number | null;
   content: string | null;
   createdAt: string | null;
-  cards: ConversationCardVO[] | null;
+  cards: ConversationCardDTO[] | null;
 }
 
-export interface ConversationRunState {
+export interface ConversationRunStateDTO {
   active: boolean;
   userMessageId: number | null;
   assistantMessageId: number | null;
@@ -148,20 +148,20 @@ export interface ConversationRunState {
   error: string | null;
 }
 
-export interface ConversationState {
+export interface ConversationStateDTO {
   sessionId: number;
-  messages: ConversationMessageVO[];
-  cards: ConversationCardVO[];
-  activeRun: ConversationRunState;
+  messages: ConversationMessageDTO[];
+  cards: ConversationCardDTO[];
+  activeRun: ConversationRunStateDTO;
 }
 
 // ── Settings ──
 
-export interface SettingsResponse {
+export interface SettingsDTO {
   aiEnabled: boolean;
   tokenUsageEnabled: boolean;
   aiMemory: AiMemorySettings;
-  aiProfile: AiProviderSetting;
+  aiProfile: AiProviderSettingDTO;
   sources: SourceSettings;
 }
 
@@ -170,7 +170,7 @@ export interface AiMemorySettings {
   autoUpdateEnabled?: boolean;
 }
 
-export interface AiMemoryResponse {
+export interface AiMemoryDTO {
   exists: boolean;
   version: number | null;
   summary: string | null;
@@ -182,12 +182,12 @@ export interface AiMemoryResponse {
   updatedAt: string | null;
 }
 
-export interface AdminOverviewResponse {
+export interface AdminOverviewDTO {
   totalTokens: number;
   cacheBytes: number;
 }
 
-export interface AiProviderSetting {
+export interface AiProviderSettingDTO {
   baseUrl: string;
   model: string;
   temperature: number;

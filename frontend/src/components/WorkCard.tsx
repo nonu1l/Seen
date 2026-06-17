@@ -1,10 +1,10 @@
-import type { Status, WorkListItem, WorkSearchResult } from '../api/types';
+import type { Status, WorkListItemDTO, WorkSearchResultDTO } from '../api/types';
 import { Cover } from './Cover';
 import { QuickMarkMenu } from './QuickMarkMenu';
 import { STATUS_META } from '../utils/statusMeta';
 
 interface Props {
-  data: WorkListItem | WorkSearchResult;
+  data: WorkListItemDTO | WorkSearchResultDTO;
   unmarked?: boolean;
   onOpen: () => void;
   onQuickMark: (status: Status) => void;
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Props) {
-  const status: Status | null = unmarked ? null : ((data as WorkListItem).status ?? null);
+  const status: Status | null = unmarked ? null : ((data as WorkListItemDTO).status ?? null);
   const score = data.score != null && data.score > 0 ? data.score.toFixed(1) : null;
 
   return (

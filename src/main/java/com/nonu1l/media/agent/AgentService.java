@@ -1,6 +1,6 @@
 package com.nonu1l.media.agent;
 
-import com.nonu1l.media.model.dto.MatchedEntry;
+import com.nonu1l.media.model.dto.MatchedEntryDTO;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiToolRegistry;
@@ -172,10 +172,10 @@ public class AgentService {
                 String json = IntentAnalysisService.extractJsonObject(content);
                 var node = objectMapper.readTree(json);
                 String reply = node.has("replyText") ? node.get("replyText").asText() : "已为你标记。";
-                var cards = new ArrayList<MatchedEntry>();
+                var cards = new ArrayList<MatchedEntryDTO>();
                 if (node.has("cards") && node.get("cards").isArray()) {
                     for (var c : node.get("cards")) {
-                        cards.add(new MatchedEntry(
+                        cards.add(new MatchedEntryDTO(
                             c.has("subjectId") ? c.get("subjectId").asLong() : null,
                             c.has("nameCn") ? c.get("nameCn").asText() : null,
                             c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asInt() : null,
@@ -306,7 +306,7 @@ public class AgentService {
             return Map.of();
         }
         // 如果已经有 cards（如 pipeline 成功），只生成回复文案
-        var existingCards = s.<MatchedEntry>cards();
+        var existingCards = s.<MatchedEntryDTO>cards();
         if (!existingCards.isEmpty()) {
             StringBuilder cardInfo = new StringBuilder();
             for (int i = 0; i < existingCards.size(); i++) {
@@ -335,10 +335,10 @@ public class AgentService {
                 String json = IntentAnalysisService.extractJsonObject(content);
                 var node = objectMapper.readTree(json);
                 String reply = node.has("replyText") ? node.get("replyText").asText() : content;
-                var cardList = new ArrayList<com.nonu1l.media.model.dto.MatchedEntry>();
+                var cardList = new ArrayList<com.nonu1l.media.model.dto.MatchedEntryDTO>();
                 if (node.has("cards") && node.get("cards").isArray()) {
                     for (var c : node.get("cards")) {
-                        cardList.add(new com.nonu1l.media.model.dto.MatchedEntry(
+                        cardList.add(new com.nonu1l.media.model.dto.MatchedEntryDTO(
                             c.has("subjectId") ? c.get("subjectId").asLong() : null,
                             c.has("nameCn") ? c.get("nameCn").asText() : null,
                             c.has("rating") && !c.get("rating").isNull() ? c.get("rating").asInt() : null,

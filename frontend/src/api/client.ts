@@ -1,26 +1,26 @@
 import type {
-  WorkListItem,
-  SearchResponse,
-  WorkDetail,
+  WorkListItemDTO,
+  SearchDTO,
+  WorkDetailDTO,
   MarkRequest,
   DictResponse,
-  ConversationState,
-  AiChatResponse,
-  AiStreamEvent,
-  ConversationCardVO,
-  SettingsResponse,
+  ConversationStateDTO,
+  AiChatDTO,
+  AiStreamEventDTO,
+  ConversationCardDTO,
+  SettingsDTO,
   UpdateSettingsRequest,
   SettingsTestResult,
-  AiProviderSetting,
+  AiProviderSettingDTO,
   AiProviderSettingRequest,
-  AiMemoryResponse,
-  AdminOverviewResponse,
+  AiMemoryDTO,
+  AdminOverviewDTO,
 } from './types';
 
 const BASE = '/api';
 
 export interface AiStreamHandlers {
-  onEvent?: (event: AiStreamEvent) => void;
+  onEvent?: (event: AiStreamEventDTO) => void;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -90,28 +90,28 @@ function handleSseBlock(block: string, handlers?: AiStreamHandlers) {
     .map(line => line.slice(5).trimStart())
     .join('\n');
   if (!data.trim()) return;
-  const event = JSON.parse(data) as AiStreamEvent;
+  const event = JSON.parse(data) as AiStreamEventDTO;
   handlers?.onEvent?.(event);
 }
 
 export const api = {
   listWorks: () =>
-    request<WorkListItem[]>('/works/list', { method: 'POST' }),
+    request<WorkListItemDTO[]>('/works/list', { method: 'POST' }),
 
   searchAll: (q: string) =>
-    request<SearchResponse>('/works/search', { method: 'POST', body: JSON.stringify({ q }) }),
+    request<SearchDTO>('/works/search', { method: 'POST', body: JSON.stringify({ q }) }),
 
   getDetail: (id: string, platform: string) =>
-    request<WorkDetail>('/works/details', { method: 'POST', body: JSON.stringify({ id, platform }) }),
+    request<WorkDetailDTO>('/works/details', { method: 'POST', body: JSON.stringify({ id, platform }) }),
 
   mark: (req: MarkRequest) =>
-    request<WorkListItem>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
+    request<WorkListItemDTO>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
 
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),
 
   updateReview: (workId: number, rating: number | null, review: string | null) =>
-    request<WorkListItem>('/works/update-review', { method: 'POST', body: JSON.stringify({ workId, rating, review }) }),
+    request<WorkListItemDTO>('/works/update-review', { method: 'POST', body: JSON.stringify({ workId, rating, review }) }),
 
   getDict: () =>
     request<DictResponse>('/works/dict'),
@@ -125,10 +125,10 @@ export const api = {
   // ── Conversation ──
 
   getConversationState: () =>
-    request<ConversationState>('/conversation/state'),
+    request<ConversationStateDTO>('/conversation/state'),
 
   sendMessage: (userInput: string) =>
-    request<AiChatResponse>('/conversation/send', { method: 'POST', body: JSON.stringify({ userInput }) }),
+    request<AiChatDTO>('/conversation/send', { method: 'POST', body: JSON.stringify({ userInput }) }),
 
   sendMessageStream: async (userInput: string, handlers?: AiStreamHandlers) => {
     const res = await fetch(`${BASE}/conversation/send-stream`, {
@@ -143,13 +143,13 @@ export const api = {
   },
 
   saveCard: (cardId: number, rating?: number | null, review?: string | null, status?: string | null) =>
-    request<ConversationCardVO>(`/conversation/cards/${cardId}/save`, {
+    request<ConversationCardDTO>(`/conversation/cards/${cardId}/save`, {
       method: 'POST',
       body: JSON.stringify({ rating, review, status }),
     }),
 
   undoCard: (cardId: number) =>
-    request<ConversationCardVO>(`/conversation/cards/${cardId}/undo`, { method: 'POST' }),
+    request<ConversationCardDTO>(`/conversation/cards/${cardId}/undo`, { method: 'POST' }),
 
   resetConversation: () =>
     request<{ ok: boolean }>('/conversation/reset', { method: 'POST' }),
@@ -160,28 +160,28 @@ export const api = {
   // ── Settings ──
 
   getSettings: () =>
-    request<SettingsResponse>('/settings'),
+    request<SettingsDTO>('/settings'),
 
   updateSettings: (req: UpdateSettingsRequest) =>
-    request<SettingsResponse>('/settings', { method: 'PUT', body: JSON.stringify(req) }),
+    request<SettingsDTO>('/settings', { method: 'PUT', body: JSON.stringify(req) }),
 
   updateAiProfile: (req: AiProviderSettingRequest) =>
-    request<AiProviderSetting>('/settings/ai-profile', { method: 'PUT', body: JSON.stringify(req) }),
+    request<AiProviderSettingDTO>('/settings/ai-profile', { method: 'PUT', body: JSON.stringify(req) }),
 
   getAiMemory: () =>
-    request<AiMemoryResponse>('/admin/ai-memory'),
+    request<AiMemoryDTO>('/admin/ai-memory'),
 
   rebuildAiMemory: () =>
-    request<AiMemoryResponse>('/admin/ai-memory/rebuild', { method: 'POST' }),
+    request<AiMemoryDTO>('/admin/ai-memory/rebuild', { method: 'POST' }),
 
   getAdminOverview: () =>
-    request<AdminOverviewResponse>('/admin/overview'),
+    request<AdminOverviewDTO>('/admin/overview'),
 
   clearRequestCache: () =>
-    request<AdminOverviewResponse>('/admin/request-cache/clear', { method: 'POST' }),
+    request<AdminOverviewDTO>('/admin/request-cache/clear', { method: 'POST' }),
 
   resetTokenUsage: () =>
-    request<AdminOverviewResponse>('/admin/token-usage/reset', { method: 'POST' }),
+    request<AdminOverviewDTO>('/admin/token-usage/reset', { method: 'POST' }),
 
   testAiProfile: (req: Record<string, unknown>) =>
     request<SettingsTestResult>('/settings/ai-profile/test', { method: 'POST', body: JSON.stringify(req) }),

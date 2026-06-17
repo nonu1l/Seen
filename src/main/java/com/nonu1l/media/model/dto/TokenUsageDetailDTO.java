@@ -10,7 +10,7 @@ package com.nonu1l.media.model.dto;
  * @param inputText 输入片段。
  * @param outputText 输出片段。
  */
-public record TokenUsageDetail(
+public record TokenUsageDetailDTO(
     Long id,
     String profileName,
     String modelName,

@@ -1,7 +1,7 @@
 package com.nonu1l.media.controller;
 
-import com.nonu1l.media.model.dto.TokenUsageDetail;
-import com.nonu1l.media.model.dto.TokenUsageTreeNode;
+import com.nonu1l.media.model.dto.TokenUsageDetailDTO;
+import com.nonu1l.media.model.dto.TokenUsageTreeNodeDTO;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import org.springframework.core.io.ClassPathResource;
@@ -56,14 +56,14 @@ public class TokenUsageController {
      * @return 树形结构 token 用量数据。
      */
     @GetMapping("/api/admin/token-usage/tree")
-    public List<TokenUsageTreeNode> getTree() {
+    public List<TokenUsageTreeNodeDTO> getTree() {
         List<TokenUsage> all = repo.findAll(Sort.by(Sort.Direction.ASC, "sessionId", "turn", "id"));
 
         Map<Long, List<TokenUsage>> bySession = all.stream()
                 .filter(t -> t.getSessionId() != null)
                 .collect(Collectors.groupingBy(TokenUsage::getSessionId, LinkedHashMap::new, Collectors.toList()));
 
-        List<TokenUsageTreeNode> sessions = new ArrayList<>();
+        List<TokenUsageTreeNodeDTO> sessions = new ArrayList<>();
         for (var entry : bySession.entrySet()) {
             Long sessionId = entry.getKey();
             List<TokenUsage> records = entry.getValue();
@@ -77,7 +77,7 @@ public class TokenUsageController {
                             t -> t.getTurn() != null ? t.getTurn() : 0,
                             LinkedHashMap::new, Collectors.toList()));
 
-            var turnNodes = new ArrayList<TokenUsageTreeNode>();
+            var turnNodes = new ArrayList<TokenUsageTreeNodeDTO>();
             for (var te : byTurn.entrySet()) {
                 int turn = te.getKey();
                 List<TokenUsage> turnRecs = te.getValue();
@@ -87,7 +87,7 @@ public class TokenUsageController {
                                 t -> t.getNodeName() != null ? t.getNodeName() : "-",
                                 LinkedHashMap::new, Collectors.toList()));
 
-                var nodeChildren = new ArrayList<TokenUsageTreeNode>();
+                var nodeChildren = new ArrayList<TokenUsageTreeNodeDTO>();
                 for (var ne : nodeMap.entrySet()) {
                     nodeChildren.add(leaf("node/" + sessionId + "/" + turn + "/" + ne.getKey(),
                             ne.getKey(), ne.getValue()));
@@ -96,13 +96,13 @@ public class TokenUsageController {
                 // 按 totalTokens 降序
 //               nodeChildren.sort((a, b) -> Long.compare(b.totalTokens(), a.totalTokens()));
 
-                turnNodes.add(new TokenUsageTreeNode(
+                turnNodes.add(new TokenUsageTreeNodeDTO(
                         "turn/" + sessionId + "/" + turn, "Turn " + turn,
                         sumTotal(turnRecs), sumPrompt(turnRecs), sumCompletion(turnRecs),
                         turnRecs.size(), nodeChildren));
             }
 
-            sessions.add(new TokenUsageTreeNode(
+            sessions.add(new TokenUsageTreeNodeDTO(
                     "session/" + sessionId,
                     "Session #" + sessionId + "  " + dateStr,
                     sumTotal(records), sumPrompt(records), sumCompletion(records),
@@ -121,14 +121,14 @@ public class TokenUsageController {
      * @return 对应明细列表，按记录 ID 升序排序返回。
      */
     @GetMapping("/api/admin/token-usage/detail")
-    public List<TokenUsageDetail> getDetail(@RequestParam Long sessionId,
+    public List<TokenUsageDetailDTO> getDetail(@RequestParam Long sessionId,
                                              @RequestParam Integer turn,
                                              @RequestParam String node) {
         return repo.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
                 .filter(t -> sessionId.equals(t.getSessionId()))
                 .filter(t -> turn.equals(t.getTurn()))
                 .filter(t -> node.equals(t.getNodeName()))
-                .map(t -> new TokenUsageDetail(t.getId(),
+                .map(t -> new TokenUsageDetailDTO(t.getId(),
                         t.getProfileName(),
                         t.getModelName(),
                         t.getTotalTokens() != null ? t.getTotalTokens().longValue() : 0L,
@@ -137,8 +137,8 @@ public class TokenUsageController {
                 .toList();
     }
 
-    private TokenUsageTreeNode leaf(String key, String name, List<TokenUsage> recs) {
-        return new TokenUsageTreeNode(key, name,
+    private TokenUsageTreeNodeDTO leaf(String key, String name, List<TokenUsage> recs) {
+        return new TokenUsageTreeNodeDTO(key, name,
                 sumTotal(recs), sumPrompt(recs), sumCompletion(recs), recs.size());
     }
 

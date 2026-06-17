@@ -7,7 +7,7 @@ import java.io.Serializable;
  * LLM Phase 2 输出 — 匹配到的单个条目。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record MatchedEntry(
+public record MatchedEntryDTO(
         /** Bangumi 条目 ID */
         Long subjectId,
         /** 中文名 */
@@ -33,7 +33,7 @@ public record MatchedEntry(
      * @param status 标记状态。
      * @param confidence 匹配置信度（0-1）。
      */
-    public MatchedEntry(Long subjectId, String nameCn, Integer rating, String comment,
+    public MatchedEntryDTO(Long subjectId, String nameCn, Integer rating, String comment,
                         String status, Double confidence) {
         this(subjectId, nameCn, rating, comment, status, confidence, null);
     }

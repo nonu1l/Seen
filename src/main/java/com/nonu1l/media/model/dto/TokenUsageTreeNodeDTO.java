@@ -15,7 +15,7 @@ import java.util.List;
  * @param subtitle 辅助说明文本。
  * @param children 子节点列表。
  */
-public record TokenUsageTreeNode(
+public record TokenUsageTreeNodeDTO(
     String key,
     String label,
     long totalTokens,
@@ -23,7 +23,7 @@ public record TokenUsageTreeNode(
     long completionTokens,
     int callCount,
     String subtitle,
-    List<TokenUsageTreeNode> children
+    List<TokenUsageTreeNodeDTO> children
 ) {
     /**
      * 创建无子节点、无说明文案的节点。
@@ -35,7 +35,7 @@ public record TokenUsageTreeNode(
      * @param completionTokens completion token 数。
      * @param callCount 调用次数。
      */
-    public TokenUsageTreeNode(String key, String label, long totalTokens, long promptTokens,
+    public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
                               long completionTokens, int callCount) {
         this(key, label, totalTokens, promptTokens, completionTokens, callCount, null, List.of());
     }
@@ -51,7 +51,7 @@ public record TokenUsageTreeNode(
      * @param callCount 调用次数。
      * @param subtitle 辅助说明文本。
      */
-    public TokenUsageTreeNode(String key, String label, long totalTokens, long promptTokens,
+    public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
                               long completionTokens, int callCount, String subtitle) {
         this(key, label, totalTokens, promptTokens, completionTokens, callCount, subtitle, List.of());
     }
@@ -67,8 +67,8 @@ public record TokenUsageTreeNode(
      * @param callCount 调用次数。
      * @param children 子节点列表。
      */
-    public TokenUsageTreeNode(String key, String label, long totalTokens, long promptTokens,
-                              long completionTokens, int callCount, List<TokenUsageTreeNode> children) {
+    public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
+                              long completionTokens, int callCount, List<TokenUsageTreeNodeDTO> children) {
         this(key, label, totalTokens, promptTokens, completionTokens, callCount, null, children);
     }
 }

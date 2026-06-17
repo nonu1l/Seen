@@ -15,7 +15,7 @@ import java.util.List;
  * @param updatedAt 最近更新时间
  * @param error 最近的错误文案
  */
-public record ConversationRunState(
+public record ConversationRunStateDTO(
         boolean active,
         Long userMessageId,
         Long assistantMessageId,
@@ -31,7 +31,7 @@ public record ConversationRunState(
      *
      * @return inactive 状态快照
      */
-    public static ConversationRunState inactive() {
-        return new ConversationRunState(false, null, null, "", List.of(), null, null, null);
+    public static ConversationRunStateDTO inactive() {
+        return new ConversationRunStateDTO(false, null, null, "", List.of(), null, null, null);
     }
 }

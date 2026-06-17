@@ -3,7 +3,7 @@ package com.nonu1l.media.model.dto;
 /**
  * 预处理后的精简条目，用于构建 LLM 输入文本。
  */
-public record CompactSubject(
+public record CompactSubjectDTO(
         Long id,
         String nameCn,
         /** TV / OVA / MOVIE / UNRELEASED / SPECIAL */

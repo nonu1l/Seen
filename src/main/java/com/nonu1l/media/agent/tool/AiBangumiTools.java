@@ -1,8 +1,8 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.model.dto.CompactResult;
-import com.nonu1l.media.model.dto.CompactSubject;
-import com.nonu1l.media.model.dto.WorkSearchResult;
+import com.nonu1l.media.model.dto.CompactResultDTO;
+import com.nonu1l.media.model.dto.CompactSubjectDTO;
+import com.nonu1l.media.model.dto.WorkSearchResultDTO;
 import com.nonu1l.media.service.BangumiService;
 import com.nonu1l.media.service.SearchResultPreprocessor;
 import org.slf4j.Logger;
@@ -37,12 +37,12 @@ public class AiBangumiTools {
      * @param keyword 关键词
      * @return 紧凑条目列表
      */
-    public List<CompactResult> searchBangumi(String keyword) {
+    public List<CompactResultDTO> searchBangumi(String keyword) {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
-        List<WorkSearchResult> raw = bangumiService.search(keyword);
+        List<WorkSearchResultDTO> raw = bangumiService.search(keyword);
 
-        List<CompactSubject> compact = preprocessor.preprocess(raw, keyword);
-        return compact.stream().map(CompactResult::from).toList();
+        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw, keyword);
+        return compact.stream().map(CompactResultDTO::from).toList();
     }
 
     /**
@@ -51,17 +51,17 @@ public class AiBangumiTools {
      * @param keyword 关键词
      * @return 命中的紧凑条目，未命中返回 null
      */
-    public CompactResult searchBangumiOneResult(String keyword) {
+    public CompactResultDTO searchBangumiOneResult(String keyword) {
         log.debug("Tool: searchBangumiOneResult keyword='{}'", keyword);
-        List<WorkSearchResult> raw = bangumiService.search(keyword, 1);
+        List<WorkSearchResultDTO> raw = bangumiService.search(keyword, 1);
         if (raw.isEmpty()) {
             return null;
         }
-        List<CompactSubject> compact = preprocessor.preprocess(raw, keyword);
+        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw, keyword);
         if (compact.isEmpty()) {
             return null;
         }
-        return compact.stream().map(CompactResult::from).toList().getFirst();
+        return compact.stream().map(CompactResultDTO::from).toList().getFirst();
     }
 
     /**
@@ -72,10 +72,10 @@ public class AiBangumiTools {
      * @return 紧凑排行结果
      */
     @Deprecated
-    public List<CompactResult> trendingBangumi(int type, Integer year) {
+    public List<CompactResultDTO> trendingBangumi(int type, Integer year) {
         log.debug("Tool: trendingBangumi type={} year={}", type, year);
         return bangumiService.trending(type, year).stream()
-                .map(r -> new CompactResult(
+                .map(r -> new CompactResultDTO(
                         r.getId(), r.getNameCn(), r.getNameOrig(),
                         r.getPlatform(), r.getAirDate(),
                         r.getEpsCount(), r.getScore(), r.getRank()))

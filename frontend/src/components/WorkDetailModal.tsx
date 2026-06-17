@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Status, WorkDetail } from '../api/types';
+import type { Status, WorkDetailDTO } from '../api/types';
 import { Cover } from './Cover';
 import { StarRating } from './StarRating';
 import { STATUS_OPTIONS } from '../utils/statusMeta';
@@ -8,7 +8,7 @@ import { STATUS_OPTIONS } from '../utils/statusMeta';
 interface Props { id: number; platform: string; onClose: (changed: boolean) => void; }
 
 export function WorkDetailModal({ id, platform, onClose }: Props) {
-  const [d, setD] = useState<WorkDetail | null>(null);
+  const [d, setD] = useState<WorkDetailDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState<number | null>(null);

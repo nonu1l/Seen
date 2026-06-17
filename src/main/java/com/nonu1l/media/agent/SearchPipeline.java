@@ -3,8 +3,8 @@ package com.nonu1l.media.agent;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
-import com.nonu1l.media.model.dto.MatchedEntry;
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.MatchedEntryDTO;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -72,7 +72,7 @@ public class SearchPipeline {
      * @param cards 命中的作品列表，通常最多 maxCards 条
      * @param failReason 全空时可见失败原因
      */
-    public record PipelineResult(List<MatchedEntry> cards, String failReason) {}
+    public record PipelineResult(List<MatchedEntryDTO> cards, String failReason) {}
 
     // ── 主入口 ──
 
@@ -115,7 +115,7 @@ public class SearchPipeline {
             return new PipelineResult(List.of(), failMessage(userInput, "关键词生成失败"));
         }
 
-        List<MatchedEntry> allCards = new ArrayList<>();
+        List<MatchedEntryDTO> allCards = new ArrayList<>();
         var seenSubjectIds = new HashSet<Long>();
         int tried = 0;
 
@@ -125,7 +125,7 @@ public class SearchPipeline {
             tried++;
 
             // 2a. 搜索
-            List<WebSearchItem> webResults = webSearchTools.searchWeb(kw);
+            List<WebSearchItemDTO> webResults = webSearchTools.searchWeb(kw);
 
             // 2b. 多线程抓取 + 清洗
             runListener.status("正在读取搜索结果");
@@ -153,7 +153,7 @@ public class SearchPipeline {
 
             runListener.status("正在查询 Bangumi");
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
-            var cardMap = new java.util.LinkedHashMap<String, MatchedEntry>();
+            var cardMap = new java.util.LinkedHashMap<String, MatchedEntryDTO>();
             futures.forEach((t, f) -> { var c = f.join(); if (c != null) cardMap.put(t, c); });
             cardMap.values().removeIf(Objects::isNull);
             var seen = new HashSet<Long>();
@@ -189,12 +189,12 @@ public class SearchPipeline {
      * @param maxRetries 最大重试次数
      * @return 命中条目；失败则返回 null
      */
-    MatchedEntry searchBangumiWithRetry(String keyword, int maxRetries) {
+    MatchedEntryDTO searchBangumiWithRetry(String keyword, int maxRetries) {
         for (int i = 0; i < maxRetries; i++) {
             try {
                 var first = bangumiTools.searchBangumiOneResult(keyword);
                 if (first != null) {
-                    return new MatchedEntry(first.id(), first.nameCn(), null, null, null, null,
+                    return new MatchedEntryDTO(first.id(), first.nameCn(), null, null, null, null,
                             first.airDate());
                 }
             } catch (Exception e) {
@@ -214,7 +214,7 @@ public class SearchPipeline {
      * @param context 归一化后的上下文
      * @return 通过校验的 subjectId 集合；若 LLM 返回空则退化为不变更原集合
      */
-    java.util.Set<Long> validateMatchIds(Map<String, MatchedEntry> cardMap, String context) {
+    java.util.Set<Long> validateMatchIds(Map<String, MatchedEntryDTO> cardMap, String context) {
         TokenUsageAdvisor.setCurrentNode("pipeline-validateMatch");
         if (cardMap.isEmpty()) return java.util.Set.of();
         StringBuilder sb = new StringBuilder();
@@ -226,7 +226,7 @@ public class SearchPipeline {
                 .replace("{context}", context);
         String result = chatClient().prompt().system(prompt).user(sb.toString()).call().content();
         if (result == null || result.isBlank()) {
-            return new java.util.HashSet<>(cardMap.values().stream().map(MatchedEntry::subjectId).collect(Collectors.toSet()));
+            return new java.util.HashSet<>(cardMap.values().stream().map(MatchedEntryDTO::subjectId).collect(Collectors.toSet()));
         }
         return result.lines().map(String::trim).filter(l -> l.matches("\\d+"))
                 .map(Long::parseLong).collect(Collectors.toSet());

@@ -1,6 +1,6 @@
 package com.nonu1l.media.controller;
 
-import com.nonu1l.media.model.dto.AiMemoryResponse;
+import com.nonu1l.media.model.dto.AiMemoryDTO;
 import com.nonu1l.media.service.AiPreferenceMemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +36,7 @@ public class AiMemoryController {
      * @return 当前画像，若尚未生成则 exists=false
      */
     @GetMapping
-    public ResponseEntity<AiMemoryResponse> currentMemory() {
+    public ResponseEntity<AiMemoryDTO> currentMemory() {
         try {
             return ResponseEntity.ok(memoryService.currentMemory());
         } catch (Exception e) {
@@ -51,7 +51,7 @@ public class AiMemoryController {
      * @return 重建后的画像；失败时返回旧画像
      */
     @PostMapping("/rebuild")
-    public ResponseEntity<AiMemoryResponse> rebuildMemory() {
+    public ResponseEntity<AiMemoryDTO> rebuildMemory() {
         try {
             return ResponseEntity.ok(memoryService.rebuildMemory());
         } catch (Exception e) {

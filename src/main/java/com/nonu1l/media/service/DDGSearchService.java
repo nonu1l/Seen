@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -53,8 +53,8 @@ public class DDGSearchService implements SearchProvider {
      * @return 标准化搜索结果
      */
     @Override
-    public List<WebSearchItem> search(String query) {
-        List<WebSearchItem> results = new ArrayList<>();
+    public List<WebSearchItemDTO> search(String query) {
+        List<WebSearchItemDTO> results = new ArrayList<>();
         try {
             int searchCount = 0;
             while (results.isEmpty() && searchCount < 3) {
@@ -74,7 +74,7 @@ public class DDGSearchService implements SearchProvider {
                     Matcher sm = SNIPPET_PAT.matcher(row);
                     if (sm.find() && lastTitle != null) {
                         String snippet = unescape(sm.group(1).replaceAll("<[^>]+>", "").trim());
-                        results.add(new WebSearchItem(lastTitle, snippet, lastLink));
+                        results.add(new WebSearchItemDTO(lastTitle, snippet, lastLink));
                         lastTitle = null;
                         lastLink = null;
                         if (results.size() >= MAX_RESULTS) break;

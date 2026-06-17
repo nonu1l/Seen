@@ -1,6 +1,6 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.model.dto.LocalRecord;
+import com.nonu1l.media.model.dto.LocalRecordDTO;
 import com.nonu1l.media.model.entity.Record;
 import com.nonu1l.media.model.entity.Work;
 import com.nonu1l.media.repository.RecordRepository;
@@ -41,16 +41,16 @@ public class AiLocalLibraryTools {
      * @param keyword 关键词，空白时返回全部
      * @return 紧凑本地记录列表
      */
-    public List<LocalRecord> searchLocal(String keyword) {
+    public List<LocalRecordDTO> searchLocal(String keyword) {
         log.debug("Tool: searchLocal keyword='{}'", keyword);
         List<Work> works = (keyword == null || keyword.isBlank())
                 ? workRepo.findAll()
                 : workRepo.searchByName(keyword.trim());
 
-        List<LocalRecord> results = new ArrayList<>();
+        List<LocalRecordDTO> results = new ArrayList<>();
         for (Work w : works) {
             Optional<Record> r = recordRepo.findLatestByWorkId(w.getId());
-            r.ifPresent(record -> results.add(new LocalRecord(
+            r.ifPresent(record -> results.add(new LocalRecordDTO(
                     w.getId(), w.getNameCn() != null ? w.getNameCn() : w.getName(),
                     record.getStatus(),
                     record.getRating() != null ? record.getRating().intValue() : null,

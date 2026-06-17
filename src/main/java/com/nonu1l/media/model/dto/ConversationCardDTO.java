@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 /**
- * 对话消息中嵌入的作品卡片 VO。
+ * 对话消息中嵌入的作品卡片 DTO。
  *
  * @param id 卡片自身 ID。
  * @param messageId 归属的会话消息 ID。
@@ -26,7 +26,7 @@ import java.util.List;
  * @param previousStatus 历史记录中的状态。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ConversationCardVO(
+public record ConversationCardDTO(
         Long id,
         Long messageId,
         Long subjectId,
@@ -47,7 +47,7 @@ public record ConversationCardVO(
         String previousStatus
 ) {
     /**
-     * 创建不含历史对比信息的卡片 VO。
+     * 创建不含历史对比信息的卡片 DTO。
      *
      * @param id 卡片自身 ID。
      * @param messageId 归属的会话消息 ID。
@@ -64,7 +64,7 @@ public record ConversationCardVO(
      * @param tags 标签列表。
      * @param plot 简介文本。
      */
-    public ConversationCardVO(Long id, Long messageId, Long subjectId,
+    public ConversationCardDTO(Long id, Long messageId, Long subjectId,
                                String nameCn, String coverUrl, String year, String platform,
                                Integer rating, Double score, String review, String status, String cardState,
                                List<String> tags, String plot) {

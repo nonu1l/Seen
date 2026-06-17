@@ -1,13 +1,13 @@
 package com.nonu1l.media.model.dto;
 
 /**
- * 设置页读取/保存后的结构化响应。
+ * 设置页读取/保存后的结构化 DTO。
  */
-public record SettingsResponse(
+public record SettingsDTO(
         boolean aiEnabled,
         boolean tokenUsageEnabled,
         AiMemorySettings aiMemory,
-        AiProviderSettingResponse aiProfile,
+        AiProviderSettingDTO aiProfile,
         SourceSettings sources
 ) {
 

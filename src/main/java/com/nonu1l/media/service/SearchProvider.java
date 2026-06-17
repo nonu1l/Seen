@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 
 import java.util.List;
 
@@ -14,7 +14,7 @@ public interface SearchProvider {
      * @param query 搜索关键词
      * @return 标准化搜索结果
      */
-    List<WebSearchItem> search(String query);
+    List<WebSearchItemDTO> search(String query);
 
     /**
      * 拉取并返回正文文本。

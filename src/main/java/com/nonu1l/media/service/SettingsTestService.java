@@ -2,8 +2,8 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
-import com.nonu1l.media.model.dto.SettingsTestRequests;
-import com.nonu1l.media.model.dto.SettingsTestResponse;
+import com.nonu1l.media.model.dto.test.SettingsTestRequests;
+import com.nonu1l.media.model.dto.test.SettingsTestResponse;
 import com.nonu1l.media.service.thinking.ThinkingMode;
 import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -173,11 +173,11 @@ public class SettingsTestService {
         List<Map<String, Object>> attempts = new ArrayList<>();
         List<String> serperTitles = trySearch("serper", query, serperApiKey, bangumiProxy, attempts);
         if (!serperTitles.isEmpty()) {
-            return searchResponse(true, "搜索连接正常", start, "serper", serperTitles, attempts);
+            return searchTestResponse(true, "搜索连接正常", start, "serper", serperTitles, attempts);
         }
         List<String> ddgTitles = trySearch("ddg", query, serperApiKey, bangumiProxy, attempts);
         if (!ddgTitles.isEmpty()) {
-            return searchResponse(true, "搜索连接正常，已从 Serper 切换到 DuckDuckGo", start, "ddg", ddgTitles, attempts);
+            return searchTestResponse(true, "搜索连接正常，已从 Serper 切换到 DuckDuckGo", start, "ddg", ddgTitles, attempts);
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("provider", "auto");
@@ -195,7 +195,7 @@ public class SettingsTestService {
             details.put("attempts", attempts);
             return response(false, "搜索不可用或无结果", start, details);
         }
-        return searchResponse(true, "搜索连接正常", start, provider, titles, attempts);
+        return searchTestResponse(true, "搜索连接正常", start, provider, titles, attempts);
     }
 
     private List<String> trySearch(String provider, String query, String serperApiKey,
@@ -221,8 +221,8 @@ public class SettingsTestService {
         }
     }
 
-    private SettingsTestResponse searchResponse(boolean ok, String message, long start, String provider,
-                                                List<String> titles, List<Map<String, Object>> attempts) {
+    private SettingsTestResponse searchTestResponse(boolean ok, String message, long start, String provider,
+                                                    List<String> titles, List<Map<String, Object>> attempts) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("provider", provider);
         details.put("count", titles.size());

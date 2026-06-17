@@ -1,7 +1,7 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.model.dto.FetchUrlResult;
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.FetchUrlResultDTO;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.service.WebFetchService;
 import com.nonu1l.media.service.WebSearchService;
 import org.slf4j.Logger;
@@ -36,7 +36,7 @@ public class AiWebSearchTools {
      * @param query 检索关键词
      * @return 外部检索结果
      */
-    public List<WebSearchItem> searchWeb(String query) {
+    public List<WebSearchItemDTO> searchWeb(String query) {
         log.debug("Tool: searchWeb query='{}'", query);
         return webSearchService.search(query);
     }
@@ -60,7 +60,7 @@ public class AiWebSearchTools {
      * @param maxChars 最大返回字符数
      * @return URL 抓取结果
      */
-    public FetchUrlResult fetchUrl(String url, String purpose, Integer maxChars) {
+    public FetchUrlResultDTO fetchUrl(String url, String purpose, Integer maxChars) {
         log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
         return webFetchService.fetch(url, maxChars);
     }

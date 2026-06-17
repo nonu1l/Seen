@@ -33,10 +33,10 @@ public class ConversationController {
     /**
      * 获取当前会话状态。
      *
-     * @return 成功时返回 {@link ConversationState}，失败时返回 500。
+     * @return 成功时返回 {@link ConversationStateDTO}，失败时返回 500。
      */
     @GetMapping("/state")
-    public ResponseEntity<ConversationState> getState() {
+    public ResponseEntity<ConversationStateDTO> getState() {
         try {
             return ResponseEntity.ok(conversationService.getState());
         } catch (Exception e) {
@@ -52,7 +52,7 @@ public class ConversationController {
      * @return 成功返回聊天响应；输入无效返回 400；异常返回 500。
      */
     @PostMapping("/send")
-    public ResponseEntity<AiChatResponse> send(@RequestBody AiChatRequest req) {
+    public ResponseEntity<AiChatDTO> send(@RequestBody AiChatRequest req) {
         try {
             if (req.userInput() == null || req.userInput().isBlank()) {
                 return ResponseEntity.badRequest().build();
@@ -91,7 +91,7 @@ public class ConversationController {
      * @return 成功返回更新后的卡片；参数非法或不存在则返回 400；其他异常返回 500。
      */
     @PostMapping("/cards/{id}/save")
-    public ResponseEntity<ConversationCardVO> saveCard(@PathVariable Long id,
+    public ResponseEntity<ConversationCardDTO> saveCard(@PathVariable Long id,
                                                         @RequestBody(required = false) SaveCardRequest req) {
         try {
             return ResponseEntity.ok(conversationService.saveCard(id, req));
@@ -110,7 +110,7 @@ public class ConversationController {
      * @return 成功返回回滚后的卡片；失败则返回 400 或 500。
      */
     @PostMapping("/cards/{id}/undo")
-    public ResponseEntity<ConversationCardVO> undoCard(@PathVariable Long id) {
+    public ResponseEntity<ConversationCardDTO> undoCard(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(conversationService.undoCard(id));
         } catch (IllegalArgumentException e) {

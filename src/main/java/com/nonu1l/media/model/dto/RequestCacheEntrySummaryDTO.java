@@ -11,7 +11,7 @@ package com.nonu1l.media.model.dto;
  * @param remainingSeconds 剩余有效期秒数
  * @param cachedSecondsAgo 已缓存秒数
  */
-public record RequestCacheEntrySummary(
+public record RequestCacheEntrySummaryDTO(
         String key,
         String method,
         String url,

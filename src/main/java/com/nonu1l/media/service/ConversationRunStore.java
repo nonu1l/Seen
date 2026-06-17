@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.ConversationRunState;
+import com.nonu1l.media.model.dto.ConversationRunStateDTO;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -93,9 +93,9 @@ public class ConversationRunStore {
      * @param sessionId 会话 ID
      * @return 活动轮次快照；无活动轮次时返回 inactive
      */
-    public ConversationRunState snapshot(Long sessionId) {
+    public ConversationRunStateDTO snapshot(Long sessionId) {
         ActiveRun run = run(sessionId);
-        return run != null ? run.snapshot() : ConversationRunState.inactive();
+        return run != null ? run.snapshot() : ConversationRunStateDTO.inactive();
     }
 
     /**
@@ -175,8 +175,8 @@ public class ConversationRunStore {
             this.updatedAt = Instant.now();
         }
 
-        private synchronized ConversationRunState snapshot() {
-            return new ConversationRunState(
+        private synchronized ConversationRunStateDTO snapshot() {
+            return new ConversationRunStateDTO(
                     true,
                     userMessageId,
                     assistantMessageId,

@@ -1,7 +1,7 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.cache.RequestCacheStore;
-import com.nonu1l.media.model.dto.AdminOverviewResponse;
+import com.nonu1l.media.model.dto.AdminOverviewDTO;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,9 +32,9 @@ public class AdminOverviewService {
      *
      * @return Token 总量与缓存字节数
      */
-    public AdminOverviewResponse overview() {
+    public AdminOverviewDTO overview() {
         Long totalTokens = tokenUsageRepository.sumTotalTokens();
-        return new AdminOverviewResponse(totalTokens != null ? totalTokens : 0L,
+        return new AdminOverviewDTO(totalTokens != null ? totalTokens : 0L,
                 requestCacheStore.totalBytes());
     }
 
@@ -43,7 +43,7 @@ public class AdminOverviewService {
      *
      * @return 清空后的汇总数据
      */
-    public AdminOverviewResponse clearRequestCache() {
+    public AdminOverviewDTO clearRequestCache() {
         requestCacheStore.clear();
         return overview();
     }
@@ -54,7 +54,7 @@ public class AdminOverviewService {
      * @return 重置后的汇总数据
      */
     @Transactional
-    public AdminOverviewResponse resetTokenUsage() {
+    public AdminOverviewDTO resetTokenUsage() {
         tokenUsageRepository.deleteAllInBatch();
         return overview();
     }

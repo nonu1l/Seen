@@ -1,10 +1,10 @@
 package com.nonu1l.media.controller;
 
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
-import com.nonu1l.media.model.dto.AiProviderSettingResponse;
-import com.nonu1l.media.model.dto.SettingsResponse;
-import com.nonu1l.media.model.dto.SettingsTestRequests;
-import com.nonu1l.media.model.dto.SettingsTestResponse;
+import com.nonu1l.media.model.dto.AiProviderSettingDTO;
+import com.nonu1l.media.model.dto.SettingsDTO;
+import com.nonu1l.media.model.dto.test.SettingsTestRequests;
+import com.nonu1l.media.model.dto.test.SettingsTestResponse;
 import com.nonu1l.media.model.dto.UpdateSettingsRequest;
 import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.service.SettingsTestService;
@@ -29,17 +29,17 @@ public class SettingsController {
     }
 
     @GetMapping
-    public SettingsResponse getSettings() {
+    public SettingsDTO getSettings() {
         return settingsService.getSettingsResponse();
     }
 
     @PutMapping
-    public SettingsResponse updateSettings(@RequestBody UpdateSettingsRequest request) {
+    public SettingsDTO updateSettings(@RequestBody UpdateSettingsRequest request) {
         return settingsService.updateSettings(request != null ? request.settings() : Map.of());
     }
 
     @PutMapping("/ai-profile")
-    public AiProviderSettingResponse updateAiProfile(@RequestBody AiProviderSettingRequest request) {
+    public AiProviderSettingDTO updateAiProfile(@RequestBody AiProviderSettingRequest request) {
         return settingsService.updateAiProviderSetting(request);
     }
 

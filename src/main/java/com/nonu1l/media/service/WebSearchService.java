@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.WebSearchItem;
+import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,7 +52,7 @@ public class WebSearchService implements SearchProvider {
      * @return 委托实现返回的结果
      */
     @Override
-    public List<WebSearchItem> search(String query) {
+    public List<WebSearchItemDTO> search(String query) {
         if (!isSearchEnabled()) {
             log.warn("Web search disabled by app.search.enabled=false");
             return List.of();
@@ -78,9 +78,9 @@ public class WebSearchService implements SearchProvider {
         return cleanFetchedText(webFetchService.fetchText(url));
     }
 
-    private List<WebSearchItem> searchAuto(String query) {
+    private List<WebSearchItemDTO> searchAuto(String query) {
         if (serper.isAvailable()) {
-            List<WebSearchItem> serperResults = searchWithProvider("serper", serper, query);
+            List<WebSearchItemDTO> serperResults = searchWithProvider("serper", serper, query);
             if (!serperResults.isEmpty()) {
                 return serperResults;
             }
@@ -91,10 +91,10 @@ public class WebSearchService implements SearchProvider {
         return searchWithProvider("ddg", ddg, query);
     }
 
-    private List<WebSearchItem> searchWithProvider(String providerName, SearchProvider provider, String query) {
+    private List<WebSearchItemDTO> searchWithProvider(String providerName, SearchProvider provider, String query) {
         long start = System.nanoTime();
         try {
-            List<WebSearchItem> results = provider.search(query);
+            List<WebSearchItemDTO> results = provider.search(query);
             log.info("Web search provider={} query='{}' results={} elapsedMs={}",
                     providerName, query, results.size(), (System.nanoTime() - start) / 1_000_000);
             return results;

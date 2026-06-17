@@ -2,8 +2,8 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
-import com.nonu1l.media.model.dto.AiProviderSettingResponse;
-import com.nonu1l.media.model.dto.SettingsResponse;
+import com.nonu1l.media.model.dto.AiProviderSettingDTO;
+import com.nonu1l.media.model.dto.SettingsDTO;
 import com.nonu1l.media.model.entity.AppSetting;
 import com.nonu1l.media.repository.AppSettingRepository;
 import jakarta.annotation.PostConstruct;
@@ -50,16 +50,16 @@ public class SettingsService {
         refreshSnapshot();
     }
 
-    public SettingsResponse getSettingsResponse() {
-        return new SettingsResponse(
+    public SettingsDTO getSettingsResponse() {
+        return new SettingsDTO(
                 getBoolean(AI_ENABLED),
                 getBoolean(AI_TOKEN_USAGE_ENABLED),
-                new SettingsResponse.AiMemorySettings(
+                new SettingsDTO.AiMemorySettings(
                         getBoolean(AI_MEMORY_ENABLED),
                         getBoolean(AI_MEMORY_AUTO_UPDATE_ENABLED)
                 ),
                 getAiProviderSettingResponse(),
-                new SettingsResponse.SourceSettings(
+                new SettingsDTO.SourceSettings(
                         getString(SEARCH_PROVIDER),
                         hasText(SERPER_API_KEY),
                         getString(SERPER_API_KEY),
@@ -70,7 +70,7 @@ public class SettingsService {
     }
 
     @Transactional
-    public SettingsResponse updateSettings(Map<String, Object> updates) {
+    public SettingsDTO updateSettings(Map<String, Object> updates) {
         if (updates == null || updates.isEmpty()) {
             return getSettingsResponse();
         }
@@ -90,8 +90,8 @@ public class SettingsService {
         return getSettingsResponse();
     }
 
-    public AiProviderSettingResponse getAiProviderSettingResponse() {
-        return new AiProviderSettingResponse(
+    public AiProviderSettingDTO getAiProviderSettingResponse() {
+        return new AiProviderSettingDTO(
                 getString(AI_BASE_URL),
                 getString(AI_MODEL),
                 getDouble(AI_TEMPERATURE),
@@ -101,7 +101,7 @@ public class SettingsService {
     }
 
     @Transactional
-    public AiProviderSettingResponse updateAiProviderSetting(AiProviderSettingRequest request) {
+    public AiProviderSettingDTO updateAiProviderSetting(AiProviderSettingRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("请求不能为空");
         }

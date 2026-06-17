@@ -12,12 +12,12 @@ import java.util.List;
  * @param createdAt 消息创建时间
  * @param cards 本轮生成的卡片列表
  */
-public record AiStreamEvent(
+public record AiStreamEventDTO(
         String type,
         Long messageId,
         String content,
         Instant createdAt,
-        List<ConversationCardVO> cards
+        List<ConversationCardDTO> cards
 ) {
 
     /**
@@ -27,8 +27,8 @@ public record AiStreamEvent(
      * @param createdAt 创建时间
      * @return SSE 事件
      */
-    public static AiStreamEvent userSaved(Long messageId, Instant createdAt) {
-        return new AiStreamEvent("user_saved", messageId, null, createdAt, null);
+    public static AiStreamEventDTO userSaved(Long messageId, Instant createdAt) {
+        return new AiStreamEventDTO("user_saved", messageId, null, createdAt, null);
     }
 
     /**
@@ -37,8 +37,8 @@ public record AiStreamEvent(
      * @param content 状态文案
      * @return SSE 事件
      */
-    public static AiStreamEvent status(String content) {
-        return new AiStreamEvent("status", null, content, null, null);
+    public static AiStreamEventDTO status(String content) {
+        return new AiStreamEventDTO("status", null, content, null, null);
     }
 
     /**
@@ -47,8 +47,8 @@ public record AiStreamEvent(
      * @param content 增量文本
      * @return SSE 事件
      */
-    public static AiStreamEvent delta(String content) {
-        return new AiStreamEvent("delta", null, content, null, null);
+    public static AiStreamEventDTO delta(String content) {
+        return new AiStreamEventDTO("delta", null, content, null, null);
     }
 
     /**
@@ -59,8 +59,8 @@ public record AiStreamEvent(
      * @param createdAt 创建时间
      * @return SSE 事件
      */
-    public static AiStreamEvent assistantSaved(Long messageId, String content, Instant createdAt) {
-        return new AiStreamEvent("assistant_saved", messageId, content, createdAt, null);
+    public static AiStreamEventDTO assistantSaved(Long messageId, String content, Instant createdAt) {
+        return new AiStreamEventDTO("assistant_saved", messageId, content, createdAt, null);
     }
 
     /**
@@ -69,8 +69,8 @@ public record AiStreamEvent(
      * @param cards 卡片列表
      * @return SSE 事件
      */
-    public static AiStreamEvent cards(List<ConversationCardVO> cards) {
-        return new AiStreamEvent("cards", null, null, null, cards);
+    public static AiStreamEventDTO cards(List<ConversationCardDTO> cards) {
+        return new AiStreamEventDTO("cards", null, null, null, cards);
     }
 
     /**
@@ -78,8 +78,8 @@ public record AiStreamEvent(
      *
      * @return SSE 事件
      */
-    public static AiStreamEvent done() {
-        return new AiStreamEvent("done", null, null, null, null);
+    public static AiStreamEventDTO done() {
+        return new AiStreamEventDTO("done", null, null, null, null);
     }
 
     /**
@@ -88,7 +88,7 @@ public record AiStreamEvent(
      * @param content 用户可见错误文案
      * @return SSE 事件
      */
-    public static AiStreamEvent error(String content) {
-        return new AiStreamEvent("error", null, content, null, null);
+    public static AiStreamEventDTO error(String content) {
+        return new AiStreamEventDTO("error", null, content, null, null);
     }
 }

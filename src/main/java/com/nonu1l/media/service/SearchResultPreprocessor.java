@@ -1,8 +1,8 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.CompactSubject;
-import com.nonu1l.media.model.dto.StructuredIntent;
-import com.nonu1l.media.model.dto.WorkSearchResult;
+import com.nonu1l.media.model.dto.CompactSubjectDTO;
+import com.nonu1l.media.model.dto.StructuredIntentDTO;
+import com.nonu1l.media.model.dto.WorkSearchResultDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -25,18 +25,18 @@ public class SearchResultPreprocessor {
      * @param keyword    用户搜索关键词
      * @return 预处理后的精简条目列表
      */
-    public List<CompactSubject> preprocess(List<WorkSearchResult> rawResults, String keyword) {
+    public List<CompactSubjectDTO> preprocess(List<WorkSearchResultDTO> rawResults, String keyword) {
         if (rawResults == null || rawResults.isEmpty()) return List.of();
 
-        List<CompactSubject> subjects = new ArrayList<>();
-        for (WorkSearchResult r : rawResults) {
+        List<CompactSubjectDTO> subjects = new ArrayList<>();
+        for (WorkSearchResultDTO r : rawResults) {
             if (r.getId() == null) continue;
 //            if (isNoise(r, keyword)) {
 //                log.debug("Filtered noise: id={} nameCn={}", r.getId(), r.getNameCn());
 //                continue;
 //            }
             String category = classify(r);
-            subjects.add(new CompactSubject(
+            subjects.add(new CompactSubjectDTO(
                     r.getId(),
                     coalesceName(r),
                     category,
@@ -55,17 +55,17 @@ public class SearchResultPreprocessor {
 
 //        // 按 rank 升序（高排名优先），无排名排最后；同 rank 按日期升序
 //        subjects.sort(Comparator
-//                .comparing(CompactSubject::rank, Comparator.nullsLast(
+//                .comparing(CompactSubjectDTO::rank, Comparator.nullsLast(
 //                        Comparator.naturalOrder()))
-//                .thenComparing(CompactSubject::airDate, Comparator.nullsLast(
+//                .thenComparing(CompactSubjectDTO::airDate, Comparator.nullsLast(
 //                        Comparator.naturalOrder()))
-//                .thenComparing(CompactSubject::id));
+//                .thenComparing(CompactSubjectDTO::id));
 //
         return subjects;
     }
 
     /**
-     * 将 CompactSubject 列表格式化为 LLM 友好的紧凑文本。
+     * 将 CompactSubjectDTO 列表格式化为 LLM 友好的紧凑文本。
      *
      * @param subjects 条目列表
      * @param keyword  触发检索的关键词
@@ -73,7 +73,7 @@ public class SearchResultPreprocessor {
      * @return 带规则约束的可直接注入 LLM 的文本
      */
     @Deprecated
-    public String toCompactText(List<CompactSubject> subjects, String keyword, StructuredIntent intent) {
+    public String toCompactText(List<CompactSubjectDTO> subjects, String keyword, StructuredIntentDTO intent) {
         StringBuilder sb = new StringBuilder();
         sb.append("搜索关键词：").append(keyword).append("\n");
         if (intent != null) {
@@ -97,7 +97,7 @@ public class SearchResultPreprocessor {
             sb.append(String.join(" | ", parts)).append("\n");
         }
         sb.append("\n搜索结果（按上映日期排序）：\n");
-        for (CompactSubject s : subjects) {
+        for (CompactSubjectDTO s : subjects) {
             sb.append(s.toCompactLine()).append("\n");
         }
         sb.append("\n规则：\n");
@@ -120,7 +120,7 @@ public class SearchResultPreprocessor {
      * @param keyword 用户关键词
      * @return 当前实现返回 {@code false}
      */
-    public boolean isNoise(WorkSearchResult item, String keyword) {
+    public boolean isNoise(WorkSearchResultDTO item, String keyword) {
 //        if (keyword == null || keyword.isBlank()) return false;
 //        String name = coalesceName(item);
 //        if (name == null) return true;
@@ -150,7 +150,7 @@ public class SearchResultPreprocessor {
      * @param item 条目
      * @return 分类标识字符串
      */
-    public String classify(WorkSearchResult item) {
+    public String classify(WorkSearchResultDTO item) {
         String airDate = item.getAirDate();
         // 未上映：无日期或日期为 0000-00-00
         if (airDate == null || airDate.isBlank() || airDate.startsWith("0000")) {
@@ -182,7 +182,7 @@ public class SearchResultPreprocessor {
         return "SPECIAL";
     }
 
-    private String coalesceName(WorkSearchResult r) {
+    private String coalesceName(WorkSearchResultDTO r) {
         if (r.getNameCn() != null && !r.getNameCn().isBlank()) return r.getNameCn();
         return r.getNameOrig();
     }

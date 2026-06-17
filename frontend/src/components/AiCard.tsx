@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { ConversationCardVO, Status } from '../api/types';
+import type { ConversationCardDTO, Status } from '../api/types';
 import { Cover } from './Cover';
 import { STATUS_OPTIONS, statusLabel } from '../utils/statusMeta';
 
 interface Props {
-  card: ConversationCardVO;
+  card: ConversationCardDTO;
   onSave: (id: number, rating: number | null, review: string | null, status: string | null) => void;
   onUndo: (id: number) => void;
 }
@@ -243,11 +243,11 @@ export function AiCard({ card, onSave, onUndo }: Props) {
   );
 }
 
-function hasHistory(card: ConversationCardVO) {
+function hasHistory(card: ConversationCardDTO) {
   return card.previousStatus != null || card.previousRating != null || (card.previousReview != null && card.previousReview.length > 0);
 }
 
-function formatHistory(card: ConversationCardVO) {
+function formatHistory(card: ConversationCardDTO) {
   const parts: string[] = [];
   if (card.previousStatus != null) {
     parts.push(statusLabel(card.previousStatus));
