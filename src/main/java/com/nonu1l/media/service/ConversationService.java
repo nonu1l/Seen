@@ -53,6 +53,7 @@ public class ConversationService {
     private final WorkRepository workRepo;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
+    private final ConversationRunStore runStore;
     private volatile ExecutorService streamExecutor;
 
     /**
@@ -66,6 +67,7 @@ public class ConversationService {
      * @param workRepo 作品仓储
      * @param transactionTemplate 事务模板，用于分段提交与避免长事务
      * @param objectMapper JSON 映射工具
+     * @param runStore 当前进程内的活动对话轮次存储
      */
     public ConversationService(ConversationSessionRepository sessionRepo,
                                 ConversationMessageRepository messageRepo,
@@ -76,7 +78,8 @@ public class ConversationService {
                                 RecordRepository recordRepo,
                                 WorkRepository workRepo,
                                 TransactionTemplate transactionTemplate,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                ConversationRunStore runStore) {
         this.sessionRepo = sessionRepo;
         this.messageRepo = messageRepo;
         this.cardRepo = cardRepo;
@@ -87,6 +90,7 @@ public class ConversationService {
         this.workRepo = workRepo;
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
+        this.runStore = runStore;
     }
 
     // ── 会话管理 ─────────────────────────────────────────────
@@ -109,7 +113,7 @@ public class ConversationService {
     /**
      * 查询当前会话的完整状态快照，供前端加载。
      *
-     * @return 会话 ID、时间升序消息列表、卡片列表组成的状态对象
+     * @return 会话 ID、时间升序消息列表、卡片列表和活动轮次组成的状态对象
      */
     @Transactional(readOnly = true)
     public ConversationState getState() {
@@ -126,7 +130,7 @@ public class ConversationService {
                 .map(this::toVO)
                 .toList();
 
-        return new ConversationState(session.getId(), messageVOs, cardVOs);
+        return new ConversationState(session.getId(), messageVOs, cardVOs, runStore.snapshot(session.getId()));
     }
 
     // ── 发送消息 ─────────────────────────────────────────────
@@ -191,15 +195,17 @@ public class ConversationService {
 
     private void doSendMessageStream(String userInput, SseEmitter emitter) {
         SseEventSender sender = new SseEventSender(emitter);
-        AgentRunListener listener = AgentRunEvents.streaming(sender::send);
         ConversationSession session = getOrCreateSession();
+        Long sessionId = session.getId();
+        AgentRunListener listener = AgentRunEvents.streaming(event -> publishRunEvent(sessionId, event, sender));
         Instant now = Instant.now();
 
         try {
             ConversationMessage userMsg = transactionTemplate.execute(
                     tx -> saveUserMessage(session, userInput, now));
             if (userMsg != null) {
-                sender.send(AiStreamEvent.userSaved(userMsg.getId(), userMsg.getCreatedAt()));
+                runStore.start(sessionId, userMsg.getId(), userMsg.getCreatedAt());
+                publishRunEvent(sessionId, AiStreamEvent.userSaved(userMsg.getId(), userMsg.getCreatedAt()), sender);
             }
 
             String history = buildHistory(session.getId());
@@ -214,18 +220,42 @@ public class ConversationService {
             AiChatResponse response = transactionTemplate.execute(
                     tx -> saveAssistantResponse(session, result, userMsg, now));
             if (response != null) {
-                sender.send(AiStreamEvent.assistantSaved(response.messageId(), response.replyText(), now));
+                publishRunEvent(sessionId, AiStreamEvent.assistantSaved(response.messageId(), response.replyText(), now), sender);
                 if (response.cards() != null && !response.cards().isEmpty()) {
-                    sender.send(AiStreamEvent.cards(response.cards()));
+                    publishRunEvent(sessionId, AiStreamEvent.cards(response.cards()), sender);
                 }
             }
-            sender.send(AiStreamEvent.done());
+            publishRunEvent(sessionId, AiStreamEvent.done(), sender);
+            runStore.complete(sessionId);
             emitter.complete();
         } catch (Exception e) {
             log.error("sendMessageStream failed", e);
-            sender.trySend(AiStreamEvent.error("抱歉，处理出错了，请重试。"));
+            publishRunEvent(sessionId, AiStreamEvent.error("抱歉，处理出错了，请重试。"), sender);
+            runStore.complete(sessionId);
             emitter.complete();
         }
+    }
+
+    /**
+     * 将流式事件同步写入活动轮次快照，并以尽力方式发送到 SSE 客户端。
+     *
+     * @param sessionId 会话 ID
+     * @param event 流式事件
+     * @param sender SSE 发送器
+     */
+    private void publishRunEvent(Long sessionId, AiStreamEvent event, SseEventSender sender) {
+        if (event == null) {
+            return;
+        }
+        switch (event.type()) {
+            case "status" -> runStore.status(sessionId, event.content());
+            case "delta" -> runStore.delta(sessionId, event.content());
+            case "assistant_saved" -> runStore.assistantSaved(sessionId, event.messageId(), event.content(), event.createdAt());
+            case "error" -> runStore.error(sessionId, event.content());
+            default -> {
+            }
+        }
+        sender.trySend(event);
     }
 
     /**
@@ -489,6 +519,7 @@ public class ConversationService {
         var latest = sessionRepo.findTopByOrderByIdDesc();
         if (latest.isPresent()) {
             ConversationSession session = latest.get();
+            runStore.clear(session.getId());
             messageRepo.deleteAllBySessionId(session.getId());
             cardRepo.deleteAllBySessionId(session.getId());
             sessionRepo.delete(session);

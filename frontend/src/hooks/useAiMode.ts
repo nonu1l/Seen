@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
-import type { ConversationMessageVO, ConversationCardVO, AiStreamEvent } from '../api/types';
+import type { ConversationMessageVO, ConversationCardVO, AiStreamEvent, ConversationState } from '../api/types';
+
+const ACTIVE_ASSISTANT_ID = -900719925474000;
 
 export function useAiMode() {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,22 +11,51 @@ export function useAiMode() {
   const [cards, setCards] = useState<ConversationCardVO[]>([]);
   const [loading, setLoading] = useState(false);
   const [runStatuses, setRunStatuses] = useState<string[]>([]);
+  const [recoveringRun, setRecoveringRun] = useState(false);
   const restoredRef = useRef(false);
+
+  const applyConversationState = useCallback((state: ConversationState) => {
+    const activeRun = state.activeRun;
+    const nextMessages = [...state.messages];
+    setSessionId(state.sessionId);
+    setCards(state.cards);
+
+    if (activeRun?.active) {
+      const assistantId = activeRun.assistantMessageId ?? ACTIVE_ASSISTANT_ID;
+      const assistantContent = activeRun.assistantContent || activeRun.error || '';
+      if (assistantContent && !nextMessages.some(msg => msg.id === assistantId)) {
+        nextMessages.push({
+          id: assistantId,
+          role: 'assistant',
+          content: assistantContent,
+          createdAt: activeRun.updatedAt ?? activeRun.startedAt ?? new Date().toISOString(),
+        });
+      }
+      setMessages(nextMessages);
+      setRunStatuses(activeRun.statuses ?? []);
+      setLoading(true);
+      setRecoveringRun(true);
+      return;
+    }
+
+    setMessages(nextMessages);
+    setRunStatuses([]);
+    setLoading(false);
+    setRecoveringRun(false);
+  }, []);
 
   const restoreState = useCallback(async () => {
     try {
       const state = await api.getConversationState();
-      if (state.messages.length > 0 || state.cards.length > 0) {
-        setSessionId(state.sessionId);
-        setMessages(state.messages);
-        setCards(state.cards);
+      if (state.messages.length > 0 || state.cards.length > 0 || state.activeRun?.active) {
+        applyConversationState(state);
         return true;
       }
     } catch (e) {
       console.warn('Failed to restore conversation state:', e);
     }
     return false;
-  }, []);
+  }, [applyConversationState]);
 
   useEffect(() => {
     if (restoredRef.current) return;
@@ -33,6 +64,25 @@ export function useAiMode() {
       if (hasHistory) setIsOpen(true);
     });
   }, [restoreState]);
+
+  useEffect(() => {
+    if (!recoveringRun) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      try {
+        const state = await api.getConversationState();
+        if (!cancelled) {
+          applyConversationState(state);
+        }
+      } catch (e) {
+        console.warn('Failed to refresh active AI run:', e);
+      }
+    }, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [recoveringRun, applyConversationState]);
 
   // ── 发送消息 ──
 
@@ -50,6 +100,7 @@ export function useAiMode() {
       id: tempUserId, role: 'user', content: text, createdAt: now,
     }]);
     setRunStatuses([]);
+    setRecoveringRun(false);
     setLoading(true);
 
     try {
@@ -159,6 +210,7 @@ export function useAiMode() {
     } finally {
       setLoading(false);
       setRunStatuses([]);
+      setRecoveringRun(false);
     }
   }, [loading]);
 
@@ -187,6 +239,8 @@ export function useAiMode() {
     setMessages([]);
     setCards([]);
     setRunStatuses([]);
+    setRecoveringRun(false);
+    setLoading(false);
   }, []);
 
   return {

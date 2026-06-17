@@ -137,10 +137,22 @@ export interface AiStreamEvent {
   cards: ConversationCardVO[] | null;
 }
 
+export interface ConversationRunState {
+  active: boolean;
+  userMessageId: number | null;
+  assistantMessageId: number | null;
+  assistantContent: string;
+  statuses: string[];
+  startedAt: string | null;
+  updatedAt: string | null;
+  error: string | null;
+}
+
 export interface ConversationState {
   sessionId: number;
   messages: ConversationMessageVO[];
   cards: ConversationCardVO[];
+  activeRun: ConversationRunState;
 }
 
 // ── Settings ──

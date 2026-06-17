@@ -8,9 +8,11 @@ import java.util.List;
  * @param sessionId 会话 ID。
  * @param messages 消息列表。
  * @param cards 卡片列表。
+ * @param activeRun 正在执行的对话轮次快照。
  */
 public record ConversationState(
         Long sessionId,
         List<ConversationMessageVO> messages,
-        List<ConversationCardVO> cards
+        List<ConversationCardVO> cards,
+        ConversationRunState activeRun
 ) {}
