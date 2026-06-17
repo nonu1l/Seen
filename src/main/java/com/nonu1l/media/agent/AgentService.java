@@ -61,7 +61,7 @@ public class AgentService {
         this.memoryService = memoryService;
         this.objectMapper = objectMapper;
         this.classifyPrompt = loadPrompt("prompts/classify-system.st");
-        this.searchPipeline = new SearchPipeline(this::chatClient, bangumiTools, webSearchTools);
+        this.searchPipeline = new SearchPipeline(this::chatClient, this::cleanAssistantContent, bangumiTools, webSearchTools);
     }
 
     /**
@@ -139,7 +139,7 @@ public class AgentService {
         listener.status("正在理解需求");
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
         TokenUsageAdvisor.setCurrentNode("classify");
-        String intent = chatClient().prompt().system(system).user(s.userInput()).call().content();
+        String intent = cleanAssistantContent(chatClient().prompt().system(system).user(s.userInput()).call().content());
         if (intent != null) intent = intent.trim().toLowerCase();
         if (intent == null || !List.of("mark", "unmark", "recommend", "search", "analyze").contains(intent)) {
             intent = "analyze";
@@ -166,6 +166,7 @@ public class AgentService {
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolRegistry.callbacks()).call().content();
+        content = cleanAssistantContent(content);
         listener.status("正在整理标记结果");
         if (content != null && !content.isBlank()) {
             try {
@@ -215,6 +216,7 @@ public class AgentService {
         String content = chatClient().prompt()
                 .system(system).user(s.userInput())
                 .toolCallbacks(toolRegistry.callbacks()).call().content();
+        content = cleanAssistantContent(content);
         listener.status("正在整理取消标记结果");
         if (content != null && !content.isBlank()) {
             try {
@@ -329,6 +331,7 @@ public class AgentService {
                 .toolCallbacks(toolRegistry.callbacks())
                 .call()
                 .content();
+        content = cleanAssistantContent(content);
         if (content != null && !content.isBlank()) {
             // 尝试提取 JSON，失败则当纯文本回复
             try {
@@ -367,11 +370,15 @@ public class AgentService {
      */
     private String generateReply(String system, String user, AgentRunListener listener) {
         listener.status("正在生成回复");
-        return chatClient().prompt().system(system).user(user).call().content();
+        return cleanAssistantContent(chatClient().prompt().system(system).user(user).call().content());
     }
 
     private ChatClient chatClient() {
         return chatClientFactory.currentClient();
+    }
+
+    private String cleanAssistantContent(String content) {
+        return chatClientFactory.cleanAssistantContent(content);
     }
 
     /**

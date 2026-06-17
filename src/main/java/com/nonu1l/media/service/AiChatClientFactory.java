@@ -60,6 +60,21 @@ public class AiChatClientFactory {
         return cache.computeIfAbsent(cacheKey, ignored -> buildClient(setting, extraBody));
     }
 
+    /**
+     * 按当前 provider 策略清理模型正文，处理部分模型把思考标签混入 content 的情况。
+     *
+     * @param content 模型原始正文
+     * @return 清理后的正文
+     */
+    public String cleanAssistantContent(String content) {
+        if (content == null) {
+            return null;
+        }
+        SettingsService.AiRuntimeSetting setting = settingsService.currentRuntimeSetting();
+        validate(setting);
+        return thinkingStrategyRegistry().cleanAssistantContent(setting, content);
+    }
+
     private ThinkingStrategyRegistry thinkingStrategyRegistry() {
         return thinkingStrategyRegistry != null
                 ? thinkingStrategyRegistry

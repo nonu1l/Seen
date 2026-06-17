@@ -54,6 +54,27 @@ class ThinkingStrategyRegistryTest {
     }
 
     @Test
+    void miniMaxCleansThinkTagFromAssistantContent() {
+        SettingsService.AiRuntimeSetting setting = setting("minimax", "MiniMax-M3");
+        String content = """
+                <think>
+                The user wants to unmark a local record.
+                </think>
+                unmark
+                """;
+
+        assertEquals("unmark", registry.cleanAssistantContent(setting, content));
+    }
+
+    @Test
+    void openAiKeepsAssistantContentUnchanged() {
+        SettingsService.AiRuntimeSetting setting = setting("openai", "gpt-5");
+        String content = "<think>not expected</think>\nanalyze";
+
+        assertEquals(content, registry.cleanAssistantContent(setting, content));
+    }
+
+    @Test
     void mimoOnlyInjectsDisabledMode() {
         SettingsService.AiRuntimeSetting setting = setting("mimo", "MiMo");
 

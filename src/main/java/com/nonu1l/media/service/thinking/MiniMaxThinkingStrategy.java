@@ -4,12 +4,15 @@ import com.nonu1l.media.service.SettingsService;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * MiniMax OpenAI-compatible 策略，关闭使用 disabled，开启或自动使用 adaptive。
  */
 @Component
 public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
+
+    private static final Pattern THINK_BLOCK = Pattern.compile("(?is)<think>.*?</think>\\s*");
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
@@ -26,6 +29,11 @@ public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
             return thinkingType("adaptive");
         }
         return Map.of();
+    }
+
+    @Override
+    public String cleanAssistantContent(String content) {
+        return content == null ? null : THINK_BLOCK.matcher(content).replaceAll("").trim();
     }
 
     @Override

@@ -66,4 +66,15 @@ public class ThinkingStrategyRegistry {
     public Map<String, Object> extraBody(SettingsService.AiRuntimeSetting setting, ThinkingMode mode) {
         return resolve(setting).extraBody(setting, mode);
     }
+
+    /**
+     * 使用当前 provider 策略清理模型正文，去除混入 assistant content 的推理标签。
+     *
+     * @param setting 当前 AI 运行配置
+     * @param content 模型回复正文
+     * @return 清理后的正文
+     */
+    public String cleanAssistantContent(SettingsService.AiRuntimeSetting setting, String content) {
+        return resolve(setting).cleanAssistantContent(content);
+    }
 }

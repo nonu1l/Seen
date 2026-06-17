@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ public class SearchPipeline {
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
 
     private final Supplier<ChatClient> chatClientSupplier;
+    private final Function<String, String> contentCleaner;
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
     private final static int maxCards = 5;
@@ -49,7 +51,21 @@ public class SearchPipeline {
     public SearchPipeline(Supplier<ChatClient> chatClientSupplier,
                           AiBangumiTools bangumiTools,
                           AiWebSearchTools webSearchTools) {
+        this(chatClientSupplier, Function.identity(), bangumiTools, webSearchTools);
+    }
+
+    /**
+     * @param chatClientSupplier 用于关键词、标题提炼、校验和失败文案生成的 LLM 客户端供应器
+     * @param contentCleaner provider 级模型正文清理器
+     * @param bangumiTools AI Bangumi 查询工具
+     * @param webSearchTools AI Web 搜索工具
+     */
+    public SearchPipeline(Supplier<ChatClient> chatClientSupplier,
+                          Function<String, String> contentCleaner,
+                          AiBangumiTools bangumiTools,
+                          AiWebSearchTools webSearchTools) {
         this.chatClientSupplier = chatClientSupplier;
+        this.contentCleaner = contentCleaner != null ? contentCleaner : Function.identity();
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
         this.promptKeywords = load("prompts/pipeline-keywords.st");
@@ -224,7 +240,7 @@ public class SearchPipeline {
             .append(")\n"));
         String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", context);
-        String result = chatClient().prompt().system(prompt).user(sb.toString()).call().content();
+        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(sb.toString()).call().content());
         if (result == null || result.isBlank()) {
             return new java.util.HashSet<>(cardMap.values().stream().map(MatchedEntryDTO::subjectId).collect(Collectors.toSet()));
         }
@@ -243,7 +259,7 @@ public class SearchPipeline {
     List<String> generateKeywords(String userInput) {
         TokenUsageAdvisor.setCurrentNode("pipeline-generateKeywords");
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
-        String result = chatClient().prompt().system(prompt).user(userInput).call().content();
+        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(userInput).call().content());
         if (result == null || result.isBlank()) return List.of(userInput);
         return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
     }
@@ -265,7 +281,7 @@ public class SearchPipeline {
                 今日日期: %s
                 """.formatted(LocalDate.now());
         String user = "用户上下文：\n" + context + "\n\n失败关键词：\n" + keyword;
-        String result = chatClient().prompt().system(system).user(user).call().content();
+        String result = cleanAssistantContent(chatClient().prompt().system(system).user(user).call().content());
         if (result == null || result.isBlank()) return List.of();
         List<String> urls = result.lines()
                 .map(String::trim)
@@ -295,7 +311,7 @@ public class SearchPipeline {
         if (text.length() > 8000) text = text.substring(0, 8000);
         String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", userInput);
-        String result = chatClient().prompt().system(prompt).user(text).call().content();
+        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(text).call().content());
         if (result == null || result.isBlank()) return List.of();
         return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
     }
@@ -310,11 +326,15 @@ public class SearchPipeline {
     String failMessage(String userInput, String reason) {
         TokenUsageAdvisor.setCurrentNode("pipeline-failMessage");
         String prompt = promptFail.replace("{reason}", reason);
-        String result = chatClient().prompt().system(prompt).user(userInput).call().content();
+        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(userInput).call().content());
         return result != null && !result.isBlank() ? result : "抱歉，未找到相关影视作品。";
     }
 
     private ChatClient chatClient() {
         return chatClientSupplier.get();
+    }
+
+    private String cleanAssistantContent(String content) {
+        return content == null ? null : contentCleaner.apply(content);
     }
 }
