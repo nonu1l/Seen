@@ -143,7 +143,8 @@ public class AgentService {
         listener.status("正在理解需求");
         String system = classifyPrompt.replace("{today}", java.time.LocalDate.now().toString());
         TokenUsageAdvisor.setCurrentNode("classify");
-        String intent = cleanAssistantContent(chatClient().prompt().system(system).user(s.userInput()).call().content());
+        String classifyInput = buildClassifyInput(s.userInput(), s.history());
+        String intent = cleanAssistantContent(chatClient().prompt().system(system).user(classifyInput).call().content());
         if (intent != null) intent = intent.trim().toLowerCase();
         if (intent == null || !List.of("mark", "unmark", "recommend", "search", "analyze").contains(intent)) {
             intent = "analyze";
@@ -382,6 +383,13 @@ public class AgentService {
 
     private String cleanAssistantContent(String content) {
         return chatClientFactory.cleanAssistantContent(content);
+    }
+
+    private String buildClassifyInput(String userInput, String history) {
+        if (history == null || history.isBlank()) {
+            return userInput;
+        }
+        return "对话历史：\n" + history + "\n\n当前用户输入：\n" + userInput;
     }
 
     /**
