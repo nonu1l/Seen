@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { ArrowLeft, RotateCcw, Settings, X } from 'lucide-react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 export interface AppLayoutContext {
@@ -42,32 +43,23 @@ export default function AppLayout() {
             {isSettings ? (
               <button type="button" onClick={handleBack}
                 className="btn-icon" title="返回" aria-label="返回">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
-                </svg>
+                <ArrowLeft size={18} strokeWidth={2} />
               </button>
             ) : (
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => navigate('/settings')}
                   className="btn-icon" title="设置" aria-label="设置">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z" />
-                    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 0 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-                  </svg>
+                  <Settings size={18} strokeWidth={1.8} />
                 </button>
                 {isAi && (
                   <>
                     <button type="button" onClick={() => navigate('/')}
                       className="btn-icon" title="退出" aria-label="退出">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
+                      <X size={18} strokeWidth={2} />
                     </button>
                     <button type="button" onClick={() => onReset?.()}
                       className="btn-icon" title="重置" aria-label="重置">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                      </svg>
+                      <RotateCcw size={18} strokeWidth={2} />
                     </button>
                   </>
                 )}

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { ArrowUp, LoaderCircle } from 'lucide-react';
 
 interface Props {
   onSend: (text: string) => void;
@@ -57,14 +58,9 @@ export function AiInput({ onSend, loading }: Props) {
         style={{ background: 'var(--accent)', color: '#fff' }}
       >
         {loading ? (
-          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-          </svg>
+          <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={2.5} />
         ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" />
-            </svg>
+          <ArrowUp size={18} strokeWidth={2.5} />
         )}
       </button>
     </div>

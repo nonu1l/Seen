@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useHomeList } from '../api/hooks';
@@ -68,10 +69,7 @@ export default function HomePage() {
       {/* 搜索框 — sticky */}
       <div className="sticky top-0 z-10 -mx-3 px-3 sm:-mx-8 sm:px-8 pt-4 pb-3" style={{ background: 'var(--bg)' }}>
         <div className="relative">
-          <svg className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}
-               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
           <input type="text" value={displayQuery}
                  onChange={e => {
                    setDisplayQuery(e.target.value);
@@ -89,9 +87,7 @@ export default function HomePage() {
           {displayQuery && (
             <button type="button" onClick={() => { setQuery(''); setDisplayQuery(''); }}
                     className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors hover:opacity-70" style={{ color: 'var(--text-muted)' }} aria-label="清除">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" strokeWidth={2} />
             </button>
           )}
         </div>

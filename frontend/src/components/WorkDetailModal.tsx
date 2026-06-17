@@ -1,4 +1,5 @@
 import { type ChangeEvent, type FocusEvent, type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Status, WorkDetailDTO } from '../api/types';
 import { Cover } from './Cover';
@@ -193,18 +194,14 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
                 onMouseDown={e => e.preventDefault()}
                 onClick={unmark}
                 data-delete-record="true"
-                className="inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md text-[color:var(--text-muted)] transition-colors hover:bg-white/[0.04] hover:text-[color:var(--text-primary)]"
+                className="btn-icon"
                 aria-label="删除记录"
                 title="删除记录">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-7 0l.7 12A2 2 0 0010.7 21h2.6a2 2 0 002-1.9L16 7M10 11v6M14 11v6" />
-                </svg>
+                <Trash2 className="h-5 w-5" strokeWidth={2} />
               </button>
             )}
             <button onClick={() => onClose(changedRef.current || changed)} className="btn-icon" aria-label="关闭">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-5 w-5" strokeWidth={2} />
             </button>
           </div>
         </div>

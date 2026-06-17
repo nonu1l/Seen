@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Check, ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Status } from '../api/types';
 import { STATUS_OPTIONS } from '../utils/statusMeta';
@@ -64,9 +65,7 @@ export function QuickMarkMenu({ current, onSelect, trigger }: Props) {
         {trigger ?? (
           <>
             标记
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-            </svg>
+            <ChevronDown className="h-3 w-3" strokeWidth={2} />
           </>
         )}
       </button>
@@ -95,9 +94,7 @@ export function QuickMarkMenu({ current, onSelect, trigger }: Props) {
               <span className={`dot ${dd}`} />
               {label}
               {current === s && (
-                <svg className="ml-auto h-3.5 w-3.5" style={{ color: 'var(--accent)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
+                <Check className="ml-auto h-3.5 w-3.5" strokeWidth={2.5} style={{ color: 'var(--accent)' }} />
               )}
             </button>
           ))}
