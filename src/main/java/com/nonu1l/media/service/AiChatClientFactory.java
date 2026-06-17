@@ -35,12 +35,12 @@ public class AiChatClientFactory {
     }
 
     /**
-     * 使用业务默认思考模式创建当前 AI 客户端。
+     * 使用业务默认思考模式创建当前 AI 客户端，优先启用 provider 支持的推理能力。
      *
      * @return 当前运行时配置对应的 ChatClient
      */
     public ChatClient currentClient() {
-        return currentClient(ThinkingMode.DISABLED);
+        return currentClient(ThinkingMode.ENABLED);
     }
 
     /**
