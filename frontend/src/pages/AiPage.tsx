@@ -100,7 +100,7 @@ export default function AiPage() {
           WebkitBackdropFilter: 'blur(12px)',
         }}>
         <div className="mx-auto w-full max-w-7xl">
-          <AiInput onSend={ai.send} loading={ai.loading} />
+          <AiInput onSend={ai.send} onStop={ai.stop} loading={ai.loading} />
         </div>
       </div>
     </div>

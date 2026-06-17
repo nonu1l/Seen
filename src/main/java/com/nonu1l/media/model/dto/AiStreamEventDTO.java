@@ -4,11 +4,11 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * AI 流式对话事件，供 SSE 接口按步骤推送消息、状态、增量文本和卡片。
+ * AI 流式对话事件，供 SSE 接口按步骤推送消息、状态、最终回复和卡片。
  *
  * @param type 事件类型
  * @param messageId 关联消息 ID；user_saved 为用户消息，assistant_saved 为助手消息
- * @param content 状态文案、增量文本或最终回复正文
+ * @param content 状态文案或最终回复正文
  * @param createdAt 消息创建时间
  * @param cards 本轮生成的卡片列表
  */
@@ -39,16 +39,6 @@ public record AiStreamEventDTO(
      */
     public static AiStreamEventDTO status(String content) {
         return new AiStreamEventDTO("status", null, content, null, null);
-    }
-
-    /**
-     * 创建助手文本增量事件。
-     *
-     * @param content 增量文本
-     * @return SSE 事件
-     */
-    public static AiStreamEventDTO delta(String content) {
-        return new AiStreamEventDTO("delta", null, content, null, null);
     }
 
     /**

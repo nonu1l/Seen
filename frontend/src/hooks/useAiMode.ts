@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import type { ConversationMessageDTO, ConversationCardDTO, AiStreamEventDTO, ConversationStateDTO } from '../api/types';
-
-const ACTIVE_ASSISTANT_ID = -900719925474000;
 
 export function useAiMode() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,16 +19,6 @@ export function useAiMode() {
     setCards(state.cards);
 
     if (activeRun?.active) {
-      const assistantId = activeRun.assistantMessageId ?? ACTIVE_ASSISTANT_ID;
-      const assistantContent = activeRun.assistantContent || activeRun.error || '';
-      if (assistantContent && !nextMessages.some(msg => msg.id === assistantId)) {
-        nextMessages.push({
-          id: assistantId,
-          role: 'assistant',
-          content: assistantContent,
-          createdAt: activeRun.updatedAt ?? activeRun.startedAt ?? new Date().toISOString(),
-        });
-      }
       setMessages(nextMessages);
       setRunStatuses(activeRun.statuses ?? []);
       setLoading(true);
@@ -91,9 +79,8 @@ export function useAiMode() {
     const now = new Date().toISOString();
     const text = input.trim();
     const tempUserId = -Date.now();
-    const tempAssistantId = tempUserId - 1;
-    let currentAssistantId = tempAssistantId;
-    let assistantVisible = false;
+    let assistantMessageId: number | null = null;
+    let restoredRunState = false;
 
     setMessages(prev => [...prev, {
       id: tempUserId, role: 'user', content: text, createdAt: now,
@@ -103,17 +90,6 @@ export function useAiMode() {
     setLoading(true);
 
     try {
-      const ensureAssistant = (createdAt?: string | null) => {
-        if (assistantVisible) return;
-        assistantVisible = true;
-        setMessages(prev => [...prev, {
-          id: currentAssistantId,
-          role: 'assistant',
-          content: '',
-          createdAt: createdAt ?? new Date().toISOString(),
-        }]);
-      };
-
       const handleStreamEvent = (event: AiStreamEventDTO) => {
         switch (event.type) {
           case 'user_saved':
@@ -130,36 +106,29 @@ export function useAiMode() {
                 : [...prev.slice(-5), event.content!]);
             }
             break;
-          case 'delta':
-            if (event.content) {
-              ensureAssistant(event.createdAt);
-              setMessages(prev => prev.map(msg => msg.id === currentAssistantId
-                ? { ...msg, content: msg.content + event.content }
-                : msg));
-            }
-            break;
           case 'assistant_saved': {
-            const oldAssistantId = currentAssistantId;
-            const nextAssistantId = event.messageId ?? oldAssistantId;
-            currentAssistantId = nextAssistantId;
-            if (assistantVisible) {
-              setMessages(prev => prev.map(msg => msg.id === oldAssistantId
+            const nextAssistantId = event.messageId ?? assistantMessageId ?? tempUserId - 1;
+            const oldAssistantId = assistantMessageId;
+            assistantMessageId = nextAssistantId;
+            setMessages(prev => {
+              const exists = oldAssistantId != null && prev.some(msg => msg.id === oldAssistantId);
+              if (exists) {
+                return prev.map(msg => msg.id === oldAssistantId
                 ? {
                   ...msg,
                   id: nextAssistantId,
                   content: event.content ?? msg.content,
                   createdAt: event.createdAt ?? msg.createdAt,
                 }
-                : msg));
-            } else {
-              assistantVisible = true;
-              setMessages(prev => [...prev, {
+                : msg);
+              }
+              return [...prev, {
                 id: nextAssistantId,
                 role: 'assistant',
                 content: event.content ?? '',
                 createdAt: event.createdAt ?? new Date().toISOString(),
-              }]);
-            }
+              }];
+            });
             break;
           }
           case 'cards':
@@ -168,10 +137,10 @@ export function useAiMode() {
             }
             break;
           case 'error':
-            if (event.content && !assistantVisible) {
-              assistantVisible = true;
+            if (event.content && assistantMessageId == null) {
+              assistantMessageId = tempUserId - 1;
               setMessages(prev => [...prev, {
-                id: currentAssistantId,
+                id: assistantMessageId!,
                 role: 'assistant',
                 content: event.content!,
                 createdAt: new Date().toISOString(),
@@ -186,22 +155,45 @@ export function useAiMode() {
       await api.sendMessageStream(text, { onEvent: handleStreamEvent });
     } catch (e) {
       console.error('Send message failed:', e);
+      if (e instanceof ApiError && e.status === 409) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserId));
+        restoredRunState = await restoreState();
+        if (!restoredRunState) {
+          setRunStatuses(['已有 AI 任务正在运行']);
+          setLoading(true);
+          setRecoveringRun(true);
+          restoredRunState = true;
+        }
+        return;
+      }
       const errorText = '抱歉，请求失败，请重试。';
-      if (assistantVisible) {
-        setMessages(prev => prev.map(msg => msg.id === currentAssistantId
+      if (assistantMessageId != null) {
+        setMessages(prev => prev.map(msg => msg.id === assistantMessageId
           ? { ...msg, content: msg.content || errorText }
           : msg));
       } else {
         setMessages(prev => [...prev, {
-          id: tempAssistantId, role: 'assistant', content: errorText, createdAt: now,
+          id: tempUserId - 1, role: 'assistant', content: errorText, createdAt: now,
         }]);
       }
     } finally {
-      setLoading(false);
-      setRunStatuses([]);
-      setRecoveringRun(false);
+      if (!restoredRunState) {
+        setLoading(false);
+        setRunStatuses([]);
+        setRecoveringRun(false);
+      }
     }
-  }, [loading]);
+  }, [loading, restoreState]);
+
+  const stop = useCallback(async () => {
+    try {
+      const state = await api.stopConversation();
+      applyConversationState(state);
+    } catch (e) {
+      console.error('Stop AI run failed:', e);
+      await restoreState();
+    }
+  }, [applyConversationState, restoreState]);
 
   // ── 保存 / 撤销 ──
 
@@ -235,6 +227,6 @@ export function useAiMode() {
   return {
     isOpen, setIsOpen,
     sessionId, messages, cards, loading, runStatuses,
-    send, saveCard, undoCard, reset,
+    send, stop, saveCard, undoCard, reset,
   };
 }

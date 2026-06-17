@@ -126,7 +126,7 @@ export interface ConversationCardDTO {
 
 export type CardState = 'PENDING' | 'SAVED' | 'EXCLUDED' | 'EDITABLE' | 'CONFLICT' | 'UNMARKED' | 'RESTORED';
 
-export type AiStreamEventType = 'user_saved' | 'status' | 'delta' | 'assistant_saved' | 'cards' | 'done' | 'error';
+export type AiStreamEventType = 'user_saved' | 'status' | 'assistant_saved' | 'cards' | 'done' | 'error';
 
 export interface AiStreamEventDTO {
   type: AiStreamEventType;

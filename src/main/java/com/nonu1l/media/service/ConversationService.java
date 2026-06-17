@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -42,6 +43,7 @@ public class ConversationService {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
     private static final long STREAM_TIMEOUT_MILLIS = 10 * 60 * 1000L;
+    private static final String STOPPED_REPLY = "已停止本次生成。";
 
     private final ConversationSessionRepository sessionRepo;
     private final ConversationMessageRepository messageRepo;
@@ -142,9 +144,40 @@ public class ConversationService {
      * @return 已启动的 SSE emitter
      */
     public SseEmitter sendMessageStream(String userInput) {
+        ConversationSession session = getOrCreateSession();
+        Long sessionId = session.getId();
+        if (!runStore.reserve(sessionId, Instant.now())) {
+            throw new ActiveConversationRunException("已有 AI 任务正在运行");
+        }
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
-        streamExecutor().execute(() -> doSendMessageStream(userInput, emitter));
+        try {
+            Future<?> future = streamExecutor().submit(() -> doSendMessageStream(session, userInput, emitter));
+            runStore.attachExecution(sessionId, future, emitter);
+        } catch (RuntimeException e) {
+            runStore.complete(sessionId, null);
+            throw e;
+        }
         return emitter;
+    }
+
+    /**
+     * 停止当前正在运行的 AI 对话任务，并返回最新会话状态。
+     *
+     * @return 停止后的会话快照；没有活动任务时直接返回当前快照
+     */
+    public ConversationStateDTO stopActiveRun() {
+        ConversationRunStore.StoppedRun stopped = runStore.stopActive();
+        if (stopped != null && stopped.sessionId() != null && stopped.userMessageId() != null) {
+            if (stopped.assistantMessageId() == null
+                    && runStore.markStoppedAssistantIfNeeded(stopped.sessionId(), stopped.userMessageId())) {
+                transactionTemplate.execute(tx -> {
+                    saveStoppedAssistantResponse(stopped.sessionId());
+                    return null;
+                });
+            }
+            runStore.complete(stopped.sessionId(), stopped.userMessageId());
+        }
+        return getState();
     }
 
     /**
@@ -172,28 +205,37 @@ public class ConversationService {
         return executor;
     }
 
-    private void doSendMessageStream(String userInput, SseEmitter emitter) {
+    private void doSendMessageStream(ConversationSession session, String userInput, SseEmitter emitter) {
         SseEventSender sender = new SseEventSender(emitter);
-        ConversationSession session = getOrCreateSession();
         Long sessionId = session.getId();
         AgentRunListener listener = AgentRunEvents.streaming(event -> publishRunEvent(sessionId, event, sender));
         Instant now = Instant.now();
+        Long userMessageId = null;
+        boolean doneSent = false;
 
         try {
             ConversationMessage userMsg = transactionTemplate.execute(
                     tx -> saveUserMessage(session, userInput, now));
             if (userMsg != null) {
-                runStore.start(sessionId, userMsg.getId(), userMsg.getCreatedAt());
+                userMessageId = userMsg.getId();
+                runStore.userSaved(sessionId, userMsg.getId(), userMsg.getCreatedAt());
                 publishRunEvent(sessionId, AiStreamEventDTO.userSaved(userMsg.getId(), userMsg.getCreatedAt()), sender);
+                if (runStore.markStoppedAssistantIfNeeded(sessionId, userMessageId)) {
+                    transactionTemplate.execute(tx -> {
+                        saveStoppedAssistantResponse(sessionId);
+                        return null;
+                    });
+                    return;
+                }
+                if (runStore.isStopped(sessionId, userMessageId)) {
+                    return;
+                }
             }
 
             String history = buildHistory(session.getId());
             IntentAnalysisResultDTO result = invokeAgent(userInput, history, listener);
-            String replyText = result.replyText() != null && !result.replyText().isBlank()
-                    ? result.replyText()
-                    : generateReplyText(result);
-            if (!listener.hasDelta()) {
-                streamReplyText(replyText, listener);
+            if (runStore.isStopped(sessionId, userMessageId)) {
+                return;
             }
 
             AssistantResponse response = transactionTemplate.execute(
@@ -205,12 +247,17 @@ public class ConversationService {
                 }
             }
             publishRunEvent(sessionId, AiStreamEventDTO.done(), sender);
-            runStore.complete(sessionId);
-            emitter.complete();
+            doneSent = true;
         } catch (Exception e) {
-            log.error("sendMessageStream failed", e);
-            publishRunEvent(sessionId, AiStreamEventDTO.error("抱歉，处理出错了，请重试。"), sender);
-            runStore.complete(sessionId);
+            if (!runStore.isStopped(sessionId, userMessageId)) {
+                log.error("sendMessageStream failed", e);
+                publishRunEvent(sessionId, AiStreamEventDTO.error("抱歉，处理出错了，请重试。"), sender);
+            }
+        } finally {
+            runStore.complete(sessionId, userMessageId);
+            if (!doneSent && !runStore.isStopped(userMessageId)) {
+                sender.trySend(AiStreamEventDTO.done());
+            }
             emitter.complete();
         }
     }
@@ -228,7 +275,6 @@ public class ConversationService {
         }
         switch (event.type()) {
             case "status" -> runStore.status(sessionId, event.content());
-            case "delta" -> runStore.delta(sessionId, event.content());
             case "assistant_saved" -> runStore.assistantSaved(sessionId, event.messageId(), event.content(), event.createdAt());
             case "error" -> runStore.error(sessionId, event.content());
             default -> {
@@ -363,6 +409,26 @@ public class ConversationService {
         sessionRepo.save(session);
 
         return new AssistantResponse(assistantMsg.getId(), replyText, cardDTOs);
+    }
+
+    /**
+     * 保存停止提示助手消息，不回滚已经写入的用户消息。
+     *
+     * @param sessionId 会话 ID
+     */
+    private void saveStoppedAssistantResponse(Long sessionId) {
+        Instant now = Instant.now();
+        ConversationMessage assistantMsg = new ConversationMessage();
+        assistantMsg.setSessionId(sessionId);
+        assistantMsg.setRole("assistant");
+        assistantMsg.setContent(STOPPED_REPLY);
+        assistantMsg.setCreatedAt(now);
+        messageRepo.save(assistantMsg);
+
+        sessionRepo.findById(sessionId).ifPresent(session -> {
+            session.setUpdatedAt(now);
+            sessionRepo.save(session);
+        });
     }
 
     // ── 卡片操作 ─────────────────────────────────────────────
@@ -706,30 +772,6 @@ public class ConversationService {
     }
 
     /**
-     * 将已经生成好的回复按小块发送，用于结构化节点无法直接流式输出的场景。
-     *
-     * @param replyText 完整回复文本
-     * @param listener 单轮运行监听器
-     */
-    private void streamReplyText(String replyText, AgentRunListener listener) {
-        if (replyText == null || replyText.isBlank()) {
-            return;
-        }
-        listener.status("正在生成回复");
-        int chunkSize = 12;
-        for (int i = 0; i < replyText.length(); i += chunkSize) {
-            int end = Math.min(replyText.length(), i + chunkSize);
-            listener.delta(replyText.substring(i, end));
-            try {
-                Thread.sleep(12);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    /**
      * 取消标记前生成快照卡片：读取作品和最近一条记录，用于前端撤回与回显。
      *
      * @param sessionId 会话 ID
@@ -800,5 +842,14 @@ public class ConversationService {
      * 单轮流式处理落库后的内部响应，用于继续发送 assistant_saved 与 cards 事件。
      */
     private record AssistantResponse(Long messageId, String replyText, List<ConversationCardDTO> cards) {
+    }
+
+    /**
+     * 表示当前进程内已有 AI 轮次正在运行。
+     */
+    public static class ActiveConversationRunException extends RuntimeException {
+        public ActiveConversationRunException(String message) {
+            super(message);
+        }
     }
 }

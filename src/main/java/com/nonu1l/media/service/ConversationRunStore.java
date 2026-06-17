@@ -2,35 +2,80 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.model.dto.ConversationRunStateDTO;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 保存当前进程内正在执行的 AI 对话轮次，供页面重开后恢复状态与回复片段。
+ * 保存当前进程内正在执行的单例 AI 对话轮次，供页面重开后恢复状态并支持停止。
  */
 @Service
 public class ConversationRunStore {
 
     private static final int MAX_STATUSES = 6;
 
-    private final ConcurrentMap<Long, ActiveRun> runs = new ConcurrentHashMap<>();
+    private final AtomicReference<ActiveRun> activeRun = new AtomicReference<>();
+    private final Set<Long> stoppedUserMessages = ConcurrentHashMap.newKeySet();
+    private final Set<Long> stoppedAssistantSavedMessages = ConcurrentHashMap.newKeySet();
 
     /**
-     * 开始记录某个会话的新一轮 AI 处理。
+     * 尝试占用全局 AI 运行槽位。
      *
      * @param sessionId 会话 ID
-     * @param userMessageId 已落库的用户消息 ID
      * @param startedAt 本轮开始时间
+     * @return 成功占用返回 true；已有未停止任务时返回 false
      */
-    public void start(Long sessionId, Long userMessageId, Instant startedAt) {
+    public boolean reserve(Long sessionId, Instant startedAt) {
         if (sessionId == null) {
-            return;
+            return false;
         }
-        runs.put(sessionId, new ActiveRun(userMessageId, startedAt != null ? startedAt : Instant.now()));
+        ActiveRun next = new ActiveRun(sessionId, startedAt != null ? startedAt : Instant.now());
+        while (true) {
+            ActiveRun current = activeRun.get();
+            if (current != null && !current.isStopped()) {
+                return false;
+            }
+            if (activeRun.compareAndSet(current, next)) {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * 关联后台任务和 SSE emitter，便于停止时尽力取消并关闭连接。
+     *
+     * @param sessionId 会话 ID
+     * @param future 后台任务
+     * @param emitter SSE emitter
+     */
+    public void attachExecution(Long sessionId, Future<?> future, SseEmitter emitter) {
+        ActiveRun run = run(sessionId);
+        if (run != null) {
+            run.attachExecution(future, emitter);
+        }
+    }
+
+    /**
+     * 记录用户消息已经落库。
+     *
+     * @param sessionId 会话 ID
+     * @param userMessageId 用户消息 ID
+     * @param createdAt 创建时间
+     */
+    public void userSaved(Long sessionId, Long userMessageId, Instant createdAt) {
+        ActiveRun run = run(sessionId);
+        if (run != null) {
+            run.userSaved(userMessageId, createdAt);
+            if (run.isStopped() && userMessageId != null) {
+                stoppedUserMessages.add(userMessageId);
+            }
+        }
     }
 
     /**
@@ -43,19 +88,6 @@ public class ConversationRunStore {
         ActiveRun run = run(sessionId);
         if (run != null) {
             run.status(status);
-        }
-    }
-
-    /**
-     * 追加助手回复增量。
-     *
-     * @param sessionId 会话 ID
-     * @param delta 回复增量文本
-     */
-    public void delta(Long sessionId, String delta) {
-        ActiveRun run = run(sessionId);
-        if (run != null) {
-            run.delta(delta);
         }
     }
 
@@ -88,91 +120,201 @@ public class ConversationRunStore {
     }
 
     /**
-     * 获取某个会话当前活动轮次的只读快照。
+     * 停止当前活动轮次，并返回停止时的关键信息。
      *
-     * @param sessionId 会话 ID
-     * @return 活动轮次快照；无活动轮次时返回 inactive
+     * @return 当前活动轮次；没有活动轮次时返回 null
      */
-    public ConversationRunStateDTO snapshot(Long sessionId) {
-        ActiveRun run = run(sessionId);
-        return run != null ? run.snapshot() : ConversationRunStateDTO.inactive();
+    public StoppedRun stopActive() {
+        ActiveRun run = activeRun.get();
+        if (run == null) {
+            return null;
+        }
+        StoppedRun stopped = run.stop();
+        if (stopped.userMessageId() != null) {
+            stoppedUserMessages.add(stopped.userMessageId());
+        }
+        return stopped;
     }
 
     /**
-     * 完成并移除某个会话的活动轮次。
+     * 判断指定用户消息对应的运行是否已经被停止。
+     *
+     * @param userMessageId 用户消息 ID
+     * @return 已停止返回 true
+     */
+    public boolean isStopped(Long userMessageId) {
+        return userMessageId != null && stoppedUserMessages.contains(userMessageId);
+    }
+
+    /**
+     * 判断当前会话或指定用户消息是否已经被停止。
      *
      * @param sessionId 会话 ID
+     * @param userMessageId 用户消息 ID
+     * @return 当前轮次已停止或用户消息已登记停止时返回 true
      */
-    public void complete(Long sessionId) {
-        if (sessionId != null) {
-            runs.remove(sessionId);
+    public boolean isStopped(Long sessionId, Long userMessageId) {
+        ActiveRun run = run(sessionId);
+        return (run != null && run.isStopped()) || isStopped(userMessageId);
+    }
+
+    /**
+     * 为已停止的用户消息登记停止提示已保存，保证停止助手消息只落库一次。
+     *
+     * @param sessionId 会话 ID
+     * @param userMessageId 用户消息 ID
+     * @return 当前应保存停止提示时返回 true
+     */
+    public boolean markStoppedAssistantIfNeeded(Long sessionId, Long userMessageId) {
+        return userMessageId != null
+                && isStopped(sessionId, userMessageId)
+                && stoppedAssistantSavedMessages.add(userMessageId);
+    }
+
+    /**
+     * 获取某个会话当前活动轮次的只读快照。
+     *
+     * @param sessionId 会话 ID
+     * @return 活动轮次快照；无活动轮次或已停止时返回 inactive
+     */
+    public ConversationRunStateDTO snapshot(Long sessionId) {
+        ActiveRun run = run(sessionId);
+        return run != null && !run.isStopped() ? run.snapshot() : ConversationRunStateDTO.inactive();
+    }
+
+    /**
+     * 完成并移除某个活动轮次。
+     *
+     * @param sessionId 会话 ID
+     * @param userMessageId 用户消息 ID，可为空
+     */
+    public void complete(Long sessionId, Long userMessageId) {
+        ActiveRun run = run(sessionId);
+        if (run != null && (userMessageId == null || userMessageId.equals(run.userMessageId()))) {
+            activeRun.compareAndSet(run, null);
         }
     }
 
     /**
-     * 清理某个会话的活动轮次，通常用于会话重置。
+     * 清理当前活动轮次，通常用于会话重置。
      *
      * @param sessionId 会话 ID
      */
     public void clear(Long sessionId) {
-        complete(sessionId);
+        ActiveRun run = run(sessionId);
+        if (run != null) {
+            run.stop();
+            complete(sessionId, run.userMessageId());
+        }
     }
 
     private ActiveRun run(Long sessionId) {
-        return sessionId == null ? null : runs.get(sessionId);
+        ActiveRun run = activeRun.get();
+        return run != null && run.sessionId().equals(sessionId) ? run : null;
+    }
+
+    /**
+     * 停止运行时返回的只读快照。
+     *
+     * @param sessionId 会话 ID
+     * @param userMessageId 用户消息 ID
+     * @param assistantMessageId 已保存助手消息 ID
+     */
+    public record StoppedRun(Long sessionId, Long userMessageId, Long assistantMessageId) {
     }
 
     private static final class ActiveRun {
-        private final Long userMessageId;
+        private final Long sessionId;
         private final Instant startedAt;
-        private final StringBuilder assistantContent = new StringBuilder();
         private final List<String> statuses = new ArrayList<>();
+        private Long userMessageId;
         private Long assistantMessageId;
+        private String assistantContent = "";
         private Instant updatedAt;
         private String error;
+        private Future<?> future;
+        private SseEmitter emitter;
+        private boolean stopped;
 
-        private ActiveRun(Long userMessageId, Instant startedAt) {
-            this.userMessageId = userMessageId;
+        private ActiveRun(Long sessionId, Instant startedAt) {
+            this.sessionId = sessionId;
             this.startedAt = startedAt;
             this.updatedAt = startedAt;
         }
 
+        private Long sessionId() {
+            return sessionId;
+        }
+
+        private synchronized Long userMessageId() {
+            return userMessageId;
+        }
+
+        private synchronized boolean isStopped() {
+            return stopped;
+        }
+
+        private synchronized void attachExecution(Future<?> future, SseEmitter emitter) {
+            this.future = future;
+            this.emitter = emitter;
+        }
+
+        private synchronized void userSaved(Long userMessageId, Instant createdAt) {
+            this.userMessageId = userMessageId;
+            this.updatedAt = createdAt != null ? createdAt : Instant.now();
+        }
+
         private synchronized void status(String status) {
-            if (status == null || status.isBlank()) {
+            if (status == null || status.isBlank() || stopped) {
                 return;
             }
-            if (statuses.isEmpty() || !statuses.getLast().equals(status)) {
+            if (statuses.isEmpty() || !statuses.get(statuses.size() - 1).equals(status)) {
                 statuses.add(status);
                 while (statuses.size() > MAX_STATUSES) {
-                    statuses.removeFirst();
+                    statuses.remove(0);
                 }
             }
             updatedAt = Instant.now();
         }
 
-        private synchronized void delta(String delta) {
-            if (delta == null || delta.isEmpty()) {
-                return;
-            }
-            assistantContent.append(delta);
-            updatedAt = Instant.now();
-        }
-
         private synchronized void assistantSaved(Long assistantMessageId, String content, Instant updatedAt) {
             this.assistantMessageId = assistantMessageId;
-            if (content != null) {
-                assistantContent.setLength(0);
-                assistantContent.append(content);
-            }
+            this.assistantContent = content != null ? content : "";
             this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
         }
 
         private synchronized void error(String message) {
-            if (message == null || message.isBlank()) {
+            if (message == null || message.isBlank() || stopped) {
                 return;
             }
             this.error = message;
             this.updatedAt = Instant.now();
+        }
+
+        private StoppedRun stop() {
+            Future<?> futureToCancel;
+            SseEmitter emitterToComplete;
+            Long stoppedUserMessageId;
+            Long stoppedAssistantMessageId;
+            synchronized (this) {
+                stopped = true;
+                updatedAt = Instant.now();
+                futureToCancel = future;
+                emitterToComplete = emitter;
+                stoppedUserMessageId = userMessageId;
+                stoppedAssistantMessageId = assistantMessageId;
+            }
+            if (futureToCancel != null) {
+                futureToCancel.cancel(true);
+            }
+            if (emitterToComplete != null) {
+                try {
+                    emitterToComplete.complete();
+                } catch (Exception ignored) {
+                    // The client may already be gone.
+                }
+            }
+            return new StoppedRun(sessionId, stoppedUserMessageId, stoppedAssistantMessageId);
         }
 
         private synchronized ConversationRunStateDTO snapshot() {
@@ -180,7 +322,7 @@ public class ConversationRunStore {
                     true,
                     userMessageId,
                     assistantMessageId,
-                    assistantContent.toString(),
+                    assistantContent,
                     List.copyOf(statuses),
                     startedAt,
                     updatedAt,

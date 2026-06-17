@@ -358,40 +358,16 @@ public class AgentService {
     // ── helpers ─────────────────────────────────────────────
 
     /**
-     * 生成最终面向用户的自然语言回复；流式监听器会逐段接收 delta。
+     * 生成最终面向用户的自然语言回复。
      *
      * @param system system prompt
      * @param user user prompt
      * @param listener 单轮运行监听器
-     * @return 聚合后的完整回复文本
+     * @return 完整回复文本
      */
     private String generateReply(String system, String user, AgentRunListener listener) {
         listener.status("正在生成回复");
-        if (!listener.streamDeltas()) {
-            return chatClient().prompt().system(system).user(user).call().content();
-        }
-
-        StringBuilder reply = new StringBuilder();
-        try {
-            chatClient().prompt()
-                    .system(system)
-                    .user(user)
-                    .stream()
-                    .content()
-                    .doOnNext(delta -> {
-                        reply.append(delta);
-                        listener.delta(delta);
-                    })
-                    .blockLast();
-        } catch (Exception e) {
-            log.warn("Stream reply failed, falling back to call: {}", e.getMessage());
-            String fallback = chatClient().prompt().system(system).user(user).call().content();
-            if (fallback != null && reply.isEmpty()) {
-                listener.delta(fallback);
-            }
-            return fallback;
-        }
-        return reply.toString();
+        return chatClient().prompt().system(system).user(user).call().content();
     }
 
     private ChatClient chatClient() {

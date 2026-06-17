@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react';
-import { ArrowUp, LoaderCircle } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 
 interface Props {
   onSend: (text: string) => void;
+  onStop: () => void;
   loading: boolean;
 }
 
-export function AiInput({ onSend, loading }: Props) {
+export function AiInput({ onSend, onStop, loading }: Props) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -52,13 +53,15 @@ export function AiInput({ onSend, loading }: Props) {
       />
       <button
         type="button"
-        onClick={handleSend}
-        disabled={loading || !value.trim()}
+        onClick={loading ? onStop : handleSend}
+        disabled={!loading && !value.trim()}
+        aria-label={loading ? '停止生成' : '发送'}
+        title={loading ? '停止生成' : '发送'}
         className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-30"
         style={{ background: 'var(--accent)', color: '#fff' }}
       >
         {loading ? (
-          <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={2.5} />
+          <Square size={14} fill="currentColor" strokeWidth={2.5} />
         ) : (
           <ArrowUp size={18} strokeWidth={2.5} />
         )}

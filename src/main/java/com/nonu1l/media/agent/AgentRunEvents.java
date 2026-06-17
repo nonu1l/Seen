@@ -3,7 +3,6 @@ package com.nonu1l.media.agent;
 import com.nonu1l.media.model.dto.AiStreamEventDTO;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -14,10 +13,6 @@ public final class AgentRunEvents {
     private static final AgentRunListener NOOP = new AgentRunListener() {
         @Override
         public void status(String message) {
-        }
-
-        @Override
-        public void delta(String content) {
         }
 
         @Override
@@ -50,7 +45,6 @@ public final class AgentRunEvents {
 
     private static final class StreamingAgentRunListener implements AgentRunListener {
         private final Consumer<AiStreamEventDTO> sender;
-        private final AtomicBoolean hasDelta = new AtomicBoolean(false);
 
         private StreamingAgentRunListener(Consumer<AiStreamEventDTO> sender) {
             this.sender = sender;
@@ -64,28 +58,10 @@ public final class AgentRunEvents {
         }
 
         @Override
-        public void delta(String content) {
-            if (content != null && !content.isEmpty()) {
-                hasDelta.set(true);
-                sender.accept(AiStreamEventDTO.delta(content));
-            }
-        }
-
-        @Override
         public void error(String message) {
             if (message != null && !message.isBlank()) {
                 sender.accept(AiStreamEventDTO.error(message));
             }
-        }
-
-        @Override
-        public boolean streamDeltas() {
-            return true;
-        }
-
-        @Override
-        public boolean hasDelta() {
-            return hasDelta.get();
         }
     }
 }

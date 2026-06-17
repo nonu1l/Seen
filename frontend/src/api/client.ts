@@ -23,13 +23,23 @@ export interface AiStreamHandlers {
   onEvent?: (event: AiStreamEventDTO) => void;
 }
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options
   });
   if (!res.ok) {
-    throw new Error(await errorMessage(res));
+    throw new ApiError(await errorMessage(res), res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -134,10 +144,13 @@ export const api = {
       body: JSON.stringify({ userInput }),
     });
     if (!res.ok) {
-      throw new Error(await errorMessage(res));
+      throw new ApiError(await errorMessage(res), res.status);
     }
     await readSseStream(res, handlers);
   },
+
+  stopConversation: () =>
+    request<ConversationStateDTO>('/conversation/stop', { method: 'POST' }),
 
   saveCard: (cardId: number, rating?: number | null, review?: string | null, status?: string | null) =>
     request<ConversationCardDTO>(`/conversation/cards/${cardId}/save`, {
