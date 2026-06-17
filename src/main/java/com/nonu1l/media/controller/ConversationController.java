@@ -46,25 +46,6 @@ public class ConversationController {
     }
 
     /**
-     * 发送一条用户输入并获取 AI 回复。
-     *
-     * @param req 用户输入请求，{@code userInput} 不能为空或空白。
-     * @return 成功返回聊天响应；输入无效返回 400；异常返回 500。
-     */
-    @PostMapping("/send")
-    public ResponseEntity<AiChatDTO> send(@RequestBody AiChatRequest req) {
-        try {
-            if (req.userInput() == null || req.userInput().isBlank()) {
-                return ResponseEntity.badRequest().build();
-            }
-            return ResponseEntity.ok(conversationService.sendMessage(req.userInput().trim()));
-        } catch (Exception e) {
-            log.error("send failed", e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    /**
      * 发送一条用户输入并以 SSE 形式流式返回 AI 处理进度和回复。
      *
      * @param req 用户输入请求，{@code userInput} 不能为空或空白。

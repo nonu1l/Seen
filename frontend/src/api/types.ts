@@ -126,12 +126,6 @@ export interface ConversationCardDTO {
 
 export type CardState = 'PENDING' | 'SAVED' | 'EXCLUDED' | 'EDITABLE' | 'CONFLICT' | 'UNMARKED' | 'RESTORED';
 
-export interface AiChatDTO {
-  messageId: number;
-  replyText: string;
-  cards: ConversationCardDTO[];
-}
-
 export type AiStreamEventType = 'user_saved' | 'status' | 'delta' | 'assistant_saved' | 'cards' | 'done' | 'error';
 
 export interface AiStreamEventDTO {

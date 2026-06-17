@@ -6,7 +6,6 @@ import type {
   DictResponse,
   AppConfigDTO,
   ConversationStateDTO,
-  AiChatDTO,
   AiStreamEventDTO,
   ConversationCardDTO,
   SettingsDTO,
@@ -127,9 +126,6 @@ export const api = {
 
   getConversationState: () =>
     request<ConversationStateDTO>('/conversation/state'),
-
-  sendMessage: (userInput: string) =>
-    request<AiChatDTO>('/conversation/send', { method: 'POST', body: JSON.stringify({ userInput }) }),
 
   sendMessageStream: async (userInput: string, handlers?: AiStreamHandlers) => {
     const res = await fetch(`${BASE}/conversation/send-stream`, {

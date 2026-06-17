@@ -94,7 +94,6 @@ export function useAiMode() {
     const tempAssistantId = tempUserId - 1;
     let currentAssistantId = tempAssistantId;
     let assistantVisible = false;
-    let userSaved = false;
 
     setMessages(prev => [...prev, {
       id: tempUserId, role: 'user', content: text, createdAt: now,
@@ -118,7 +117,6 @@ export function useAiMode() {
       const handleStreamEvent = (event: AiStreamEventDTO) => {
         switch (event.type) {
           case 'user_saved':
-            userSaved = true;
             if (event.messageId != null) {
               setMessages(prev => prev.map(msg => msg.id === tempUserId
                 ? { ...msg, id: event.messageId!, createdAt: event.createdAt ?? msg.createdAt }
@@ -188,23 +186,14 @@ export function useAiMode() {
       await api.sendMessageStream(text, { onEvent: handleStreamEvent });
     } catch (e) {
       console.error('Send message failed:', e);
-      if (!userSaved) {
-        try {
-          const res = await api.sendMessage(text);
-          setMessages(prev => [...prev, {
-            id: res.messageId, role: 'assistant', content: res.replyText, createdAt: now,
-          }]);
-          if (res.cards.length > 0) {
-            setCards(prev => [...prev, ...res.cards]);
-          }
-        } catch {
-          setMessages(prev => [...prev, {
-            id: tempAssistantId, role: 'assistant', content: '抱歉，请求失败，请重试。', createdAt: now,
-          }]);
-        }
+      const errorText = '抱歉，请求失败，请重试。';
+      if (assistantVisible) {
+        setMessages(prev => prev.map(msg => msg.id === currentAssistantId
+          ? { ...msg, content: msg.content || errorText }
+          : msg));
       } else {
         setMessages(prev => [...prev, {
-          id: tempAssistantId, role: 'assistant', content: '抱歉，请求失败，请重试。', createdAt: now,
+          id: tempAssistantId, role: 'assistant', content: errorText, createdAt: now,
         }]);
       }
     } finally {

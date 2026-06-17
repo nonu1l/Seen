@@ -136,27 +136,6 @@ public class ConversationService {
     // ── 发送消息 ─────────────────────────────────────────────
 
     /**
-     * 处理一条用户输入：先落库用户消息、构建上下文并调用 Agent，再落库助手回复与副作用。
-     *
-     * <p>为避免长事务，拆分为两段短事务：用户侧写入、LLM 调用、回复侧写入。</p>
-     *
-     * @param userInput 用户输入文本
-     * @return 包含助手消息 ID、回复文本及本轮卡片列表的响应对象
-     */
-    public AiChatDTO sendMessage(String userInput) {
-        ConversationSession session = getOrCreateSession();
-        Instant now = Instant.now();
-
-        ConversationMessage userMsg = transactionTemplate.execute(
-                tx -> saveUserMessage(session, userInput, now));
-        String history = buildHistory(session.getId());
-        IntentAnalysisResultDTO result = invokeAgent(userInput, history);
-
-        return transactionTemplate.execute(
-                tx -> saveAssistantResponse(session, result, userMsg, now));
-    }
-
-    /**
      * 启动一轮 SSE 流式对话，后台执行 Agent 链路并持续推送事件。
      *
      * @param userInput 用户输入文本
@@ -217,7 +196,7 @@ public class ConversationService {
                 streamReplyText(replyText, listener);
             }
 
-            AiChatDTO response = transactionTemplate.execute(
+            AssistantResponse response = transactionTemplate.execute(
                     tx -> saveAssistantResponse(session, result, userMsg, now));
             if (response != null) {
                 publishRunEvent(sessionId, AiStreamEventDTO.assistantSaved(response.messageId(), response.replyText(), now), sender);
@@ -325,10 +304,10 @@ public class ConversationService {
      * @param result Agent 解析结果
      * @param userMsg 本轮用户消息（用于关联回写）
      * @param now 统一时间戳
-     * @return AiChatDTO，含本轮助手消息 ID、文案、返回卡片列表
+     * @return 含本轮助手消息 ID、文案、返回卡片列表的内部响应
      */
-    private AiChatDTO saveAssistantResponse(ConversationSession session, IntentAnalysisResultDTO result,
-                                                  ConversationMessage userMsg, Instant now) {
+    private AssistantResponse saveAssistantResponse(ConversationSession session, IntentAnalysisResultDTO result,
+                                                    ConversationMessage userMsg, Instant now) {
         String replyText = result.replyText() != null && !result.replyText().isBlank()
                 ? result.replyText()
                 : generateReplyText(result);
@@ -383,7 +362,7 @@ public class ConversationService {
         session.setUpdatedAt(now);
         sessionRepo.save(session);
 
-        return new AiChatDTO(assistantMsg.getId(), replyText, cardDTOs);
+        return new AssistantResponse(assistantMsg.getId(), replyText, cardDTOs);
     }
 
     // ── 卡片操作 ─────────────────────────────────────────────
@@ -815,5 +794,11 @@ public class ConversationService {
             thread.setDaemon(true);
             return thread;
         }
+    }
+
+    /**
+     * 单轮流式处理落库后的内部响应，用于继续发送 assistant_saved 与 cards 事件。
+     */
+    private record AssistantResponse(Long messageId, String replyText, List<ConversationCardDTO> cards) {
     }
 }
