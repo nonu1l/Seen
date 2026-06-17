@@ -3,12 +3,14 @@ import { Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { Status, WorkDetailDTO } from '../api/types';
 import { Cover } from './Cover';
+import { useConfirm } from './ConfirmProvider';
 import { StarRating } from './StarRating';
 import { STATUS_OPTIONS } from '../utils/statusMeta';
 
 interface Props { id: number; platform: string; onClose: (changed: boolean) => void; }
 
 export function WorkDetailModal({ id, platform, onClose }: Props) {
+  const confirm = useConfirm();
   const [d, setD] = useState<WorkDetailDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +170,13 @@ export function WorkDetailModal({ id, platform, onClose }: Props) {
 
   const unmark = async () => {
     if (!d?.id) return;
-    if (!window.confirm('确定要删除该记录吗？将同时删除作品信息和所有标记记录。')) return;
+    const confirmed = await confirm({
+      title: '删除该记录？',
+      message: '将同时删除作品信息和所有标记记录，此操作不可撤销。',
+      confirmLabel: '删除记录',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try { await api.unmark(d.id); changedRef.current = true; setChanged(true); onClose(true); }
     catch (e: any) { setError(e?.message || '操作失败'); }
   };

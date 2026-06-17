@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { useConfirm } from '../components/ConfirmProvider';
 import { useToast } from '../components/ToastProvider';
 import { SecretInput } from '../components/settings/SecretInput';
 import { SettingsRow } from '../components/settings/SettingsRow';
@@ -152,6 +153,7 @@ function sameSources(a: SourceValues, b: SourceValues) {
 }
 
 export default function SettingsPage() {
+  const confirm = useConfirm();
   const toast = useToast();
   const [activeGroup, setActiveGroup] = useState<SettingsGroup>('ai');
   const [aiDraft, setAiDraft] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
@@ -327,7 +329,13 @@ export default function SettingsPage() {
   };
 
   const clearRequestCache = async () => {
-    if (!window.confirm('确定要清空当前请求缓存吗？')) return;
+    const confirmed = await confirm({
+      title: '清空请求缓存？',
+      message: '手动清空后，下一次请求会重新访问数据源。',
+      confirmLabel: '清空缓存',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setAdminActionLoading('cache');
     try {
       const next = await api.clearRequestCache();
@@ -341,7 +349,13 @@ export default function SettingsPage() {
   };
 
   const resetTokenUsage = async () => {
-    if (!window.confirm('确定要重置 Token 计算吗？这会删除全部 Token 使用明细。')) return;
+    const confirmed = await confirm({
+      title: '重置 Token 计算？',
+      message: '这会删除全部 Token 使用明细，并将统计总量重置为 0。',
+      confirmLabel: '重置 Token',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setAdminActionLoading('token');
     try {
       const next = await api.resetTokenUsage();
