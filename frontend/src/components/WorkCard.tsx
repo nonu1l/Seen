@@ -25,7 +25,7 @@ export function WorkCard({ data, unmarked, onOpen, onQuickMark, index = 0 }: Pro
     >
       {/* Cover */}
       <div className="relative aspect-[2/3] rounded-[6px] overflow-hidden cover-gradient-bottom"
-        style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+        style={{ border: '1px solid var(--cover-border)' }}>
         <Cover src={data.coverUrl} alt={data.nameCn} />
         {score && <span className="cover-score">{score}</span>}
         {data.platform && <span className="cover-platform">{data.platform}</span>}

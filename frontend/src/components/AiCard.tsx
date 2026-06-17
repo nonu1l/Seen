@@ -84,7 +84,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
       {/* ── 上区：封面 + 元数据 ── */}
       <div className="flex gap-3">
         <div className="flex-shrink-0 self-start overflow-hidden rounded-md relative aspect-[2/3] cover-gradient-bottom"
-          style={{ width: 88, border: '1px solid rgba(255,255,255,0.08)' }}>
+          style={{ width: 88, border: '1px solid var(--cover-border)' }}>
           <Cover src={card.coverUrl} alt={card.nameCn} />
           {card.platform && <span className="cover-platform" style={{ fontSize: 10, padding: '0 5px', bottom: 6, right: 6 }}>{card.platform}</span>}
         </div>
@@ -121,7 +121,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
           </div>
           {hasHistory(card) && (
             <div className="rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
-              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              style={{ background: 'var(--amber-dim)', border: '1px solid var(--border-active)' }}>
               <span style={{ color: 'var(--text-muted)' }}>之前：</span>
               <span style={{ color: 'var(--text-secondary)' }}>
                 {formatHistory(card)}
@@ -186,7 +186,7 @@ export function AiCard({ card, onSave, onUndo }: Props) {
           {(editable || !saved) && (
             <button type="button" onClick={handleSave} disabled={saving}
               className="rounded-md px-4 py-1 text-[12px] font-medium transition-colors disabled:opacity-60"
-              style={{ background: 'var(--accent)', color: '#fff' }}>
+              style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>
               {saving ? '...' : '保存'}
             </button>
           )}

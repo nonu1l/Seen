@@ -49,7 +49,7 @@ export default function AiPage() {
                     className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-left ${isUser ? '' : 'ai-prose'}`}
                     style={{
                       background: isUser ? 'var(--accent)' : 'var(--bg-card)',
-                      color: isUser ? '#fff' : 'var(--text-primary)',
+                      color: isUser ? 'var(--on-accent)' : 'var(--text-primary)',
                     }}
                   >
                     {isUser
@@ -95,7 +95,7 @@ export default function AiPage() {
       {/* 悬浮输入框 — 固定在视口底部，磨砂玻璃 */}
       <div className="fixed bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-2"
         style={{
-          background: 'rgba(8,8,15,0.75)',
+          background: 'var(--dock-bg)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}>

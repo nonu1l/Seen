@@ -58,7 +58,7 @@ export function AiInput({ onSend, onStop, loading }: Props) {
         aria-label={loading ? '停止生成' : '发送'}
         title={loading ? '停止生成' : '发送'}
         className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-30"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
       >
         {loading ? (
           <Square size={14} fill="currentColor" strokeWidth={2.5} />

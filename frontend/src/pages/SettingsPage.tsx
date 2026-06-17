@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { api } from '../api/client';
 import { useConfirm } from '../components/ConfirmProvider';
 import { useToast } from '../components/ToastProvider';
@@ -6,6 +7,7 @@ import { SecretInput } from '../components/settings/SecretInput';
 import { SettingsRow } from '../components/settings/SettingsRow';
 import { TestResult } from '../components/settings/TestResult';
 import { ToggleRow } from '../components/settings/ToggleRow';
+import { useTheme } from '../theme/ThemeProvider';
 import type {
   AdminOverviewDTO,
   AiMemoryDTO,
@@ -155,6 +157,7 @@ function sameSources(a: SourceValues, b: SourceValues) {
 export default function SettingsPage() {
   const confirm = useConfirm();
   const toast = useToast();
+  const { theme, setTheme } = useTheme();
   const [activeGroup, setActiveGroup] = useState<SettingsGroup>('ai');
   const [aiDraft, setAiDraft] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
   const [aiInitial, setAiInitial] = useState<EditableAiConfig>(EMPTY_AI_CONFIG);
@@ -627,6 +630,29 @@ export default function SettingsPage() {
         </div>
 
         <div className="settings-form">
+          <SettingsRow title="界面主题" description="切换后会立即应用，并保存在当前浏览器。">
+            <div className="settings-segmented settings-segmented--two">
+              <button
+                type="button"
+                className={theme === 'dark' ? 'is-active' : ''}
+                aria-pressed={theme === 'dark'}
+                onClick={() => setTheme('dark')}
+              >
+                <Moon size={14} strokeWidth={1.9} />
+                深色
+              </button>
+              <button
+                type="button"
+                className={theme === 'light' ? 'is-active' : ''}
+                aria-pressed={theme === 'light'}
+                onClick={() => setTheme('light')}
+              >
+                <Sun size={14} strokeWidth={1.9} />
+                亮色
+              </button>
+            </div>
+          </SettingsRow>
+
           <ToggleRow
             title="记录 Token 使用明细"
             description="开启后记录每次 AI 调用的 token 用量，并可在后台明细页查看。"

@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>媒体追踪</title>
+    <script>
+      try {
+        const theme = window.localStorage.getItem('seen.theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

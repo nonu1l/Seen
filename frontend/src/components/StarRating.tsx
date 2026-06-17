@@ -42,7 +42,7 @@ export function StarRating({ value, onChange, readOnly = false, size = 24, allow
           <button key={i} type="button" disabled={readOnly}
             className={`relative inline-flex items-center justify-center transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}
             style={{ width: size, height: size, border: 0, background: 'transparent', padding: 0,
-              color: active ? 'var(--amber)' : 'rgba(255,255,255,0.12)' }}
+              color: active ? 'var(--amber)' : 'var(--star-empty)' }}
             onClick={e => {
               if (readOnly) return;
               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
