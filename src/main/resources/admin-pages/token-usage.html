@@ -192,10 +192,16 @@ async function fetchTree() {
 function renderTree(sessions) {
   const el = document.getElementById('tree');
   if (!sessions.length) { el.innerHTML = '<div class="node-row"><span class="name" style="color:var(--muted)">No data</span></div>'; return; }
-  let grandTotal=0, grandCalls=0;
-  for (const s of sessions) { grandTotal+=s.totalTokens; grandCalls+=s.callCount; }
+  let grandTotal=0, grandPrompt=0, grandCached=0, grandCalls=0;
+  for (const s of sessions) {
+    grandTotal+=s.totalTokens;
+    grandPrompt+=s.promptTokens||0;
+    grandCached+=s.nativeCachedTokens||0;
+    grandCalls+=s.callCount;
+  }
   document.getElementById('stats').textContent =
-    `${sessions.length} session · ${grandTotal.toLocaleString()} tokens · ${grandCalls} calls`;
+    `${sessions.length} session · ${grandTotal.toLocaleString()} tokens · ` +
+    `${grandCached.toLocaleString()} cached · ${hitRate(grandCached, grandPrompt)} hit · ${grandCalls} calls`;
 
   let html = '';
   for (const s of sessions) html += nodeHTML(s, 'session');
@@ -206,7 +212,9 @@ function nodeHTML(n, kind) {
   const hasKids = n.children && n.children.length > 0;
   const arrow = hasKids ? `<span class="arrow">▶</span>` : `<span class="arrow spacer">▶</span>`;
   const ico = kind==='session'?'📁': kind==='turn'?'📂': n.label.startsWith('pipeline-')?'⚙':'○';
-  const meta = `<span class="meta"><span>${n.totalTokens.toLocaleString()}t</span><span>×${n.callCount}</span></span>`;
+  const cached = n.nativeCachedTokens || 0;
+  const cacheMeta = cached > 0 ? `<span>cache ${cached.toLocaleString()} · ${hitRate(cached, n.promptTokens||0)}</span>` : '';
+  const meta = `<span class="meta"><span>${n.totalTokens.toLocaleString()}t</span>${cacheMeta}<span>×${n.callCount}</span></span>`;
 
   let dataAttrs = '';
   if (kind === 'node') {
@@ -280,7 +288,11 @@ async function loadDetail(sid, turn, node, label) {
       html += `<span class="cc-index">#${i+1}</span>`;
       html += `<span class="cc-model">${esc(`${c.profileName||'default'} / ${c.modelName||'unknown'}`)}</span>`;
       if (c.requestId) html += `<span class="cc-model">${esc(c.requestId)}</span>`;
-      html += `<span class="cc-tokens">${(c.totalTokens||0).toLocaleString()} tokens</span>`;
+      const cached = c.nativeCachedTokens || 0;
+      const cachedText = cached > 0
+        ? ` · cached ${cached.toLocaleString()} · ${hitRate(cached, c.promptTokens||0)} hit`
+        : '';
+      html += `<span class="cc-tokens">${(c.totalTokens||0).toLocaleString()} tokens${cachedText}</span>`;
       html += `</div>`;
       html += `<div class="call-card-body">`;
       html += `<div class="section">`;
@@ -300,6 +312,10 @@ async function loadDetail(sid, turn, node, label) {
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hitRate(cached, prompt) {
+  if (!prompt || prompt <= 0) return '0.0%';
+  return `${((cached || 0) * 100 / prompt).toFixed(1)}%`;
+}
 
 // ── theme ──
 function getTheme() { return document.documentElement.getAttribute('data-theme')||'light'; }

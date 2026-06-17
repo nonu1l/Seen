@@ -11,6 +11,7 @@ import java.util.List;
  * @param totalTokens 当前节点总 token。
  * @param promptTokens prompt token 数。
  * @param completionTokens completion token 数。
+ * @param nativeCachedTokens provider 原生返回的 prompt cache 命中 token 数。
  * @param callCount 调用次数。
  * @param subtitle 辅助说明文本。
  * @param children 子节点列表。
@@ -21,6 +22,7 @@ public record TokenUsageTreeNodeDTO(
     long totalTokens,
     long promptTokens,
     long completionTokens,
+    long nativeCachedTokens,
     int callCount,
     String subtitle,
     List<TokenUsageTreeNodeDTO> children
@@ -33,11 +35,12 @@ public record TokenUsageTreeNodeDTO(
      * @param totalTokens 当前节点总 token。
      * @param promptTokens prompt token 数。
      * @param completionTokens completion token 数。
+     * @param nativeCachedTokens provider 原生返回的 prompt cache 命中 token 数。
      * @param callCount 调用次数。
      */
     public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
-                              long completionTokens, int callCount) {
-        this(key, label, totalTokens, promptTokens, completionTokens, callCount, null, List.of());
+                              long completionTokens, long nativeCachedTokens, int callCount) {
+        this(key, label, totalTokens, promptTokens, completionTokens, nativeCachedTokens, callCount, null, List.of());
     }
 
     /**
@@ -48,12 +51,13 @@ public record TokenUsageTreeNodeDTO(
      * @param totalTokens 当前节点总 token。
      * @param promptTokens prompt token 数。
      * @param completionTokens completion token 数。
+     * @param nativeCachedTokens provider 原生返回的 prompt cache 命中 token 数。
      * @param callCount 调用次数。
      * @param subtitle 辅助说明文本。
      */
     public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
-                              long completionTokens, int callCount, String subtitle) {
-        this(key, label, totalTokens, promptTokens, completionTokens, callCount, subtitle, List.of());
+                              long completionTokens, long nativeCachedTokens, int callCount, String subtitle) {
+        this(key, label, totalTokens, promptTokens, completionTokens, nativeCachedTokens, callCount, subtitle, List.of());
     }
 
     /**
@@ -64,11 +68,13 @@ public record TokenUsageTreeNodeDTO(
      * @param totalTokens 当前节点总 token。
      * @param promptTokens prompt token 数。
      * @param completionTokens completion token 数。
+     * @param nativeCachedTokens provider 原生返回的 prompt cache 命中 token 数。
      * @param callCount 调用次数。
      * @param children 子节点列表。
      */
     public TokenUsageTreeNodeDTO(String key, String label, long totalTokens, long promptTokens,
-                              long completionTokens, int callCount, List<TokenUsageTreeNodeDTO> children) {
-        this(key, label, totalTokens, promptTokens, completionTokens, callCount, null, children);
+                              long completionTokens, long nativeCachedTokens, int callCount,
+                              List<TokenUsageTreeNodeDTO> children) {
+        this(key, label, totalTokens, promptTokens, completionTokens, nativeCachedTokens, callCount, null, children);
     }
 }

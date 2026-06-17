@@ -15,6 +15,9 @@ import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.metadata.Usage;
 import reactor.core.publisher.Flux;
 
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -179,12 +182,14 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
                     tu.setTotalTokens(usage.getTotalTokens() > 0 ? (int) usage.getTotalTokens() : null);
+                    tu.setNativeCachedTokens(extractNativeCachedTokens(usage.getNativeUsage()));
                     tu.setInputText(context.inputText());
                     tu.setOutputText(outputText);
                     repo.save(tu);
-                    log.debug("Token: profile={} node={} turn={} model={} prompt={} completion={} total={}",
+                    log.debug("Token: profile={} node={} turn={} model={} prompt={} completion={} total={} nativeCached={}",
                             tu.getProfileName(), tu.getNodeName(), tu.getTurn(), tu.getModelName(),
-                            tu.getPromptTokens(), tu.getCompletionTokens(), tu.getTotalTokens());
+                            tu.getPromptTokens(), tu.getCompletionTokens(), tu.getTotalTokens(),
+                            tu.getNativeCachedTokens());
                     if (outputText != null) {
                         log.debug("LLM output (first 500 chars): {}",
                             outputText.length() > 500 ? outputText.substring(0, 500) : outputText);
@@ -194,6 +199,76 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                 }
             }
         }
+    }
+
+    /**
+     * 从 provider 原始 usage 中提取官方 prompt cache 命中数。
+     *
+     * <p>不同 OpenAI 兼容 SDK 可能暴露为 Map、Optional 或 record 风格方法，因此这里只读
+     * prompt_tokens_details.cached_tokens，不做本地估算。</p>
+     *
+     * @param nativeUsage Spring AI 暴露的 provider 原始 usage 对象。
+     * @return 官方 cached tokens；没有返回时为 {@code null}。
+     */
+    private Long extractNativeCachedTokens(Object nativeUsage) {
+        Object usage = unwrapOptional(nativeUsage);
+        if (usage == null) {
+            return null;
+        }
+
+        Object details = readValue(usage, "prompt_tokens_details", "promptTokensDetails", "getPromptTokensDetails");
+        Object cachedTokens = readValue(unwrapOptional(details), "cached_tokens", "cachedTokens", "getCachedTokens");
+        Long value = asPositiveLong(unwrapOptional(cachedTokens));
+        return value != null && value > 0 ? value : null;
+    }
+
+    private Object readValue(Object source, String... names) {
+        if (source == null) {
+            return null;
+        }
+        Object unwrapped = unwrapOptional(source);
+        if (unwrapped == null) {
+            return null;
+        }
+        if (unwrapped instanceof Map<?, ?> map) {
+            for (String name : names) {
+                if (map.containsKey(name)) {
+                    return map.get(name);
+                }
+            }
+        }
+        for (String name : names) {
+            try {
+                Method method = unwrapped.getClass().getMethod(name);
+                return method.invoke(unwrapped);
+            } catch (ReflectiveOperationException | SecurityException ignored) {
+                // Try the next known accessor shape.
+            }
+        }
+        return null;
+    }
+
+    private Object unwrapOptional(Object value) {
+        if (value instanceof Optional<?> optional) {
+            return optional.orElse(null);
+        }
+        return value;
+    }
+
+    private Long asPositiveLong(Object value) {
+        if (value instanceof Number number) {
+            long longValue = number.longValue();
+            return longValue > 0 ? longValue : null;
+        }
+        if (value instanceof String text) {
+            try {
+                long parsed = Long.parseLong(text);
+                return parsed > 0 ? parsed : null;
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**

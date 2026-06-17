@@ -99,14 +99,14 @@ public class TokenUsageController {
                 turnNodes.add(new TokenUsageTreeNodeDTO(
                         "turn/" + sessionId + "/" + turn, "Turn " + turn,
                         sumTotal(turnRecs), sumPrompt(turnRecs), sumCompletion(turnRecs),
-                        turnRecs.size(), nodeChildren));
+                        sumNativeCached(turnRecs), turnRecs.size(), nodeChildren));
             }
 
             sessions.add(new TokenUsageTreeNodeDTO(
                     "session/" + sessionId,
                     "Session #" + sessionId + "  " + dateStr,
                     sumTotal(records), sumPrompt(records), sumCompletion(records),
-                    records.size(), dateStr, turnNodes));
+                    sumNativeCached(records), records.size(), dateStr, turnNodes));
         }
 
         return sessions;
@@ -133,6 +133,8 @@ public class TokenUsageController {
                         t.getModelName(),
                         t.getRequestId(),
                         t.getTotalTokens() != null ? t.getTotalTokens().longValue() : 0L,
+                        t.getPromptTokens() != null ? t.getPromptTokens().longValue() : 0L,
+                        t.getNativeCachedTokens() != null ? t.getNativeCachedTokens() : 0L,
                         t.getInputText(),
                         t.getOutputText()))
                 .toList();
@@ -140,7 +142,7 @@ public class TokenUsageController {
 
     private TokenUsageTreeNodeDTO leaf(String key, String name, List<TokenUsage> recs) {
         return new TokenUsageTreeNodeDTO(key, name,
-                sumTotal(recs), sumPrompt(recs), sumCompletion(recs), recs.size());
+                sumTotal(recs), sumPrompt(recs), sumCompletion(recs), sumNativeCached(recs), recs.size());
     }
 
     private long sumTotal(List<TokenUsage> list) {
@@ -153,5 +155,9 @@ public class TokenUsageController {
 
     private long sumCompletion(List<TokenUsage> list) {
         return list.stream().mapToLong(t -> t.getCompletionTokens() != null ? t.getCompletionTokens() : 0).sum();
+    }
+
+    private long sumNativeCached(List<TokenUsage> list) {
+        return list.stream().mapToLong(t -> t.getNativeCachedTokens() != null ? t.getNativeCachedTokens() : 0).sum();
     }
 }

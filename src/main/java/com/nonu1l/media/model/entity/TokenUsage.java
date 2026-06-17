@@ -39,6 +39,10 @@ public class TokenUsage {
     @Column(name = "total_tokens")
     private Integer totalTokens;
 
+    /** Provider 原生返回的 prompt cache 命中 token 数。 */
+    @Column(name = "native_cached_tokens")
+    private Long nativeCachedTokens;
+
     /** 关联的会话 ID，用于多轮追踪 */
     @Column(name = "session_id")
     private Long sessionId;
