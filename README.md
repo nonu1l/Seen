@@ -59,6 +59,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 - 支持通过 `app.ai.thinking-mode` 配置 AI provider 的 thinking / 推理模式，默认开启以提升复杂 Agent 任务的处理能力。
 - 简化 AI 对话流式链路为状态流 + 最终结果模式，并增加单例运行锁与停止当前任务能力。
 - 处理 MiniMax 思考模式将 `<think>` 内容混入正文的问题，避免影响 Agent 意图识别和 JSON 解析。
+- 拆分 AI 标记与取消标记专用提示词，减少正常 mark / unmark 分支的无关规则和提示词 token。
 
 ---
 
@@ -79,8 +80,8 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 │ classify │ ← 识别意图：mark / unmark / recommend / search / analyze
 └────┬─────┘
      │
-     ├─ mark ─────────→ 全工具 LLM（搜索+匹配+评分推断+状态推断）
-     ├─ unmark ───────→ 全工具 LLM（searchLocal+提取 unmarkIds）
+     ├─ mark ─────────→ 标记专用提示词（搜索+匹配+评分推断+状态推断）
+     ├─ unmark ───────→ 取消标记专用提示词（searchLocal+提取 unmarkIds）
      ├─ recommend ────→ SearchPipeline 多步搜索管道
      ├─ search ───────→ SearchPipeline（同上）
      └─ analyze ──────→ 轻量 LLM 直接问答

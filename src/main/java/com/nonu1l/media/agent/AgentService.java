@@ -39,6 +39,8 @@ public class AgentService {
     private final AiToolRegistry toolRegistry;
     private final ObjectMapper objectMapper;
     private final String classifyPrompt;
+    private final String agentMarkPrompt;
+    private final String agentUnmarkPrompt;
     private final SearchPipeline searchPipeline;
     private final AiPreferenceMemoryService memoryService;
 
@@ -61,6 +63,8 @@ public class AgentService {
         this.memoryService = memoryService;
         this.objectMapper = objectMapper;
         this.classifyPrompt = loadPrompt("prompts/classify-system.st");
+        this.agentMarkPrompt = loadPrompt("prompts/agent-mark.st");
+        this.agentUnmarkPrompt = loadPrompt("prompts/agent-unmark.st");
         this.searchPipeline = new SearchPipeline(this::chatClient, this::cleanAssistantContent, bangumiTools, webSearchTools);
     }
 
@@ -149,7 +153,7 @@ public class AgentService {
     }
 
     /**
-     * 标记节点：通过完整系统提示与工具回调，解析用户标记意图为卡片/取消标记列表。
+     * 标记节点：通过标记专用提示词与工具回调，解析用户标记意图为卡片列表。
      *
      * @param s 当前状态
      * @return 包含 replyText、cards、unmarkIds 的 map；解析失败则返回提示文案
@@ -158,8 +162,7 @@ public class AgentService {
         log.debug("Node[mark] enter");
         listener.status("正在解析标记请求");
         TokenUsageAdvisor.setCurrentNode("mark");
-        // 使用完整 agent prompt + 工具回调来处理标记类请求（提取片名 + 搜索匹配）
-        String system = loadPrompt("prompts/agent-system.st")
+        String system = agentMarkPrompt
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
         listener.status("正在查询作品信息");
@@ -209,7 +212,7 @@ public class AgentService {
         log.debug("Node[unmark] enter");
         listener.status("正在解析取消标记请求");
         TokenUsageAdvisor.setCurrentNode("unmark");
-        String system = loadPrompt("prompts/agent-system.st")
+        String system = agentUnmarkPrompt
                 .replace("{today}", java.time.LocalDate.now().toString())
                 .replace("{history}", s.history());
         listener.status("正在查询本地记录");
