@@ -67,6 +67,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 - 修正长期记忆评分证据生成逻辑，将 0 分按“未评分”处理，避免没有打分的作品被误判为低分偏好。
 - Token 用量明细记录 provider 原生返回的 prompt cache 命中 token，并在后台明细页展示官方缓存命中率。
 - AI 工具调用改为结构化失败可见返回，搜索、抓取、找片和作品操作失败时会把 error/hint 返回给 Agent 以便自我修正。
+- AI 推荐展示卡片不再把推荐理由写入用户影评，避免保存候选卡片时污染真实影评。
 - 收敛自主 Agent 作品工具方法命名，移除 `findWorksForAgent`、`presentWorksForAgent`、`markWorkForAgent`、`unmarkWorkForAgent` 兼容方法。
 - 收敛 Web 工具命名，移除 `web_search` 与旧版简单 `fetchWeb`，将原 `fetch_url` 能力统一暴露为增强版 `fetchWeb`。
 - 网络搜索源改为 Serper / Tavily 手动选择，移除 DuckDuckGo 与自动回退链路；搜索失败和无结果会以结构化原因返回给 Agent。

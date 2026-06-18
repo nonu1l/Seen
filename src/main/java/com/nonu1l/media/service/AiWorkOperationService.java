@@ -74,7 +74,7 @@ public class AiWorkOperationService {
      * 展示一个候选作品卡片，不写入用户记录。
      *
      * @param subjectId Bangumi subjectId
-     * @param reason 推荐或搜索理由，可为空
+     * @param reason 推荐或搜索理由，可为空；最小修复阶段仅作为工具说明，不写入用户影评
      * @return 创建后的展示卡片
      */
     @Transactional
@@ -86,9 +86,6 @@ public class AiWorkOperationService {
 
         ConversationCard card = newCard(context, subjectId, "PRESENT", "PENDING");
         applyMeta(card, meta);
-        if (reason != null && !reason.isBlank()) {
-            card.setReview(reason.trim());
-        }
         applyPrevious(card, previous);
         return toDTO(cardRepo.save(card));
     }
