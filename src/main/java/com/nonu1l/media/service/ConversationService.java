@@ -258,7 +258,7 @@ public class ConversationService {
             TokenUsageAdvisor.setRequestId(requestId);
             TokenUsageAdvisor.setCurrentTurn((int) messageRepo.countBySessionIdAndRole(sessionId, "user"));
             AiToolContextHolder.set(new AiToolExecutionContext(
-                    sessionId, requestId, userMessageId, assistantMessageId, listener));
+                    sessionId, requestId, userMessageId, assistantMessageId, userInput, listener));
 
             String replyText;
             try {

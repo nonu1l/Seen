@@ -33,6 +33,16 @@ public interface ConversationCardRepository extends JpaRepository<ConversationCa
     List<ConversationCard> findAllBySessionIdAndRequestIdOrderByIdAsc(Long sessionId, String requestId);
 
     /**
+     * 统计某轮请求已经产生的指定动作卡片数量，用于 AI 工具安全阈值判断。
+     *
+     * @param sessionId 会话 ID
+     * @param requestId AI 请求 ID
+     * @param actionType 动作类型
+     * @return 已创建的动作卡片数量
+     */
+    long countBySessionIdAndRequestIdAndActionType(Long sessionId, String requestId, String actionType);
+
+    /**
      * 删除指定会话下全部卡片。
      *
      * <p>关键副作用：会直接从数据库移除所有匹配会话的卡片记录，操作不可恢复。</p>

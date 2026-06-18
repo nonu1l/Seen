@@ -27,6 +27,7 @@ public class AiAutonomousTools {
     private final RecordRepository recordRepo;
     private final WorkRepository workRepo;
     private final SearchPipeline searchPipeline;
+    private final AiToolSafetyService safetyService;
 
     /**
      * 创建自主 Agent 工具集合。
@@ -38,6 +39,7 @@ public class AiAutonomousTools {
      * @param operationService AI 写库操作服务
      * @param recordRepo 记录仓储
      * @param workRepo 作品仓储
+     * @param safetyService AI 工具安全策略
      */
     public AiAutonomousTools(AiChatClientFactory chatClientFactory,
                              AiBangumiTools bangumiTools,
@@ -45,11 +47,13 @@ public class AiAutonomousTools {
                              AiPreferenceMemoryService memoryService,
                              AiWorkOperationService operationService,
                              RecordRepository recordRepo,
-                             WorkRepository workRepo) {
+                             WorkRepository workRepo,
+                             AiToolSafetyService safetyService) {
         this.memoryService = memoryService;
         this.operationService = operationService;
         this.recordRepo = recordRepo;
         this.workRepo = workRepo;
+        this.safetyService = safetyService;
         this.searchPipeline = new SearchPipeline(chatClientFactory::currentClient,
                 chatClientFactory::cleanAssistantContent, bangumiTools, webSearchTools);
     }
@@ -159,6 +163,12 @@ public class AiAutonomousTools {
         if (subjectId == null) {
             return new AgentWorkActionResultDTO(false, "unmark", null, null, null,
                     "subjectId required", "取消标记前必须先调用 searchLocal 找到本地已有记录。");
+        }
+        AiToolExecutionContext context = AiToolContextHolder.require();
+        AiToolSafetyService.SafetyDecision safety = safetyService.checkUnmarkAllowed(context);
+        if (!safety.allowed()) {
+            return new AgentWorkActionResultDTO(false, "unmark", subjectId, null, null,
+                    safety.error(), safety.hint());
         }
         TokenUsageAdvisor.setCurrentNode("tool-unmarkWork");
         try {
