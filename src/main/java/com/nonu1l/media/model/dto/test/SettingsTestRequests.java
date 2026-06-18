@@ -16,7 +16,7 @@ public final class SettingsTestRequests {
     ) {
     }
 
-    public record SearchTestRequest(String provider, String serperApiKey, String bangumiProxy, String query) {
+    public record SearchTestRequest(String provider, String serperApiKey, String tavilyApiKey, String bangumiProxy, String query) {
     }
 
     public record BangumiTestRequest(String bangumiProxy) {

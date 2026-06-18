@@ -17,8 +17,6 @@ import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -97,13 +95,11 @@ public class SettingsTestService {
         long start = System.nanoTime();
         String provider = normalizeProvider(request != null ? request.provider() : null);
         String serperApiKey = valueOrCurrent(request != null ? request.serperApiKey() : null, SettingsService.SERPER_API_KEY);
-        String bangumiProxy = valueOrCurrent(request != null ? request.bangumiProxy() : null, SettingsService.BANGUMI_PROXY);
+        String tavilyApiKey = valueOrCurrent(request != null ? request.tavilyApiKey() : null, SettingsService.TAVILY_API_KEY);
         String query = request != null && request.query() != null && !request.query().isBlank()
                 ? request.query().trim()
                 : TEST_QUERY;
-        return "auto".equals(provider)
-                ? testAutoSearch(start, query, serperApiKey, bangumiProxy)
-                : testSingleSearch(start, provider, query, serperApiKey, bangumiProxy);
+        return testSingleSearch(start, provider, query, serperApiKey, tavilyApiKey);
     }
 
     public SettingsTestResponse testBangumi(SettingsTestRequests.BangumiTestRequest request) {
@@ -154,41 +150,27 @@ public class SettingsTestService {
         return extractSerperTitles(json);
     }
 
-    private List<String> testDdgSearch(String query, String proxy) {
-        String url = settingsService.ddgSearchUrl(proxy) + URLEncoder.encode(query, StandardCharsets.UTF_8);
-        String html = restTemplate.getForObject(url, String.class);
-        if (html == null || html.isBlank()) return List.of();
-        List<String> titles = new ArrayList<>();
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("<a[^>]*href=\"[^\"]*\"[^>]*>([^<]*)")
-                .matcher(html);
-        while (matcher.find() && titles.size() < 5) {
-            String title = unescape(matcher.group(1).trim());
-            if (!title.isBlank()) titles.add(title);
+    private List<String> testTavilySearch(String query, String apiKey) throws Exception {
+        if (apiKey.isBlank()) {
+            throw new IllegalArgumentException("Tavily API Key 不能为空");
         }
-        return titles;
-    }
-
-    private SettingsTestResponse testAutoSearch(long start, String query, String serperApiKey, String bangumiProxy) {
-        List<Map<String, Object>> attempts = new ArrayList<>();
-        List<String> serperTitles = trySearch("serper", query, serperApiKey, bangumiProxy, attempts);
-        if (!serperTitles.isEmpty()) {
-            return searchTestResponse(true, "搜索连接正常", start, "serper", serperTitles, attempts);
-        }
-        List<String> ddgTitles = trySearch("ddg", query, serperApiKey, bangumiProxy, attempts);
-        if (!ddgTitles.isEmpty()) {
-            return searchTestResponse(true, "搜索连接正常，已从 Serper 切换到 DuckDuckGo", start, "ddg", ddgTitles, attempts);
-        }
-        Map<String, Object> details = new LinkedHashMap<>();
-        details.put("provider", "auto");
-        details.put("attempts", attempts);
-        return response(false, "Serper 与 DuckDuckGo 均不可用或无结果", start, details);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("query", query);
+        body.put("search_depth", "basic");
+        body.put("max_results", 5);
+        body.put("include_answer", false);
+        body.put("include_raw_content", false);
+        String json = restTemplate.postForObject(endpointProperties.getTavilySearchUrl(), new HttpEntity<>(objectMapper.writeValueAsString(body), headers), String.class);
+        return extractTavilyTitles(json);
     }
 
     private SettingsTestResponse testSingleSearch(long start, String provider, String query,
-                                                  String serperApiKey, String bangumiProxy) {
+                                                  String serperApiKey, String tavilyApiKey) {
         List<Map<String, Object>> attempts = new ArrayList<>();
-        List<String> titles = trySearch(provider, query, serperApiKey, bangumiProxy, attempts);
+        List<String> titles = trySearch(provider, query, serperApiKey, tavilyApiKey, attempts);
         if (titles.isEmpty()) {
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("provider", provider);
@@ -199,14 +181,14 @@ public class SettingsTestService {
     }
 
     private List<String> trySearch(String provider, String query, String serperApiKey,
-                                   String bangumiProxy, List<Map<String, Object>> attempts) {
+                                   String tavilyApiKey, List<Map<String, Object>> attempts) {
         long start = System.nanoTime();
         Map<String, Object> attempt = new LinkedHashMap<>();
         attempt.put("provider", provider);
         try {
             List<String> titles = "serper".equals(provider)
                     ? testSerperSearch(query, serperApiKey)
-                    : testDdgSearch(query, bangumiProxy);
+                    : testTavilySearch(query, tavilyApiKey);
             attempt.put("ok", !titles.isEmpty());
             attempt.put("count", titles.size());
             attempt.put("elapsedMs", (System.nanoTime() - start) / 1_000_000);
@@ -214,7 +196,7 @@ public class SettingsTestService {
             return titles;
         } catch (Exception e) {
             attempt.put("ok", false);
-            attempt.put("error", sanitize(e.getMessage(), serperApiKey));
+            attempt.put("error", sanitize(sanitize(e.getMessage(), serperApiKey), tavilyApiKey));
             attempt.put("elapsedMs", (System.nanoTime() - start) / 1_000_000);
             attempts.add(attempt);
             return List.of();
@@ -237,6 +219,18 @@ public class SettingsTestService {
         if (organic == null || !organic.isArray()) return List.of();
         List<String> titles = new ArrayList<>();
         for (JsonNode item : organic) {
+            if (item.has("title")) titles.add(item.get("title").asText());
+            if (titles.size() >= 5) break;
+        }
+        return titles;
+    }
+
+    private List<String> extractTavilyTitles(String json) throws Exception {
+        if (json == null || json.isBlank()) return List.of();
+        JsonNode results = objectMapper.readTree(json).get("results");
+        if (results == null || !results.isArray()) return List.of();
+        List<String> titles = new ArrayList<>();
+        for (JsonNode item : results) {
             if (item.has("title")) titles.add(item.get("title").asText());
             if (titles.size() >= 5) break;
         }
@@ -267,17 +261,12 @@ public class SettingsTestService {
             normalized = settingsService.getString(SettingsService.SEARCH_PROVIDER);
         }
         if ("serper".equalsIgnoreCase(normalized)) return "serper";
-        if ("ddg".equalsIgnoreCase(normalized)) return "ddg";
-        return "auto";
+        if ("tavily".equalsIgnoreCase(normalized)) return "tavily";
+        return "serper";
     }
 
     private String valueOrCurrent(String value, String key) {
         String normalized = blankToEmpty(value);
         return normalized.isBlank() ? settingsService.getString(key) : normalized;
-    }
-
-    private static String unescape(String s) {
-        return s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-                .replace("&quot;", "\"").replace("&#x27;", "'").replace("&#39;", "'");
     }
 }

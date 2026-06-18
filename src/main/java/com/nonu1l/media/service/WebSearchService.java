@@ -9,19 +9,20 @@ import org.springframework.stereotype.Service;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Web 搜索路由 — 根据配置选择 DDG 或 Serper。
+ * Web 搜索路由，根据设置页选择的 provider 委托给对应搜索策略。
  */
 @Service
 public class WebSearchService implements SearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(WebSearchService.class);
 
-    private final DDGSearchService ddg;
-    private final SerperSearchService serper;
+    private final Map<String, WebSearchProviderStrategy> providers;
     private final SettingsService settingsService;
     private final WebFetchService webFetchService;
     private final boolean searchEnabled;
@@ -29,18 +30,20 @@ public class WebSearchService implements SearchProvider {
     /**
      * 注入底层搜索实现，实际请求时按当前设置动态选择。
      *
-     * @param ddg DDG 备选实现
-     * @param serper Serper 实现
+     * @param providerStrategies 可用搜索源策略列表
      * @param settingsService 设置读取服务
      * @param webFetchService 独立网页抓取服务
      * @param searchEnabled 是否启用外部搜索源
      */
-    public WebSearchService(DDGSearchService ddg, SerperSearchService serper,
+    public WebSearchService(List<WebSearchProviderStrategy> providerStrategies,
                             SettingsService settingsService,
                             WebFetchService webFetchService,
                             @Value("${app.search.enabled:true}") boolean searchEnabled) {
-        this.ddg = ddg;
-        this.serper = serper;
+        Map<String, WebSearchProviderStrategy> providerMap = new LinkedHashMap<>();
+        for (WebSearchProviderStrategy strategy : providerStrategies) {
+            providerMap.put(strategy.providerKey(), strategy);
+        }
+        this.providers = Map.copyOf(providerMap);
         this.settingsService = settingsService;
         this.webFetchService = webFetchService;
         this.searchEnabled = searchEnabled;
@@ -70,17 +73,17 @@ public class WebSearchService implements SearchProvider {
                     "Web search disabled by app.search.enabled=false", "请告知用户当前外部搜索已关闭，或改用本地记录/已有知识。");
         }
         String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
-        if ("auto".equalsIgnoreCase(provider)) {
-            return searchAuto(query);
+        WebSearchProviderStrategy strategy = providers.get(provider);
+        if (strategy == null) {
+            return new WebSearchToolResultDTO(false, query, provider, 0, List.of(),
+                    "Unsupported web search provider: " + provider, "请在设置页选择 Serper 或 Tavily。");
         }
-        if ("serper".equalsIgnoreCase(provider)) {
-            if (!serper.isAvailable()) {
-                return new WebSearchToolResultDTO(false, query, "serper", 0, List.of(),
-                        "Serper API key is missing", "可以切换搜索源为 auto/ddg，或让用户配置 Serper API Key。");
-            }
-            return searchWithProvider("serper", query);
+        if (!strategy.isAvailable()) {
+            return new WebSearchToolResultDTO(false, query, strategy.providerKey(), 0, List.of(),
+                    displayName(strategy.providerKey()) + " API key is missing",
+                    "请在设置页配置 " + displayName(strategy.providerKey()) + " API Key，或切换到另一个已配置搜索源。");
         }
-        return searchWithProvider("ddg", query);
+        return searchWithProvider(strategy, query);
     }
 
     /**
@@ -94,34 +97,17 @@ public class WebSearchService implements SearchProvider {
         return cleanFetchedText(webFetchService.fetchText(url));
     }
 
-    private WebSearchToolResultDTO searchAuto(String query) {
-        if (serper.isAvailable()) {
-            WebSearchToolResultDTO serperResult = searchWithProvider("serper", query);
-            if (serperResult.ok()) {
-                return serperResult;
-            }
-            log.info("Serper returned no usable results for '{}', falling back to DuckDuckGo", query);
-            WebSearchToolResultDTO ddgResult = searchWithProvider("ddg", query);
-            if (ddgResult.ok()) {
-                return ddgResult;
-            }
-            String error = serperResult.error() + "; " + ddgResult.error();
-            return new WebSearchToolResultDTO(false, query, "auto", 0, List.of(), error,
-                    "两个搜索源都没有返回可用结果，可以改写关键词，或用 fetchWeb 直接访问公开资料源。");
-        } else {
-            log.info("Serper API key is missing, using DuckDuckGo for '{}'", query);
-        }
-        return searchWithProvider("ddg", query);
+    private WebSearchToolResultDTO searchWithProvider(WebSearchProviderStrategy strategy, String query) {
+        long start = System.nanoTime();
+        WebSearchToolResultDTO result = strategy.searchWithDiagnostics(query);
+        log.info("Web search provider={} query='{}' results={} ok={} elapsedMs={}",
+                strategy.providerKey(), query, result.count(), result.ok(), (System.nanoTime() - start) / 1_000_000);
+        return result;
     }
 
-    private WebSearchToolResultDTO searchWithProvider(String providerName, String query) {
-        long start = System.nanoTime();
-        WebSearchToolResultDTO result = "serper".equals(providerName)
-                ? serper.searchWithDiagnostics(query)
-                : ddg.searchWithDiagnostics(query);
-        log.info("Web search provider={} query='{}' results={} ok={} elapsedMs={}",
-                providerName, query, result.count(), result.ok(), (System.nanoTime() - start) / 1_000_000);
-        return result;
+    private static String displayName(String provider) {
+        if ("tavily".equalsIgnoreCase(provider)) return "Tavily";
+        return "Serper";
     }
 
     /**

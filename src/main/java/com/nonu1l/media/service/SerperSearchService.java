@@ -61,7 +61,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  */
 @Service
-public class SerperSearchService implements SearchProvider {
+public class SerperSearchService implements SearchProvider, WebSearchProviderStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(SerperSearchService.class);
     private static final int MAX_RESULTS = 10;
@@ -91,9 +91,15 @@ public class SerperSearchService implements SearchProvider {
         this.endpointProperties = endpointProperties;
     }
 
+    @Override
+    public String providerKey() {
+        return "serper";
+    }
+
     /**
      * @return API Key 已配置则返回 true，可用于 provider 路由判断
      */
+    @Override
     public boolean isAvailable() {
         return settingsService.hasText(SettingsService.SERPER_API_KEY);
     }
@@ -121,7 +127,7 @@ public class SerperSearchService implements SearchProvider {
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
             return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                    "Serper API key is missing", "可以改用 DuckDuckGo，或让用户在设置页配置 Serper API Key。");
+                    "Serper API key is missing", "请让用户在设置页配置 Serper API Key，或切换到已配置的 Tavily。");
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -135,14 +141,14 @@ public class SerperSearchService implements SearchProvider {
                     endpointProperties.getSerperSearchUrl(), request, String.class);
             if (json == null) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper returned empty response", "可以换关键词重试，或改用 DuckDuckGo。");
+                        "Serper returned empty response", "可以换关键词重试，或切换到 Tavily / fetchWeb。");
             }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode organic = root.get("organic");
             if (organic == null || !organic.isArray()) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper response has no organic results", "可以换关键词重试，或改用 DuckDuckGo。");
+                        "Serper response has no organic results", "可以换关键词重试，或切换到 Tavily / fetchWeb。");
             }
 
             for (JsonNode r : organic) {
@@ -160,13 +166,13 @@ public class SerperSearchService implements SearchProvider {
                 .reduce("", (a, b) -> a + b + "\n"));
             if (results.isEmpty()) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper returned 0 usable results", "可以换关键词，或改用 DuckDuckGo / fetchWeb。");
+                        "Serper returned 0 usable results", "可以换关键词，或切换到 Tavily / fetchWeb。");
             }
             return new WebSearchToolResultDTO(true, query, "serper", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Serper search failed '{}': {}", query, e.getMessage());
             return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                    "Serper search failed: " + e.getMessage(), "可以改用 DuckDuckGo，或缩短/改写关键词后重试。");
+                    "Serper search failed: " + e.getMessage(), "可以切换到 Tavily，或缩短/改写关键词后重试。");
         }
     }
 

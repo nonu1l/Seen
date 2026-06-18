@@ -30,9 +30,11 @@ interface EditableAiConfig {
 }
 
 interface SourceValues {
-  searchProvider: 'auto' | 'serper' | 'ddg';
+  searchProvider: 'serper' | 'tavily';
   serperApiKey: string;
   serperApiKeySet: boolean;
+  tavilyApiKey: string;
+  tavilyApiKeySet: boolean;
   bangumiProxy: string;
   detailCastEnabled: boolean;
 }
@@ -82,9 +84,11 @@ function toAiConfigDraft(settings: SettingsDTO | null): EditableAiConfig {
 
 function toSourceValues(settings: SettingsDTO | null): SourceValues {
   return {
-    searchProvider: settings?.sources.searchProvider ?? 'auto',
+    searchProvider: settings?.sources.searchProvider ?? 'serper',
     serperApiKey: settings?.sources.serperApiKey ?? '',
     serperApiKeySet: settings?.sources.serperApiKeySet ?? false,
+    tavilyApiKey: settings?.sources.tavilyApiKey ?? '',
+    tavilyApiKeySet: settings?.sources.tavilyApiKeySet ?? false,
     bangumiProxy: settings?.sources.bangumiProxy ?? '',
     detailCastEnabled: settings?.sources.detailCastEnabled ?? true,
   };
@@ -150,6 +154,7 @@ function formatBytes(value: number) {
 function sameSources(a: SourceValues, b: SourceValues) {
   return a.searchProvider === b.searchProvider
     && isSecretUnchanged(a.serperApiKey, b.serperApiKey)
+    && isSecretUnchanged(a.tavilyApiKey, b.tavilyApiKey)
     && a.bangumiProxy === b.bangumiProxy
     && a.detailCastEnabled === b.detailCastEnabled;
 }
@@ -167,6 +172,7 @@ export default function SettingsPage() {
   const [adminOverview, setAdminOverview] = useState<AdminOverviewDTO | null>(null);
   const [showAiSecret, setShowAiSecret] = useState(false);
   const [showSerperSecret, setShowSerperSecret] = useState(false);
+  const [showTavilySecret, setShowTavilySecret] = useState(false);
   const [loading, setLoading] = useState(true);
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [memoryRebuilding, setMemoryRebuilding] = useState(false);
@@ -197,6 +203,7 @@ export default function SettingsPage() {
     setAiInitial(nextDraft);
     setShowAiSecret(false);
     setShowSerperSecret(false);
+    setShowTavilySecret(false);
   };
 
   const reload = async () => {
@@ -400,6 +407,9 @@ export default function SettingsPage() {
       if (shouldSubmitSecret(sourceValues.serperApiKey, sourceInitial.serperApiKey)) {
         payload['search.serper-api-key'] = sourceValues.serperApiKey.trim();
       }
+      if (shouldSubmitSecret(sourceValues.tavilyApiKey, sourceInitial.tavilyApiKey)) {
+        payload['search.tavily-api-key'] = sourceValues.tavilyApiKey.trim();
+      }
       const next = await api.updateSettings({ settings: payload });
       applySettings(next);
       toast.success('设置已生效');
@@ -425,6 +435,7 @@ export default function SettingsPage() {
           ? await api.testSearchSettings({
             provider: sourceValues.searchProvider,
             serperApiKey: sourceValues.serperApiKey,
+            tavilyApiKey: sourceValues.tavilyApiKey,
             bangumiProxy: sourceValues.bangumiProxy,
             query: '孤独摇滚',
           })
@@ -709,9 +720,8 @@ export default function SettingsPage() {
       <div className="settings-form">
         <SettingsRow title="搜索源">
           <div className="settings-segmented">
-            <button type="button" className={sourceValues.searchProvider === 'auto' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'auto')}>智能选择</button>
             <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
-            <button type="button" className={sourceValues.searchProvider === 'ddg' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'ddg')}>DuckDuckGo</button>
+            <button type="button" className={sourceValues.searchProvider === 'tavily' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'tavily')}>Tavily</button>
           </div>
         </SettingsRow>
 
@@ -722,6 +732,16 @@ export default function SettingsPage() {
             placeholder="Serper API Key"
             onVisibilityChange={setShowSerperSecret}
             onChange={value => setSource('serperApiKey', value)}
+          />
+        </SettingsRow>
+
+        <SettingsRow title="Tavily API Key">
+          <SecretInput
+            value={sourceValues.tavilyApiKey}
+            visible={showTavilySecret}
+            placeholder="Tavily API Key"
+            onVisibilityChange={setShowTavilySecret}
+            onChange={value => setSource('tavilyApiKey', value)}
           />
         </SettingsRow>
 

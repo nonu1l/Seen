@@ -274,7 +274,7 @@ public class SearchPipeline {
     List<String> fetchDirectUrls(String context, String keyword) {
         TokenUsageAdvisor.setCurrentNode("pipeline-directFetchUrls");
         String system = """
-                你是影视资料检索助手。当前 Serper / DuckDuckGo 搜索没有可用结果。
+                你是影视资料检索助手。当前配置的 Web 搜索源没有可用结果。
                 请根据用户需求和你的知识，选择最多 3 个公开 HTTP(S) URL，用于直接获取影视榜单、热门列表或资料页面。
                 优先考虑 Bangumi、豆瓣、IMDb、AniList、Jikan/MyAnimeList、TMDb、公开视频平台榜单或公开 API。
                 只输出 URL，每行一个；不要输出解释文字。

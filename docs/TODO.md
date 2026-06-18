@@ -11,7 +11,7 @@
 - [ ] 定期清理缓存、token 使用记录等辅助数据
 - [ ] 设置页面
   - [ ] 模型配置：base url、model、api key
-  - [ ] 搜索源切换：Serper / DuckDuckGo
+  - [ ] 搜索源切换：Serper / Tavily
   - [ ] Bangumi 代理地址配置
   - [ ] AI 助手开关
   - [ ] 展示偏好：默认排序、卡片密度、演员信息、简介显示

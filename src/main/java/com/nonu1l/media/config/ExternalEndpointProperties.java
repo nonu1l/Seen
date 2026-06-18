@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 public class ExternalEndpointProperties {
 
     private String bangumiApiBase;
-    private String duckduckgoLiteSearchUrl;
     private String serperSearchUrl;
+    private String tavilySearchUrl;
 
     public String getBangumiApiBase() {
         return bangumiApiBase;
@@ -22,19 +22,19 @@ public class ExternalEndpointProperties {
         this.bangumiApiBase = bangumiApiBase;
     }
 
-    public String getDuckduckgoLiteSearchUrl() {
-        return duckduckgoLiteSearchUrl;
-    }
-
-    public void setDuckduckgoLiteSearchUrl(String duckduckgoLiteSearchUrl) {
-        this.duckduckgoLiteSearchUrl = duckduckgoLiteSearchUrl;
-    }
-
     public String getSerperSearchUrl() {
         return serperSearchUrl;
     }
 
     public void setSerperSearchUrl(String serperSearchUrl) {
         this.serperSearchUrl = serperSearchUrl;
+    }
+
+    public String getTavilySearchUrl() {
+        return tavilySearchUrl;
+    }
+
+    public void setTavilySearchUrl(String tavilySearchUrl) {
+        this.tavilySearchUrl = tavilySearchUrl;
     }
 }

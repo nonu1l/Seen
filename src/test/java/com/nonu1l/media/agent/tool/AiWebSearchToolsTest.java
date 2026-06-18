@@ -38,14 +38,14 @@ class AiWebSearchToolsTest {
         WebSearchService searchService = mock(WebSearchService.class);
         WebFetchService fetchService = mock(WebFetchService.class);
         when(searchService.searchWithDiagnostics("no result"))
-                .thenReturn(new WebSearchToolResultDTO(false, "no result", "ddg", 0, List.of(),
-                        "DuckDuckGo returned 0 results after 3 attempts", "换关键词"));
+                .thenReturn(new WebSearchToolResultDTO(false, "no result", "tavily", 0, List.of(),
+                        "Tavily returned 0 usable results", "换关键词"));
 
         AiWebSearchTools tools = new AiWebSearchTools(searchService, fetchService);
         var result = tools.searchWebForAgent("no result");
 
         assertFalse(result.ok());
-        assertEquals("ddg", result.provider());
-        assertEquals("DuckDuckGo returned 0 results after 3 attempts", result.error());
+        assertEquals("tavily", result.provider());
+        assertEquals("Tavily returned 0 usable results", result.error());
     }
 }

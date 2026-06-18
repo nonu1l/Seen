@@ -207,9 +207,11 @@ export interface AiProviderSettingRequest {
 }
 
 export interface SourceSettings {
-  searchProvider: 'auto' | 'serper' | 'ddg';
+  searchProvider: 'serper' | 'tavily';
   serperApiKeySet: boolean;
   serperApiKey: string;
+  tavilyApiKeySet: boolean;
+  tavilyApiKey: string;
   bangumiProxy: string;
   detailCastEnabled: boolean;
 }

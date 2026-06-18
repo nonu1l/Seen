@@ -29,6 +29,7 @@ public class SettingsService {
     public static final String AI_TEMPERATURE = "ai.temperature";
     public static final String SEARCH_PROVIDER = "search.provider";
     public static final String SERPER_API_KEY = "search.serper-api-key";
+    public static final String TAVILY_API_KEY = "search.tavily-api-key";
     public static final String BANGUMI_PROXY = "source.bangumi-proxy";
     public static final String DETAIL_CAST_ENABLED = "detail.cast-enabled";
 
@@ -63,6 +64,8 @@ public class SettingsService {
                         getString(SEARCH_PROVIDER),
                         hasText(SERPER_API_KEY),
                         getString(SERPER_API_KEY),
+                        hasText(TAVILY_API_KEY),
+                        getString(TAVILY_API_KEY),
                         getString(BANGUMI_PROXY),
                         getBoolean(DETAIL_CAST_ENABLED)
                 )
@@ -188,14 +191,6 @@ public class SettingsService {
         return value.endsWith("/api") || value.endsWith("/v0") ? value : value + "/api";
     }
 
-    public String ddgSearchUrl(String proxy) {
-        String value = proxy == null ? "" : proxy.trim();
-        if (value.isBlank()) {
-            return endpointProperties.getDuckduckgoLiteSearchUrl();
-        }
-        return AiProviderSupport.trimTrailingSlash(value) + "/search?q=";
-    }
-
     private Object effectiveValue(String key) {
         SettingDefinition definition = definitions.get(key);
         if (definition == null) {
@@ -255,6 +250,7 @@ public class SettingsService {
             return switch (definition.type()) {
                 case "boolean" -> Boolean.parseBoolean(value);
                 case "number" -> Double.parseDouble(value);
+                case "select" -> normalizeProvider(value);
                 default -> value;
             };
         } catch (Exception ignored) {
@@ -263,8 +259,8 @@ public class SettingsService {
     }
 
     private String normalizeProvider(String value) {
-        if ("auto".equalsIgnoreCase(value)) return "auto";
-        return "serper".equalsIgnoreCase(value) ? "serper" : "ddg";
+        if ("tavily".equalsIgnoreCase(value)) return "tavily";
+        return "serper";
     }
 
     private String resolveAiApiKey(AiProviderSettingRequest request) {
@@ -294,8 +290,9 @@ public class SettingsService {
         map.put(AI_API_KEY, new SettingDefinition(AI_API_KEY, "AI API Key", "string", true, ""));
         map.put(AI_MODEL, new SettingDefinition(AI_MODEL, "AI 模型", "string", false, ""));
         map.put(AI_TEMPERATURE, new SettingDefinition(AI_TEMPERATURE, "AI Temperature", "number", false, 0.0d));
-        map.put(SEARCH_PROVIDER, new SettingDefinition(SEARCH_PROVIDER, "搜索源", "select", false, "auto"));
+        map.put(SEARCH_PROVIDER, new SettingDefinition(SEARCH_PROVIDER, "搜索源", "select", false, "serper"));
         map.put(SERPER_API_KEY, new SettingDefinition(SERPER_API_KEY, "Serper API Key", "string", true, ""));
+        map.put(TAVILY_API_KEY, new SettingDefinition(TAVILY_API_KEY, "Tavily API Key", "string", true, ""));
         map.put(BANGUMI_PROXY, new SettingDefinition(BANGUMI_PROXY, "Bangumi 代理地址", "string", false, ""));
         map.put(DETAIL_CAST_ENABLED, new SettingDefinition(DETAIL_CAST_ENABLED, "展示角色 / 演员信息", "boolean", false, true));
         return Collections.unmodifiableMap(map);

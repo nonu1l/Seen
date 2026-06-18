@@ -27,6 +27,8 @@ public record SettingsDTO(
             String searchProvider,
             boolean serperApiKeySet,
             String serperApiKey,
+            boolean tavilyApiKeySet,
+            String tavilyApiKey,
             String bangumiProxy,
             boolean detailCastEnabled
     ) {
