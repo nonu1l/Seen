@@ -70,6 +70,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 - 收敛 Web 工具命名，移除 `web_search` 与旧版简单 `fetchWeb`，将原 `fetch_url` 能力统一暴露为增强版 `fetchWeb`。
 - 网络搜索源改为 Serper / Tavily 手动选择，移除 DuckDuckGo 与自动回退链路；搜索失败和无结果会以结构化原因返回给 Agent。
 - Serper / Tavily 搜索诊断改为只报告当前 provider 的事实状态，避免把切换搜索源或改用抓取工具的建议硬编码进工具返回。
+- 收敛 Web 搜索工具结构：移除旧 `SearchProvider` 和搜索路由中的抓取残留，统一由 `WebSearchProvider` 承载 Serper / Tavily 搜索策略。
 
 ---
 

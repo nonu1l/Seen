@@ -75,7 +75,7 @@ public class AiToolRegistry {
                 .inputType(MemoryReq.class).build(),
 
             FunctionToolCallback.builder("searchWeb",
-                    (SearchReq req) -> webSearchTools.searchWebForAgent(req.keyword()))
+                    (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
                 .description("搜索引擎")
                 .inputType(SearchReq.class).build(),
 

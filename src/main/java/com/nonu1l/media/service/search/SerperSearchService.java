@@ -1,8 +1,10 @@
-package com.nonu1l.media.service;
+package com.nonu1l.media.service.search;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.service.SettingsService;
+import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -61,7 +63,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  */
 @Service
-public class SerperSearchService implements SearchProvider, WebSearchProviderStrategy {
+public class SerperSearchService implements WebSearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(SerperSearchService.class);
     private static final int MAX_RESULTS = 10;
@@ -102,17 +104,6 @@ public class SerperSearchService implements SearchProvider, WebSearchProviderStr
     @Override
     public boolean isAvailable() {
         return settingsService.hasText(SettingsService.SERPER_API_KEY);
-    }
-
-    /**
-     * 调用 Serper 的 search 接口返回前 10 条有效结果。
-     *
-     * @param query 搜索关键词
-     * @return 结构化搜索结果
-     */
-    @Override
-    public List<WebSearchItemDTO> search(String query) {
-        return searchWithDiagnostics(query).items();
     }
 
     /**
@@ -172,30 +163,4 @@ public class SerperSearchService implements SearchProvider, WebSearchProviderStr
         }
     }
 
-    /**
-     * 抓取目标页面并做 HTML 到纯文本清洗。
-     *
-     * <p>返回长度限制为 3000 字符，便于下游 LLM 处理。</p>
-     *
-     * @param url 页面 URL
-     * @return 清洗后的正文文本
-     */
-    @Override
-    public String fetch(String url) {
-        try {
-            String html = restTemplate.getForObject(url, String.class);
-            if (html == null) return null;
-            String text = html
-                    .replaceAll("(?s)<script[^>]*>.*?</script>", " ")
-                    .replaceAll("(?s)<style[^>]*>.*?</style>", " ")
-                    .replaceAll("<[^>]+>", " ")
-                    .replaceAll("&[a-z]+;", " ")
-                    .replaceAll("\\s+", " ").trim();
-            log.info("SerperFetch {} chars from {}", text.length(), url);
-            return text.length() <= 3000 ? text : text.substring(0, 3000);
-        } catch (Exception e) {
-            log.warn("SerperFetch failed '{}': {}", url, e.getMessage());
-            return null;
-        }
-    }
 }

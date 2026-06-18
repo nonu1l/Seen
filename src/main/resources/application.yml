@@ -51,8 +51,8 @@ logging:
     org.hibernate.SQL: DEBUG
     com.nonu1l.media.agent.tool.AiBangumiTools: DEBUG
     com.nonu1l.media.service.WebSearchService: DEBUG
-    com.nonu1l.media.service.SerperSearchService: DEBUG
-    com.nonu1l.media.service.TavilySearchService: DEBUG
+    com.nonu1l.media.service.search.SerperSearchService: DEBUG
+    com.nonu1l.media.service.search.TavilySearchService: DEBUG
     com.nonu1l.media.agent.AgentService: DEBUG
     com.nonu1l.media.config.TokenUsageAdvisor: DEBUG
     com.nonu1l.media.config.DeepSeekThinkingDisableInterceptor: DEBUG

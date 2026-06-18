@@ -1,8 +1,10 @@
-package com.nonu1l.media.service;
+package com.nonu1l.media.service.search;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.service.SettingsService;
+import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -24,7 +26,7 @@ import java.util.Map;
  * Tavily 搜索 API provider，负责把 Tavily 响应映射为统一 Web 搜索结果。
  */
 @Service
-public class TavilySearchService implements WebSearchProviderStrategy {
+public class TavilySearchService implements WebSearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(TavilySearchService.class);
     private static final int MAX_RESULTS = 10;

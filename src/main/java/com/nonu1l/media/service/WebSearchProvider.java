@@ -5,7 +5,7 @@ import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
 /**
  * Web 搜索源策略，供统一搜索入口按运行时设置选择具体 provider。
  */
-public interface WebSearchProviderStrategy {
+public interface WebSearchProvider {
 
     /**
      * @return provider 配置值，例如 serper 或 tavily。

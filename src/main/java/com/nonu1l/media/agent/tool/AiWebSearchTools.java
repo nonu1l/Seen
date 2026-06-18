@@ -38,20 +38,20 @@ public class AiWebSearchTools {
      * @param query 检索关键词
      * @return 外部检索结果
      */
-    public List<WebSearchItemDTO> searchWeb(String query) {
+    public WebSearchToolResultDTO searchWeb(String query) {
         log.debug("Tool: searchWeb query='{}'", query);
-        return webSearchService.search(query);
+        return webSearchService.searchWithDiagnostics(query);
     }
 
     /**
-     * 走统一 Web 搜索入口，并返回 Agent 可见的失败诊断。
+     * 走统一 Web 搜索入口，并只返回搜索结果条目供内部流水线使用。
      *
      * @param query 检索关键词
-     * @return 搜索结构化结果
+     * @return 外部检索结果条目
      */
-    public WebSearchToolResultDTO searchWebForAgent(String query) {
-        log.debug("Tool: searchWeb query='{}'", query);
-        return webSearchService.searchWithDiagnostics(query);
+    public List<WebSearchItemDTO> searchWebItems(String query) {
+        log.debug("Internal: searchWebItems query='{}'", query);
+        return webSearchService.searchWithDiagnostics(query).items();
     }
 
     /**

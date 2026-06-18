@@ -141,7 +141,7 @@ public class SearchPipeline {
             tried++;
 
             // 2a. 搜索
-            List<WebSearchItemDTO> webResults = webSearchTools.searchWeb(kw);
+            List<WebSearchItemDTO> webResults = webSearchTools.searchWebItems(kw);
 
             // 2b. 多线程抓取 + 清洗
             runListener.status("正在读取搜索结果");

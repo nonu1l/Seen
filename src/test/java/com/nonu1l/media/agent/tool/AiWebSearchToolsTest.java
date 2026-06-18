@@ -34,7 +34,7 @@ class AiWebSearchToolsTest {
     }
 
     @Test
-    void searchWebForAgentReturnsSearchDiagnostics() {
+    void searchWebReturnsSearchDiagnostics() {
         WebSearchService searchService = mock(WebSearchService.class);
         WebFetchService fetchService = mock(WebFetchService.class);
         when(searchService.searchWithDiagnostics("no result"))
@@ -42,7 +42,7 @@ class AiWebSearchToolsTest {
                         "Tavily returned 0 usable results", "换关键词"));
 
         AiWebSearchTools tools = new AiWebSearchTools(searchService, fetchService);
-        var result = tools.searchWebForAgent("no result");
+        var result = tools.searchWeb("no result");
 
         assertFalse(result.ok());
         assertEquals("tavily", result.provider());
