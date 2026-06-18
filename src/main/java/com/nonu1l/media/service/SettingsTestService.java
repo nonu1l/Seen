@@ -169,6 +169,9 @@ public class SettingsTestService {
 
     private SettingsTestResponse testSingleSearch(long start, String provider, String query,
                                                   String serperApiKey, String tavilyApiKey) {
+        if (SettingsService.SEARCH_PROVIDER_DISABLED.equals(provider)) {
+            return response(true, "搜索源已关闭，无需测试", start, Map.of("provider", provider));
+        }
         List<Map<String, Object>> attempts = new ArrayList<>();
         List<String> titles = trySearch(provider, query, serperApiKey, tavilyApiKey, attempts);
         if (titles.isEmpty()) {
@@ -262,6 +265,11 @@ public class SettingsTestService {
         }
         if ("serper".equalsIgnoreCase(normalized)) return "serper";
         if ("tavily".equalsIgnoreCase(normalized)) return "tavily";
+        if (SettingsService.SEARCH_PROVIDER_DISABLED.equalsIgnoreCase(normalized)
+                || "none".equalsIgnoreCase(normalized)
+                || "off".equalsIgnoreCase(normalized)) {
+            return SettingsService.SEARCH_PROVIDER_DISABLED;
+        }
         return "serper";
     }
 

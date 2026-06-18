@@ -30,7 +30,7 @@ interface EditableAiConfig {
 }
 
 interface SourceValues {
-  searchProvider: 'serper' | 'tavily';
+  searchProvider: 'disabled' | 'serper' | 'tavily';
   serperApiKey: string;
   serperApiKeySet: boolean;
   tavilyApiKey: string;
@@ -192,6 +192,7 @@ export default function SettingsPage() {
   const extraDirty = useMemo(() => aiDraft.tokenUsageEnabled !== aiInitial.tokenUsageEnabled, [aiDraft, aiInitial]);
   const sourceDirty = useMemo(() => !sameSources(sourceValues, sourceInitial), [sourceValues, sourceInitial]);
   const dirty = activeGroup === 'ai' ? aiDirty : activeGroup === 'sources' ? sourceDirty : extraDirty;
+  const searchDisabled = sourceValues.searchProvider === 'disabled';
 
   const applySettings = (next: SettingsDTO) => {
     const nextSources = toSourceValues(next);
@@ -705,7 +706,13 @@ export default function SettingsPage() {
           <p>搜索服务、Bangumi 代理和详情数据控制。</p>
         </div>
         <div className="settings-panel-buttons">
-          <button type="button" className="btn-ghost" disabled={testLoading !== null} onClick={() => runTest('search')}>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={testLoading !== null || searchDisabled}
+            title={searchDisabled ? '搜索源未启用' : undefined}
+            onClick={() => runTest('search')}
+          >
             {testLoading === 'search' ? '测试中...' : '测试搜索'}
           </button>
           <button type="button" className="btn-ghost" disabled={testLoading !== null} onClick={() => runTest('bangumi')}>
@@ -720,6 +727,7 @@ export default function SettingsPage() {
       <div className="settings-form">
         <SettingsRow title="搜索源">
           <div className="settings-segmented">
+            <button type="button" className={sourceValues.searchProvider === 'disabled' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'disabled')}>不使用</button>
             <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
             <button type="button" className={sourceValues.searchProvider === 'tavily' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'tavily')}>Tavily</button>
           </div>

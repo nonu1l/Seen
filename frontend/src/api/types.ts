@@ -207,7 +207,7 @@ export interface AiProviderSettingRequest {
 }
 
 export interface SourceSettings {
-  searchProvider: 'serper' | 'tavily';
+  searchProvider: 'disabled' | 'serper' | 'tavily';
   serperApiKeySet: boolean;
   serperApiKey: string;
   tavilyApiKeySet: boolean;

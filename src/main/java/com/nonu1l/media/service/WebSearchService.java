@@ -48,6 +48,11 @@ public class WebSearchService {
      * @return 包含搜索结果、搜索源或失败原因的结构化结果
      */
     public WebSearchResultDTO searchWithDiagnostics(String query) {
+        if (!settingsService.isWebSearchProviderEnabled()) {
+            log.warn("Web search disabled by search.provider=disabled");
+            return new WebSearchResultDTO(false, query, SettingsService.SEARCH_PROVIDER_DISABLED, 0, List.of(),
+                    "Web search disabled by settings", null);
+        }
         if (!isSearchEnabled()) {
             log.warn("Web search disabled by app.search.enabled=false");
             return new WebSearchResultDTO(false, query, "disabled", 0, List.of(),
@@ -57,7 +62,7 @@ public class WebSearchService {
         WebSearchProvider strategy = providers.get(provider);
         if (strategy == null) {
             return new WebSearchResultDTO(false, query, provider, 0, List.of(),
-                    "Unsupported web search provider: " + provider, "请在设置页选择 Serper 或 Tavily。");
+                    "Unsupported web search provider: " + provider, "请在设置页选择 Serper、Tavily 或不使用。");
         }
         if (!strategy.isAvailable()) {
             return new WebSearchResultDTO(false, query, strategy.providerKey(), 0, List.of(),

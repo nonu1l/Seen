@@ -28,6 +28,7 @@ public class SettingsService {
     public static final String AI_MODEL = "ai.model";
     public static final String AI_TEMPERATURE = "ai.temperature";
     public static final String SEARCH_PROVIDER = "search.provider";
+    public static final String SEARCH_PROVIDER_DISABLED = "disabled";
     public static final String SERPER_API_KEY = "search.serper-api-key";
     public static final String TAVILY_API_KEY = "search.tavily-api-key";
     public static final String BANGUMI_PROXY = "source.bangumi-proxy";
@@ -174,6 +175,15 @@ public class SettingsService {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 判断设置页是否启用了外部搜索 provider。
+     *
+     * @return search.provider 不是 disabled 时返回 true
+     */
+    public boolean isWebSearchProviderEnabled() {
+        return !SEARCH_PROVIDER_DISABLED.equals(getString(SEARCH_PROVIDER));
+    }
+
     public String bangumiApiBase() {
         return bangumiApiBase(getString(BANGUMI_PROXY), endpointProperties.getBangumiApiBase());
     }
@@ -259,6 +269,11 @@ public class SettingsService {
     }
 
     private String normalizeProvider(String value) {
+        if (SEARCH_PROVIDER_DISABLED.equalsIgnoreCase(value)
+                || "none".equalsIgnoreCase(value)
+                || "off".equalsIgnoreCase(value)) {
+            return SEARCH_PROVIDER_DISABLED;
+        }
         if ("tavily".equalsIgnoreCase(value)) return "tavily";
         return "serper";
     }

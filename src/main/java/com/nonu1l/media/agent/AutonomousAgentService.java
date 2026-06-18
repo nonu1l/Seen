@@ -51,7 +51,10 @@ public class AutonomousAgentService {
         TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         String system = prompt
                 .replace("{today}", LocalDate.now().toString())
-                .replace("{history}", history != null ? history : "");
+                .replace("{history}", history != null ? history : "")
+                .replace("{webToolGuidance}", toolRegistry.webToolGuidance())
+                .replace("{analysisToolList}", toolRegistry.analysisToolList())
+                .replace("{webFailureGuidance}", toolRegistry.webFailureGuidance());
         String content = chatClient().prompt()
                 .system(system)
                 .user(userInput)
