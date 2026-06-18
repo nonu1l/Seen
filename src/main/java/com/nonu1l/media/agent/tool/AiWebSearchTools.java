@@ -1,7 +1,9 @@
 package com.nonu1l.media.agent.tool;
 
 import com.nonu1l.media.model.dto.FetchUrlResultDTO;
+import com.nonu1l.media.model.dto.FetchToolResultDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
+import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
 import com.nonu1l.media.service.WebFetchService;
 import com.nonu1l.media.service.WebSearchService;
 import org.slf4j.Logger;
@@ -42,6 +44,17 @@ public class AiWebSearchTools {
     }
 
     /**
+     * 走统一 Web 搜索入口，并返回 Agent 可见的失败诊断。
+     *
+     * @param query 检索关键词
+     * @return 搜索结构化结果
+     */
+    public WebSearchToolResultDTO searchWebForAgent(String query) {
+        log.debug("Tool: searchWeb query='{}'", query);
+        return webSearchService.searchWithDiagnostics(query);
+    }
+
+    /**
      * 抓取 Web 页面正文文本。
      *
      * @param url 要抓取的 URL
@@ -50,6 +63,17 @@ public class AiWebSearchTools {
     public String fetchWeb(String url) {
         log.debug("Tool: fetchWeb url='{}'", url);
         return webFetchService.fetchText(url);
+    }
+
+    /**
+     * 抓取 Web 页面并返回 Agent 可见的失败诊断。
+     *
+     * @param url 要抓取的 URL
+     * @return 抓取结构化结果
+     */
+    public FetchToolResultDTO fetchWebForAgent(String url) {
+        log.debug("Tool: fetchWeb url='{}'", url);
+        return toToolResult(webFetchService.fetch(url, null));
     }
 
     /**
@@ -63,5 +87,35 @@ public class AiWebSearchTools {
     public FetchUrlResultDTO fetchUrl(String url, String purpose, Integer maxChars) {
         log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
         return webFetchService.fetch(url, maxChars);
+    }
+
+    /**
+     * 抓取任意公开 HTTP(S) URL，并返回 Agent 可见的失败诊断。
+     *
+     * @param url 要抓取的 URL
+     * @param purpose 抓取目的
+     * @param maxChars 最大返回字符数
+     * @return 抓取结构化结果
+     */
+    public FetchToolResultDTO fetchUrlForAgent(String url, String purpose, Integer maxChars) {
+        log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
+        return toToolResult(webFetchService.fetch(url, maxChars));
+    }
+
+    private FetchToolResultDTO toToolResult(FetchUrlResultDTO result) {
+        boolean ok = result != null && result.error() == null && result.text() != null && !result.text().isBlank();
+        String error = result == null ? "fetch returned null" : result.error();
+        String hint = ok ? null : "可以换一个公开资料源，或先调用 searchWeb 查找可访问页面。";
+        return new FetchToolResultDTO(
+                ok,
+                result != null ? result.url() : null,
+                result != null ? result.status() : 0,
+                result != null ? result.contentType() : "",
+                result != null ? result.title() : "",
+                result != null ? result.text() : "",
+                result != null && result.truncated(),
+                error,
+                hint
+        );
     }
 }

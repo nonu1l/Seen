@@ -47,19 +47,19 @@ public class AiToolRegistry {
                 .description("按 Bangumi subjectId 查询单个本地作品当前状态")
                 .inputType(WorkStateReq.class).build(),
             FunctionToolCallback.builder("findWorks",
-                    (FindWorksReq req) -> autonomousTools.findWorks(req.query(), req.mode()))
+                    (FindWorksReq req) -> autonomousTools.findWorksForAgent(req.query(), req.mode()))
                 .description("根据推荐、搜索或描述找片需求查找影视作品候选")
                 .inputType(FindWorksReq.class).build(),
             FunctionToolCallback.builder("presentWorks",
-                    (PresentWorksReq req) -> autonomousTools.presentWorks(req.subjectIds(), req.reason()))
+                    (PresentWorksReq req) -> autonomousTools.presentWorksForAgent(req.subjectIds(), req.reason()))
                 .description("把候选作品保存为 AI 页面 PENDING 展示卡片，不写入用户观看记录")
                 .inputType(PresentWorksReq.class).build(),
             FunctionToolCallback.builder("markWork",
-                    (MarkWorkReq req) -> autonomousTools.markWork(req.subjectId(), req.status(), req.rating(), req.review(), req.reason()))
+                    (MarkWorkReq req) -> autonomousTools.markWorkForAgent(req.subjectId(), req.status(), req.rating(), req.review(), req.reason()))
                 .description("直接标记、评分或修改影评；会保存记录并生成可撤销 SAVED 卡片")
                 .inputType(MarkWorkReq.class).build(),
             FunctionToolCallback.builder("unmarkWork",
-                    (UnmarkWorkReq req) -> autonomousTools.unmarkWork(req.subjectId(), req.reason()))
+                    (UnmarkWorkReq req) -> autonomousTools.unmarkWorkForAgent(req.subjectId(), req.reason()))
                 .description("取消本地已有作品标记；会删除作品记录并生成可撤回 UNMARKED 卡片")
                 .inputType(UnmarkWorkReq.class).build(),
             FunctionToolCallback.builder("readUserMemory",
@@ -67,19 +67,19 @@ public class AiToolRegistry {
                 .description("按需读取用户长期偏好记忆；推荐时可参考但当前用户请求优先")
                 .inputType(MemoryReq.class).build(),
             FunctionToolCallback.builder("searchWeb",
-                    (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
+                    (SearchReq req) -> webSearchTools.searchWebForAgent(req.keyword()))
                 .description("搜索引擎")
                 .inputType(SearchReq.class).build(),
             FunctionToolCallback.builder("web_search",
-                    (SearchReq req) -> webSearchTools.searchWeb(req.keyword()))
+                    (SearchReq req) -> webSearchTools.searchWebForAgent(req.keyword()))
                 .description("使用当前搜索源检索网页候选结果；智能选择模式会优先 Serper，失败后切换 DuckDuckGo")
                 .inputType(SearchReq.class).build(),
             FunctionToolCallback.builder("fetchWeb",
-                    (FetchReq req) -> webSearchTools.fetchWeb(req.url()))
+                    (FetchReq req) -> webSearchTools.fetchWebForAgent(req.url()))
                 .description("抓取网页纯文本")
                 .inputType(FetchReq.class).build(),
             FunctionToolCallback.builder("fetch_url",
-                    (FetchUrlReq req) -> webSearchTools.fetchUrl(req.url(), req.purpose(), req.maxChars()))
+                    (FetchUrlReq req) -> webSearchTools.fetchUrlForAgent(req.url(), req.purpose(), req.maxChars()))
                 .description("直接访问公开 HTTP(S) URL 或公开 API，返回状态、内容类型和清洗文本；搜索源不可用时可用于获取榜单或资料")
                 .inputType(FetchUrlReq.class).build(),
         };

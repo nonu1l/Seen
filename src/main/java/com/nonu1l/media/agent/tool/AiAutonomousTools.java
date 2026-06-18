@@ -3,8 +3,10 @@ package com.nonu1l.media.agent.tool;
 import com.nonu1l.media.agent.SearchPipeline;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.ConversationCardDTO;
+import com.nonu1l.media.model.dto.FindWorksToolResultDTO;
 import com.nonu1l.media.model.dto.LocalRecordDTO;
 import com.nonu1l.media.model.dto.MatchedEntryDTO;
+import com.nonu1l.media.model.dto.WorkActionToolResultDTO;
 import com.nonu1l.media.model.entity.Record;
 import com.nonu1l.media.model.entity.Work;
 import com.nonu1l.media.repository.RecordRepository;
@@ -66,16 +68,38 @@ public class AiAutonomousTools {
      * @return 候选作品卡片数据，不自动落库
      */
     public List<MatchedEntryDTO> findWorks(String query, String mode) {
+        return findWorksForAgent(query, mode).cards();
+    }
+
+    /**
+     * 使用推荐/搜索流水线查找作品候选，并把空结果原因返回给 Agent。
+     *
+     * @param query 查询或推荐需求
+     * @param mode search / recommend / description
+     * @return 带成功状态和失败说明的找片结果
+     */
+    public FindWorksToolResultDTO findWorksForAgent(String query, String mode) {
         AiToolExecutionContext context = AiToolContextHolder.require();
         if (query == null || query.isBlank()) {
-            return List.of();
+            return new FindWorksToolResultDTO(false, query, normalizeMode(mode), List.of(),
+                    "query is blank", "请先从用户请求中提取明确的作品搜索或推荐需求。");
         }
         context.listener().status("正在寻找作品");
         TokenUsageAdvisor.setCurrentNode("tool-findWorks");
-        String normalizedMode = mode != null ? mode.trim() : "search";
+        String normalizedMode = normalizeMode(mode);
         String input = query + "\n\n模式：" + normalizedMode;
         try {
-            return searchPipeline.execute(input, "", context.listener()).cards();
+            SearchPipeline.PipelineResult result = searchPipeline.execute(input, "", context.listener());
+            if (result.cards() == null || result.cards().isEmpty()) {
+                String reason = result.failReason() != null && !result.failReason().isBlank()
+                        ? result.failReason() : "未找到匹配的影视作品";
+                return new FindWorksToolResultDTO(false, query, normalizedMode, List.of(), reason,
+                        "可以换关键词、缩小条件，或向用户说明没有找到可靠候选。");
+            }
+            return new FindWorksToolResultDTO(true, query, normalizedMode, result.cards(), null, null);
+        } catch (Exception e) {
+            return new FindWorksToolResultDTO(false, query, normalizedMode, List.of(),
+                    "findWorks failed: " + e.getMessage(), "可以换一种搜索表达，或告知用户当前搜索流程失败。");
         } finally {
             TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
@@ -89,17 +113,38 @@ public class AiAutonomousTools {
      * @return 创建的 PENDING 卡片列表
      */
     public List<ConversationCardDTO> presentWorks(List<Long> subjectIds, String reason) {
+        WorkActionToolResultDTO result = presentWorksForAgent(subjectIds, reason);
+        return result.cards() != null ? result.cards() : List.of();
+    }
+
+    /**
+     * 将候选作品展示为 AI 卡片，并把失败原因返回给 Agent。
+     *
+     * @param subjectIds 作品 ID 列表
+     * @param reason 展示理由
+     * @return 展示操作结构化结果
+     */
+    public WorkActionToolResultDTO presentWorksForAgent(List<Long> subjectIds, String reason) {
         AiToolContextHolder.require();
         if (subjectIds == null || subjectIds.isEmpty()) {
-            return List.of();
+            return new WorkActionToolResultDTO(false, "present", null, null, List.of(),
+                    "subjectIds is empty", "请先通过 searchBangumi 或 findWorks 获得 subjectId。");
         }
         TokenUsageAdvisor.setCurrentNode("tool-presentWorks");
         try {
-            return subjectIds.stream()
+            List<ConversationCardDTO> cards = subjectIds.stream()
                     .distinct()
                     .limit(8)
                     .map(id -> operationService.presentWork(id, reason))
                     .toList();
+            if (cards.isEmpty()) {
+                return new WorkActionToolResultDTO(false, "present", null, null, List.of(),
+                        "no cards created", "请检查 subjectId 是否有效，或重新搜索候选作品。");
+            }
+            return new WorkActionToolResultDTO(true, "present", null, null, cards, null, null);
+        } catch (Exception e) {
+            return new WorkActionToolResultDTO(false, "present", null, null, List.of(),
+                    "presentWorks failed: " + e.getMessage(), "请重新确认 subjectId，或改为只用自然语言说明候选。");
         } finally {
             TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
@@ -116,12 +161,31 @@ public class AiAutonomousTools {
      * @return 保存后的卡片
      */
     public ConversationCardDTO markWork(Long subjectId, String status, Double rating, String review, String reason) {
+        return markWorkForAgent(subjectId, status, rating, review, reason).card();
+    }
+
+    /**
+     * 标记或修改作品记录，并把业务失败原因返回给 Agent。
+     *
+     * @param subjectId 作品 ID
+     * @param status 目标状态
+     * @param rating 评分
+     * @param review 影评
+     * @param reason 操作原因
+     * @return 标记操作结构化结果
+     */
+    public WorkActionToolResultDTO markWorkForAgent(Long subjectId, String status, Double rating, String review, String reason) {
         if (subjectId == null) {
-            throw new IllegalArgumentException("subjectId required");
+            return new WorkActionToolResultDTO(false, "mark", null, null, null,
+                    "subjectId required", "请先调用 searchBangumi、findWorks 或 searchLocal 获取准确 subjectId。");
         }
         TokenUsageAdvisor.setCurrentNode("tool-markWork");
         try {
-            return operationService.markWork(subjectId, status, rating, review, reason);
+            ConversationCardDTO card = operationService.markWork(subjectId, status, rating, review, reason);
+            return new WorkActionToolResultDTO(true, "mark", subjectId, card, null, null, null);
+        } catch (Exception e) {
+            return new WorkActionToolResultDTO(false, "mark", subjectId, null, null,
+                    "markWork failed: " + e.getMessage(), "请重新确认 subjectId、状态和评分，必要时先查询作品当前状态。");
         } finally {
             TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
@@ -135,12 +199,32 @@ public class AiAutonomousTools {
      * @return 取消标记卡片；本地不存在时返回 null
      */
     public ConversationCardDTO unmarkWork(Long subjectId, String reason) {
+        return unmarkWorkForAgent(subjectId, reason).card();
+    }
+
+    /**
+     * 取消本地作品标记，并把本地不存在等情况返回给 Agent。
+     *
+     * @param subjectId 作品 ID
+     * @param reason 操作原因
+     * @return 取消标记操作结构化结果
+     */
+    public WorkActionToolResultDTO unmarkWorkForAgent(Long subjectId, String reason) {
         if (subjectId == null) {
-            throw new IllegalArgumentException("subjectId required");
+            return new WorkActionToolResultDTO(false, "unmark", null, null, null,
+                    "subjectId required", "取消标记前必须先调用 searchLocal 找到本地已有记录。");
         }
         TokenUsageAdvisor.setCurrentNode("tool-unmarkWork");
         try {
-            return operationService.unmarkWork(subjectId, reason);
+            ConversationCardDTO card = operationService.unmarkWork(subjectId, reason);
+            if (card == null) {
+                return new WorkActionToolResultDTO(false, "unmark", subjectId, null, null,
+                        "本地没有可取消的记录", "请不要去 Bangumi 搜索新条目；直接告诉用户本地没有该记录。");
+            }
+            return new WorkActionToolResultDTO(true, "unmark", subjectId, card, null, null, null);
+        } catch (Exception e) {
+            return new WorkActionToolResultDTO(false, "unmark", subjectId, null, null,
+                    "unmarkWork failed: " + e.getMessage(), "请先调用 searchLocal 确认本地记录是否存在。");
         } finally {
             TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
@@ -207,6 +291,10 @@ public class AiAutonomousTools {
 
     private static String displayName(Work work) {
         return work.getNameCn() != null && !work.getNameCn().isBlank() ? work.getNameCn() : work.getName();
+    }
+
+    private static String normalizeMode(String mode) {
+        return mode != null && !mode.isBlank() ? mode.trim() : "search";
     }
 
     /**

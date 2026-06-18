@@ -1,6 +1,7 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
+import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -54,6 +55,16 @@ public class DDGSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItemDTO> search(String query) {
+        return searchWithDiagnostics(query).items();
+    }
+
+    /**
+     * 使用 DDG Lite 搜索并返回给 AI 工具使用的诊断信息。
+     *
+     * @param query 检索关键词
+     * @return 包含搜索结果或失败原因的结构化结果
+     */
+    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
         try {
             int searchCount = 0;
@@ -90,10 +101,16 @@ public class DDGSearchService implements SearchProvider {
             log.debug("DDG results:\n{}", results.stream()
                 .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                 .reduce("", (a, b) -> a + b + "\n"));
+            if (results.isEmpty()) {
+                return new WebSearchToolResultDTO(false, query, "ddg", 0, results,
+                        "DuckDuckGo returned 0 results after 3 attempts", "可以换关键词，或改用 fetch_url 直接访问公开榜单/API。");
+            }
+            return new WebSearchToolResultDTO(true, query, "ddg", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("DDG search failed '{}': {}", query, e.getMessage());
+            return new WebSearchToolResultDTO(false, query, "ddg", 0, results,
+                    "DuckDuckGo search failed: " + e.getMessage(), "可以换关键词重试，或改用 fetch_url 直接访问公开资料源。");
         }
-        return results;
     }
 
     /**

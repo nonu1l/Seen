@@ -2,6 +2,7 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
+import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -105,11 +106,22 @@ public class SerperSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItemDTO> search(String query) {
+        return searchWithDiagnostics(query).items();
+    }
+
+    /**
+     * 调用 Serper 搜索并返回给 AI 工具使用的诊断信息。
+     *
+     * @param query 搜索关键词
+     * @return 包含结果或失败原因的结构化结果
+     */
+    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
         String apiKey = settingsService.getString(SettingsService.SERPER_API_KEY);
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
-            return results;
+            return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                    "Serper API key is missing", "可以改用 DuckDuckGo，或让用户在设置页配置 Serper API Key。");
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -121,11 +133,17 @@ public class SerperSearchService implements SearchProvider {
 
             String json = restTemplate.postForObject(
                     endpointProperties.getSerperSearchUrl(), request, String.class);
-            if (json == null) return results;
+            if (json == null) {
+                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                        "Serper returned empty response", "可以换关键词重试，或改用 DuckDuckGo。");
+            }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode organic = root.get("organic");
-            if (organic == null || !organic.isArray()) return results;
+            if (organic == null || !organic.isArray()) {
+                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                        "Serper response has no organic results", "可以换关键词重试，或改用 DuckDuckGo。");
+            }
 
             for (JsonNode r : organic) {
                 String title = r.has("title") ? r.get("title").asText() : null;
@@ -140,10 +158,16 @@ public class SerperSearchService implements SearchProvider {
             log.debug("Serper results:\n{}", results.stream()
                 .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                 .reduce("", (a, b) -> a + b + "\n"));
+            if (results.isEmpty()) {
+                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                        "Serper returned 0 usable results", "可以换关键词，或改用 DuckDuckGo / fetch_url。");
+            }
+            return new WebSearchToolResultDTO(true, query, "serper", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Serper search failed '{}': {}", query, e.getMessage());
+            return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                    "Serper search failed: " + e.getMessage(), "可以改用 DuckDuckGo，或缩短/改写关键词后重试。");
         }
-        return results;
     }
 
     /**

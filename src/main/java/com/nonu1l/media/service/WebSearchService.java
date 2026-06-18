@@ -1,6 +1,7 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
+import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,18 +54,33 @@ public class WebSearchService implements SearchProvider {
      */
     @Override
     public List<WebSearchItemDTO> search(String query) {
+        return searchWithDiagnostics(query).items();
+    }
+
+    /**
+     * 搜索外部网页并返回 AI 可理解的诊断结果。
+     *
+     * @param query 检索关键词
+     * @return 包含搜索结果、搜索源或失败原因的结构化结果
+     */
+    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
         if (!isSearchEnabled()) {
             log.warn("Web search disabled by app.search.enabled=false");
-            return List.of();
+            return new WebSearchToolResultDTO(false, query, "disabled", 0, List.of(),
+                    "Web search disabled by app.search.enabled=false", "请告知用户当前外部搜索已关闭，或改用本地记录/已有知识。");
         }
         String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
         if ("auto".equalsIgnoreCase(provider)) {
             return searchAuto(query);
         }
         if ("serper".equalsIgnoreCase(provider)) {
-            return serper.isAvailable() ? searchWithProvider("serper", serper, query) : List.of();
+            if (!serper.isAvailable()) {
+                return new WebSearchToolResultDTO(false, query, "serper", 0, List.of(),
+                        "Serper API key is missing", "可以切换搜索源为 auto/ddg，或让用户配置 Serper API Key。");
+            }
+            return searchWithProvider("serper", query);
         }
-        return searchWithProvider("ddg", ddg, query);
+        return searchWithProvider("ddg", query);
     }
 
     /**
@@ -78,30 +94,34 @@ public class WebSearchService implements SearchProvider {
         return cleanFetchedText(webFetchService.fetchText(url));
     }
 
-    private List<WebSearchItemDTO> searchAuto(String query) {
+    private WebSearchToolResultDTO searchAuto(String query) {
         if (serper.isAvailable()) {
-            List<WebSearchItemDTO> serperResults = searchWithProvider("serper", serper, query);
-            if (!serperResults.isEmpty()) {
-                return serperResults;
+            WebSearchToolResultDTO serperResult = searchWithProvider("serper", query);
+            if (serperResult.ok()) {
+                return serperResult;
             }
             log.info("Serper returned no usable results for '{}', falling back to DuckDuckGo", query);
+            WebSearchToolResultDTO ddgResult = searchWithProvider("ddg", query);
+            if (ddgResult.ok()) {
+                return ddgResult;
+            }
+            String error = serperResult.error() + "; " + ddgResult.error();
+            return new WebSearchToolResultDTO(false, query, "auto", 0, List.of(), error,
+                    "两个搜索源都没有返回可用结果，可以改写关键词，或用 fetch_url 直接访问公开资料源。");
         } else {
             log.info("Serper API key is missing, using DuckDuckGo for '{}'", query);
         }
-        return searchWithProvider("ddg", ddg, query);
+        return searchWithProvider("ddg", query);
     }
 
-    private List<WebSearchItemDTO> searchWithProvider(String providerName, SearchProvider provider, String query) {
+    private WebSearchToolResultDTO searchWithProvider(String providerName, String query) {
         long start = System.nanoTime();
-        try {
-            List<WebSearchItemDTO> results = provider.search(query);
-            log.info("Web search provider={} query='{}' results={} elapsedMs={}",
-                    providerName, query, results.size(), (System.nanoTime() - start) / 1_000_000);
-            return results;
-        } catch (Exception e) {
-            log.warn("Web search provider={} failed query='{}': {}", providerName, query, e.getMessage());
-            return List.of();
-        }
+        WebSearchToolResultDTO result = "serper".equals(providerName)
+                ? serper.searchWithDiagnostics(query)
+                : ddg.searchWithDiagnostics(query);
+        log.info("Web search provider={} query='{}' results={} ok={} elapsedMs={}",
+                providerName, query, result.count(), result.ok(), (System.nanoTime() - start) / 1_000_000);
+        return result;
     }
 
     /**
