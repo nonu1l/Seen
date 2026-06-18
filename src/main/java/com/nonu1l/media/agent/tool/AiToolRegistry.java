@@ -47,19 +47,19 @@ public class AiToolRegistry {
                 .description("按 Bangumi subjectId 查询单个本地作品当前状态")
                 .inputType(WorkStateReq.class).build(),
             FunctionToolCallback.builder("findWorks",
-                    (FindWorksReq req) -> autonomousTools.findWorksForAgent(req.query(), req.mode()))
+                    (FindWorksReq req) -> autonomousTools.findWorks(req.query(), req.mode()))
                 .description("根据推荐、搜索或描述找片需求查找影视作品候选")
                 .inputType(FindWorksReq.class).build(),
             FunctionToolCallback.builder("presentWorks",
-                    (PresentWorksReq req) -> autonomousTools.presentWorksForAgent(req.subjectIds(), req.reason()))
+                    (PresentWorksReq req) -> autonomousTools.presentWorks(req.subjectIds(), req.reason()))
                 .description("把候选作品保存为 AI 页面 PENDING 展示卡片，不写入用户观看记录")
                 .inputType(PresentWorksReq.class).build(),
             FunctionToolCallback.builder("markWork",
-                    (MarkWorkReq req) -> autonomousTools.markWorkForAgent(req.subjectId(), req.status(), req.rating(), req.review(), req.reason()))
+                    (MarkWorkReq req) -> autonomousTools.markWork(req.subjectId(), req.status(), req.rating(), req.review(), req.reason()))
                 .description("直接标记、评分或修改影评；会保存记录并生成可撤销 SAVED 卡片")
                 .inputType(MarkWorkReq.class).build(),
             FunctionToolCallback.builder("unmarkWork",
-                    (UnmarkWorkReq req) -> autonomousTools.unmarkWorkForAgent(req.subjectId(), req.reason()))
+                    (UnmarkWorkReq req) -> autonomousTools.unmarkWork(req.subjectId(), req.reason()))
                 .description("取消本地已有作品标记；会删除作品记录并生成可撤回 UNMARKED 卡片")
                 .inputType(UnmarkWorkReq.class).build(),
             FunctionToolCallback.builder("readUserMemory",

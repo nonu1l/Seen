@@ -65,20 +65,9 @@ public class AiAutonomousTools {
      *
      * @param query 查询或推荐需求
      * @param mode search / recommend / description
-     * @return 候选作品卡片数据，不自动落库
-     */
-    public List<MatchedEntryDTO> findWorks(String query, String mode) {
-        return findWorksForAgent(query, mode).cards();
-    }
-
-    /**
-     * 使用推荐/搜索流水线查找作品候选，并把空结果原因返回给 Agent。
-     *
-     * @param query 查询或推荐需求
-     * @param mode search / recommend / description
      * @return 带成功状态和失败说明的找片结果
      */
-    public FindWorksToolResultDTO findWorksForAgent(String query, String mode) {
+    public FindWorksToolResultDTO findWorks(String query, String mode) {
         AiToolExecutionContext context = AiToolContextHolder.require();
         if (query == null || query.isBlank()) {
             return new FindWorksToolResultDTO(false, query, normalizeMode(mode), List.of(),
@@ -110,21 +99,9 @@ public class AiAutonomousTools {
      *
      * @param subjectIds 作品 ID 列表
      * @param reason 展示理由
-     * @return 创建的 PENDING 卡片列表
-     */
-    public List<ConversationCardDTO> presentWorks(List<Long> subjectIds, String reason) {
-        WorkActionToolResultDTO result = presentWorksForAgent(subjectIds, reason);
-        return result.cards() != null ? result.cards() : List.of();
-    }
-
-    /**
-     * 将候选作品展示为 AI 卡片，并把失败原因返回给 Agent。
-     *
-     * @param subjectIds 作品 ID 列表
-     * @param reason 展示理由
      * @return 展示操作结构化结果
      */
-    public WorkActionToolResultDTO presentWorksForAgent(List<Long> subjectIds, String reason) {
+    public WorkActionToolResultDTO presentWorks(List<Long> subjectIds, String reason) {
         AiToolContextHolder.require();
         if (subjectIds == null || subjectIds.isEmpty()) {
             return new WorkActionToolResultDTO(false, "present", null, null, List.of(),
@@ -158,23 +135,9 @@ public class AiAutonomousTools {
      * @param rating 评分
      * @param review 影评
      * @param reason 操作原因
-     * @return 保存后的卡片
-     */
-    public ConversationCardDTO markWork(Long subjectId, String status, Double rating, String review, String reason) {
-        return markWorkForAgent(subjectId, status, rating, review, reason).card();
-    }
-
-    /**
-     * 标记或修改作品记录，并把业务失败原因返回给 Agent。
-     *
-     * @param subjectId 作品 ID
-     * @param status 目标状态
-     * @param rating 评分
-     * @param review 影评
-     * @param reason 操作原因
      * @return 标记操作结构化结果
      */
-    public WorkActionToolResultDTO markWorkForAgent(Long subjectId, String status, Double rating, String review, String reason) {
+    public WorkActionToolResultDTO markWork(Long subjectId, String status, Double rating, String review, String reason) {
         if (subjectId == null) {
             return new WorkActionToolResultDTO(false, "mark", null, null, null,
                     "subjectId required", "请先调用 searchBangumi、findWorks 或 searchLocal 获取准确 subjectId。");
@@ -196,20 +159,9 @@ public class AiAutonomousTools {
      *
      * @param subjectId 作品 ID
      * @param reason 操作原因
-     * @return 取消标记卡片；本地不存在时返回 null
-     */
-    public ConversationCardDTO unmarkWork(Long subjectId, String reason) {
-        return unmarkWorkForAgent(subjectId, reason).card();
-    }
-
-    /**
-     * 取消本地作品标记，并把本地不存在等情况返回给 Agent。
-     *
-     * @param subjectId 作品 ID
-     * @param reason 操作原因
      * @return 取消标记操作结构化结果
      */
-    public WorkActionToolResultDTO unmarkWorkForAgent(Long subjectId, String reason) {
+    public WorkActionToolResultDTO unmarkWork(Long subjectId, String reason) {
         if (subjectId == null) {
             return new WorkActionToolResultDTO(false, "unmark", null, null, null,
                     "subjectId required", "取消标记前必须先调用 searchLocal 找到本地已有记录。");

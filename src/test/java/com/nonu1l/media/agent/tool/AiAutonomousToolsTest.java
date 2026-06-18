@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
 class AiAutonomousToolsTest {
 
     @Test
-    void unmarkWorkForAgentReturnsFailureWhenLocalRecordDoesNotExist() {
+    void unmarkWorkReturnsFailureWhenLocalRecordDoesNotExist() {
         AiWorkOperationService operationService = mock(AiWorkOperationService.class);
         when(operationService.unmarkWork(100L, "用户要求取消")).thenReturn(null);
 
@@ -34,7 +34,7 @@ class AiAutonomousToolsTest {
                 mock(WorkRepository.class)
         );
 
-        var result = tools.unmarkWorkForAgent(100L, "用户要求取消");
+        var result = tools.unmarkWork(100L, "用户要求取消");
 
         assertFalse(result.ok());
         assertNull(result.card());
