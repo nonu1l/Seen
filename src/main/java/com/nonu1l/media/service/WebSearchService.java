@@ -80,8 +80,7 @@ public class WebSearchService implements SearchProvider {
         }
         if (!strategy.isAvailable()) {
             return new WebSearchToolResultDTO(false, query, strategy.providerKey(), 0, List.of(),
-                    displayName(strategy.providerKey()) + " API key is missing",
-                    "请在设置页配置 " + displayName(strategy.providerKey()) + " API Key，或切换到另一个已配置搜索源。");
+                    displayName(strategy.providerKey()) + " API key is missing", null);
         }
         return searchWithProvider(strategy, query);
     }

@@ -127,7 +127,7 @@ public class SerperSearchService implements SearchProvider, WebSearchProviderStr
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
             return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                    "Serper API key is missing", "请让用户在设置页配置 Serper API Key，或切换到已配置的 Tavily。");
+                    "Serper API key is missing", null);
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -139,16 +139,16 @@ public class SerperSearchService implements SearchProvider, WebSearchProviderStr
 
             String json = restTemplate.postForObject(
                     endpointProperties.getSerperSearchUrl(), request, String.class);
-            if (json == null) {
+            if (json == null || json.isBlank()) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper returned empty response", "可以换关键词重试，或切换到 Tavily / fetchWeb。");
+                        "Serper returned empty response", null);
             }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode organic = root.get("organic");
             if (organic == null || !organic.isArray()) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper response has no organic results", "可以换关键词重试，或切换到 Tavily / fetchWeb。");
+                        "Serper response has no organic results", null);
             }
 
             for (JsonNode r : organic) {
@@ -164,15 +164,11 @@ public class SerperSearchService implements SearchProvider, WebSearchProviderStr
             log.debug("Serper results:\n{}", results.stream()
                 .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                 .reduce("", (a, b) -> a + b + "\n"));
-            if (results.isEmpty()) {
-                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper returned 0 usable results", "可以换关键词，或切换到 Tavily / fetchWeb。");
-            }
             return new WebSearchToolResultDTO(true, query, "serper", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Serper search failed '{}': {}", query, e.getMessage());
             return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                    "Serper search failed: " + e.getMessage(), "可以切换到 Tavily，或缩短/改写关键词后重试。");
+                    "Serper search failed: " + e.getMessage(), null);
         }
     }
 

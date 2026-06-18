@@ -81,7 +81,7 @@ public class TavilySearchService implements WebSearchProviderStrategy {
         if (apiKey.isBlank()) {
             log.warn("Tavily search skipped: no API key");
             return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
-                    "Tavily API key is missing", "请让用户在设置页配置 Tavily API Key，或切换到已配置的 Serper。");
+                    "Tavily API key is missing", null);
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -103,14 +103,14 @@ public class TavilySearchService implements WebSearchProviderStrategy {
             );
             if (json == null || json.isBlank()) {
                 return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
-                        "Tavily returned empty response", "可以换关键词重试，或用 fetchWeb 直接访问公开资料源。");
+                        "Tavily returned empty response", null);
             }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode items = root.get("results");
             if (items == null || !items.isArray()) {
                 return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
-                        "Tavily response has no results", "可以换关键词重试，或用 fetchWeb 直接访问公开资料源。");
+                        "Tavily response has no results", null);
             }
 
             for (JsonNode item : items) {
@@ -127,15 +127,11 @@ public class TavilySearchService implements WebSearchProviderStrategy {
             log.debug("Tavily results:\n{}", results.stream()
                     .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                     .reduce("", (a, b) -> a + b + "\n"));
-            if (results.isEmpty()) {
-                return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
-                        "Tavily returned 0 usable results", "可以换关键词，或用 fetchWeb 直接访问公开资料源。");
-            }
             return new WebSearchToolResultDTO(true, query, providerKey(), results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Tavily search failed '{}': {}", query, e.getMessage());
             return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
-                    "Tavily search failed: " + e.getMessage(), "可以切换到 Serper，或缩短/改写关键词后重试。");
+                    "Tavily search failed: " + e.getMessage(), null);
         }
     }
 }
