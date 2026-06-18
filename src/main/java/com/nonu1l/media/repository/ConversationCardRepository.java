@@ -15,15 +15,6 @@ import java.util.List;
 public interface ConversationCardRepository extends JpaRepository<ConversationCard, Long> {
 
     /**
-     * 按会话与卡片状态查询卡片列表，按 id 升序返回。
-     *
-     * @param sessionId 会话 ID
-     * @param cardState 卡片状态
-     * @return 指定会话内该状态的卡片列表（按创建序/主键序升序）
-     */
-    List<ConversationCard> findAllBySessionIdAndCardStateOrderByIdAsc(Long sessionId, String cardState);
-
-    /**
      * 按会话与多种状态查询卡片列表，按 id 升序返回。
      *
      * @param sessionId 会话 ID
@@ -40,17 +31,6 @@ public interface ConversationCardRepository extends JpaRepository<ConversationCa
      * @return 本轮请求产生的卡片列表
      */
     List<ConversationCard> findAllBySessionIdAndRequestIdOrderByIdAsc(Long sessionId, String requestId);
-
-    /**
-     * 查询某轮请求中指定作品的最后一张卡片。
-     *
-     * @param sessionId 会话 ID
-     * @param requestId AI 请求 ID
-     * @param subjectId 作品 ID
-     * @return 匹配卡片列表，按 ID 倒序
-     */
-    List<ConversationCard> findAllBySessionIdAndRequestIdAndSubjectIdOrderByIdDesc(
-            Long sessionId, String requestId, Long subjectId);
 
     /**
      * 删除指定会话下全部卡片。

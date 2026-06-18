@@ -104,43 +104,6 @@ public class BangumiService {
     }
 
     /**
-     * 获取 Bangumi 趋势热门排行（兼容旧接口）。
-     *
-     * @param type 条目类型（2 动画，6 真人）
-     * @param year 可选年份过滤
-     * @return 指定条件下的榜单结果
-     */
-    @Deprecated
-    public List<WorkSearchResultDTO> trending(int type, Integer year) {
-        List<WorkSearchResultDTO> results = new ArrayList<>();
-        String base = settingsService.bangumiApiBase();
-        try {
-            var filter = new java.util.LinkedHashMap<String, Object>();
-            filter.put("type", java.util.List.of(type));
-            if (year != null) {
-                filter.put("air_date", java.util.List.of(year + "-01-01"));
-            }
-            String body = objectMapper.writeValueAsString(
-                    java.util.Map.of(
-                            "keyword", "",
-                            "sort", "rank",
-                            "filter", filter));
-
-            String json = post(base + "/search/subjects?limit=15", body, 300);
-            if (json == null) return results;
-
-            JsonNode data = objectMapper.readTree(json).get("data");
-            if (data != null && data.isArray()) {
-                for (JsonNode item : data) results.add(mapSubject(item));
-            }
-            log.debug("Trending type={} year={}: {} results", type, year, results.size());
-        } catch (Exception e) {
-            log.error("Bangumi trending failed type={} year={}", type, year, e);
-        }
-        return results;
-    }
-
-    /**
      * 按 ID 查询条目基础信息。
      *
      * @param subjectId 条目ID

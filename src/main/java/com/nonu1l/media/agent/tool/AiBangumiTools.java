@@ -41,7 +41,7 @@ public class AiBangumiTools {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
         List<WorkSearchResultDTO> raw = bangumiService.search(keyword);
 
-        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw, keyword);
+        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw);
         return compact.stream().map(CompactResultDTO::from).toList();
     }
 
@@ -57,28 +57,11 @@ public class AiBangumiTools {
         if (raw.isEmpty()) {
             return null;
         }
-        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw, keyword);
+        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw);
         if (compact.isEmpty()) {
             return null;
         }
         return compact.stream().map(CompactResultDTO::from).toList().getFirst();
     }
 
-    /**
-     * 获取 Bangumi 热门排行（已废弃，保留现有 AI 工具兼容行为）。
-     *
-     * @param type 条目类型
-     * @param year 年份过滤，可为空
-     * @return 紧凑排行结果
-     */
-    @Deprecated
-    public List<CompactResultDTO> trendingBangumi(int type, Integer year) {
-        log.debug("Tool: trendingBangumi type={} year={}", type, year);
-        return bangumiService.trending(type, year).stream()
-                .map(r -> new CompactResultDTO(
-                        r.getId(), r.getNameCn(), r.getNameOrig(),
-                        r.getPlatform(), r.getAirDate(),
-                        r.getEpsCount(), r.getScore(), r.getRank()))
-                .toList();
-    }
 }

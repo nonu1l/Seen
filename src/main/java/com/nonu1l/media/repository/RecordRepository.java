@@ -14,7 +14,7 @@ import java.util.Set;
 /**
  * 作品记录仓储：提供作品追踪记录的查询、计数、删除能力。
  *
- * <p>除基础 CRUD 外，重点支持“按作品取最新记录/最近两条”和计数统计场景。</p>
+ * <p>除基础 CRUD 外，重点支持“按作品取最新记录”和计数统计场景。</p>
  */
 @Repository
 public interface RecordRepository extends JpaRepository<Record, Long> {
@@ -51,15 +51,6 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
      * @return 最近 30 条记录，按更新时间和主键倒序
      */
     List<Record> findTop30ByOrderByUpdatedAtDescIdDesc();
-
-    /**
-     * 查询单个作品最近两条记录，用于新增/覆盖前后版本对比。
-     *
-     * @param workId 作品 ID
-     * @return 指定作品最近两条记录（最多2条），按更新时间降序
-     */
-    @Query("SELECT r FROM Record r WHERE r.workId = :workId ORDER BY r.updatedAt DESC, r.id DESC LIMIT 2")
-    List<Record> findLatest2ByWorkId(@Param("workId") Long workId);
 
     /**
      * 按作品和状态统计记录数。
