@@ -148,7 +148,7 @@ public class SearchPipeline {
             List<String> pageTexts = webResults.isEmpty()
                     ? fetchDirectUrls(context, kw)
                     : webResults.stream().limit(maxPages).parallel()
-                            .map(r -> webSearchTools.fetchWeb(r.url()))
+                            .map(r -> webSearchTools.fetchWebText(r.url()))
                             .filter(t -> t != null && !t.isBlank())
                             .toList();
             if (pageTexts.isEmpty()) continue;
@@ -292,7 +292,7 @@ public class SearchPipeline {
         if (urls.isEmpty()) return List.of();
         log.info("Pipeline: direct fetch fallback urls={}", urls);
         return urls.stream()
-                .map(url -> webSearchTools.fetchUrl(url, "search-source-fallback", 6000))
+                .map(url -> webSearchTools.fetchUrlRaw(url, "search-source-fallback", 6000))
                 .filter(resultItem -> resultItem != null && resultItem.error() == null)
                 .map(resultItem -> resultItem.text())
                 .filter(text -> text != null && !text.isBlank())

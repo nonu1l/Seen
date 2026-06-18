@@ -103,13 +103,13 @@ public class DDGSearchService implements SearchProvider {
                 .reduce("", (a, b) -> a + b + "\n"));
             if (results.isEmpty()) {
                 return new WebSearchToolResultDTO(false, query, "ddg", 0, results,
-                        "DuckDuckGo returned 0 results after 3 attempts", "可以换关键词，或改用 fetch_url 直接访问公开榜单/API。");
+                        "DuckDuckGo returned 0 results after 3 attempts", "可以换关键词，或改用 fetchWeb 直接访问公开榜单/API。");
             }
             return new WebSearchToolResultDTO(true, query, "ddg", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("DDG search failed '{}': {}", query, e.getMessage());
             return new WebSearchToolResultDTO(false, query, "ddg", 0, results,
-                    "DuckDuckGo search failed: " + e.getMessage(), "可以换关键词重试，或改用 fetch_url 直接访问公开资料源。");
+                    "DuckDuckGo search failed: " + e.getMessage(), "可以换关键词重试，或改用 fetchWeb 直接访问公开资料源。");
         }
     }
 

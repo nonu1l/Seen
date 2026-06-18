@@ -160,7 +160,7 @@ public class SerperSearchService implements SearchProvider {
                 .reduce("", (a, b) -> a + b + "\n"));
             if (results.isEmpty()) {
                 return new WebSearchToolResultDTO(false, query, "serper", 0, results,
-                        "Serper returned 0 usable results", "可以换关键词，或改用 DuckDuckGo / fetch_url。");
+                        "Serper returned 0 usable results", "可以换关键词，或改用 DuckDuckGo / fetchWeb。");
             }
             return new WebSearchToolResultDTO(true, query, "serper", results.size(), results, null, null);
         } catch (Exception e) {

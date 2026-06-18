@@ -48,7 +48,7 @@ public class WebFetchService {
             URI uri = normalizeAndValidate(url);
             return fetchFollowingRedirects(uri, limit, 0);
         } catch (Exception e) {
-            log.warn("fetch_url blocked '{}': {}", url, e.getMessage());
+            log.warn("fetchWeb blocked '{}': {}", url, e.getMessage());
             return failure(url, 0, "", e.getMessage());
         }
     }
@@ -96,7 +96,7 @@ public class WebFetchService {
         String raw = new String(bytes, charset);
         CleanedText cleaned = clean(uri.toString(), contentType, raw, maxChars);
         boolean truncated = byteTruncated || cleaned.truncated();
-        log.info("fetch_url status={} chars={} truncated={} url={}",
+        log.info("fetchWeb status={} chars={} truncated={} url={}",
                 status, cleaned.text().length(), truncated, uri);
         return new FetchUrlResultDTO(uri.toString(), status, contentType, cleaned.title(), cleaned.text(), truncated,
                 status >= 400 ? "HTTP " + status : null);

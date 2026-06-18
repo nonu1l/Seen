@@ -107,7 +107,7 @@ public class WebSearchService implements SearchProvider {
             }
             String error = serperResult.error() + "; " + ddgResult.error();
             return new WebSearchToolResultDTO(false, query, "auto", 0, List.of(), error,
-                    "两个搜索源都没有返回可用结果，可以改写关键词，或用 fetch_url 直接访问公开资料源。");
+                    "两个搜索源都没有返回可用结果，可以改写关键词，或用 fetchWeb 直接访问公开资料源。");
         } else {
             log.info("Serper API key is missing, using DuckDuckGo for '{}'", query);
         }

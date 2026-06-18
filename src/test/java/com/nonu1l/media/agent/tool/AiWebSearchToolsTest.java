@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
 class AiWebSearchToolsTest {
 
     @Test
-    void fetchUrlForAgentReturnsErrorResultWhenFetchFails() {
+    void fetchWebReturnsErrorResultWhenFetchFails() {
         WebSearchService searchService = mock(WebSearchService.class);
         WebFetchService fetchService = mock(WebFetchService.class);
         when(fetchService.fetch("https://example.com/slow", 1000))
@@ -27,7 +27,7 @@ class AiWebSearchToolsTest {
                         "Connect timed out"));
 
         AiWebSearchTools tools = new AiWebSearchTools(searchService, fetchService);
-        var result = tools.fetchUrlForAgent("https://example.com/slow", "debug", 1000);
+        var result = tools.fetchWeb("https://example.com/slow", "debug", 1000);
 
         assertFalse(result.ok());
         assertEquals("Connect timed out", result.error());

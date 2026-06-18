@@ -7,7 +7,7 @@ app:
 #   业务默认 thinking 模式：enabled / disabled / auto / default
     thinking-mode: ${AI_THINKING_MODE:enabled}
   search:
-#   是否启用外部搜索源；设为 false 时 web_search 返回空，方便验证 fetch_url 直访 URL fallback
+#   是否启用外部搜索源；设为 false 时 searchWeb 返回空，方便验证 fetchWeb 直访 URL fallback
     enabled: ${WEB_SEARCH_ENABLED:true}
   endpoints:
 #    bangumi 默认 api  / https://bangumi.github.io

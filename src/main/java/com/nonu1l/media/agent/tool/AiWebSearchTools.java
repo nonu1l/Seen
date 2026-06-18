@@ -55,38 +55,14 @@ public class AiWebSearchTools {
     }
 
     /**
-     * 抓取 Web 页面正文文本。
+     * 抓取 Web 页面正文文本，供内部搜索流水线使用。
      *
      * @param url 要抓取的 URL
      * @return 清洗后的文本片段，失败时可能为 null
      */
-    public String fetchWeb(String url) {
-        log.debug("Tool: fetchWeb url='{}'", url);
+    public String fetchWebText(String url) {
+        log.debug("Internal: fetchWebText url='{}'", url);
         return webFetchService.fetchText(url);
-    }
-
-    /**
-     * 抓取 Web 页面并返回 Agent 可见的失败诊断。
-     *
-     * @param url 要抓取的 URL
-     * @return 抓取结构化结果
-     */
-    public FetchToolResultDTO fetchWebForAgent(String url) {
-        log.debug("Tool: fetchWeb url='{}'", url);
-        return toToolResult(webFetchService.fetch(url, null));
-    }
-
-    /**
-     * 抓取任意公开 HTTP(S) URL，并返回结构化状态与正文。
-     *
-     * @param url 要抓取的 URL
-     * @param purpose 抓取目的，便于日志和模型自我约束
-     * @param maxChars 最大返回字符数
-     * @return URL 抓取结果
-     */
-    public FetchUrlResultDTO fetchUrl(String url, String purpose, Integer maxChars) {
-        log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
-        return webFetchService.fetch(url, maxChars);
     }
 
     /**
@@ -97,9 +73,22 @@ public class AiWebSearchTools {
      * @param maxChars 最大返回字符数
      * @return 抓取结构化结果
      */
-    public FetchToolResultDTO fetchUrlForAgent(String url, String purpose, Integer maxChars) {
-        log.debug("Tool: fetch_url url='{}' purpose='{}'", url, purpose);
+    public FetchToolResultDTO fetchWeb(String url, String purpose, Integer maxChars) {
+        log.debug("Tool: fetchWeb url='{}' purpose='{}'", url, purpose);
         return toToolResult(webFetchService.fetch(url, maxChars));
+    }
+
+    /**
+     * 抓取任意公开 HTTP(S) URL，并返回结构化状态与正文，供内部搜索流水线使用。
+     *
+     * @param url 要抓取的 URL
+     * @param purpose 抓取目的，便于日志和模型自我约束
+     * @param maxChars 最大返回字符数
+     * @return URL 抓取结果
+     */
+    public FetchUrlResultDTO fetchUrlRaw(String url, String purpose, Integer maxChars) {
+        log.debug("Internal: fetchUrlRaw url='{}' purpose='{}'", url, purpose);
+        return webFetchService.fetch(url, maxChars);
     }
 
     private FetchToolResultDTO toToolResult(FetchUrlResultDTO result) {

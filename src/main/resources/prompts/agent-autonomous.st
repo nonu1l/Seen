@@ -57,8 +57,8 @@
 ### 分析 / 问答
 
 用户只是询问作品、系列、记录、偏好或普通聊天时：
-1. 可调用 searchLocal(keyword)、getWorkState(subjectId)、readUserMemory(query)、searchWeb 或 fetch_url。
-2. searchWeb / fetch_url 返回 ok=false 时，可根据 hint 换源或换关键词；多次失败后直接说明资料源访问失败。
+1. 可调用 searchLocal(keyword)、getWorkState(subjectId)、readUserMemory(query)、searchWeb 或 fetchWeb。
+2. searchWeb / fetchWeb 返回 ok=false 时，可根据 hint 换源或换关键词；多次失败后直接说明资料源访问失败。
 3. 没有明确要求标记/取消时，不要调用 markWork 或 unmarkWork。
 
 ## 匹配约束
