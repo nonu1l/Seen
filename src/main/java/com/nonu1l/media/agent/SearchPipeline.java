@@ -38,6 +38,16 @@ public class SearchPipeline {
     private final static int maxCards = 5;
     private final static int maxPages = 10;
     private final static int maxDirectUrls = 3;
+    private static final int MAX_EXTRACTED_TITLES = 20;
+    private static final int MAX_TITLE_LENGTH = 80;
+    private static final String NO_TITLES = "NO_TITLES";
+    private static final List<String> NO_MATCH_MARKERS = List.of(
+            "并未包含", "未包含", "没有与", "没有匹配", "未找到匹配", "不匹配", "不吻合", "无法提取"
+    );
+    private static final List<String> NON_TITLE_MARKERS = List.of(
+            "抱歉", "网页内容", "页面内容", "主要包含", "可以提取", "查询意图", "筛选器", "导航",
+            "过滤选项", "分类页面", "实际的动漫列表", "流行的人气动漫", "与您的查询", "与查询方向"
+    );
     private final String promptKeywords;
     private final String promptTitles;
     private final String promptValidate;
@@ -313,7 +323,87 @@ public class SearchPipeline {
                 .replace("{context}", userInput);
         String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(text).call().content());
         if (result == null || result.isBlank()) return List.of();
-        return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
+        return cleanExtractedTitles(result);
+    }
+
+    /**
+     * 清洗标题提取模型输出，避免说明文字被当成片名继续搜索 Bangumi。
+     *
+     * @param result 标题提取模型输出。
+     * @return 可用于后续搜索的候选标题。
+     */
+    static List<String> cleanExtractedTitles(String result) {
+        if (result == null || result.isBlank()) {
+            return List.of();
+        }
+        String normalizedResult = result.trim();
+        if (normalizedResult.lines().anyMatch(line -> NO_TITLES.equalsIgnoreCase(line.trim()))
+                || containsAny(normalizedResult, NO_MATCH_MARKERS)) {
+            return List.of();
+        }
+        return normalizedResult.lines()
+                .map(SearchPipeline::normalizeTitleCandidate)
+                .filter(SearchPipeline::isLikelyTitleCandidate)
+                .distinct()
+                .limit(MAX_EXTRACTED_TITLES)
+                .toList();
+    }
+
+    /**
+     * 去掉模型偶尔输出的编号、项目符号和包裹符号。
+     *
+     * @param line 原始单行候选。
+     * @return 归一化后的标题候选。
+     */
+    private static String normalizeTitleCandidate(String line) {
+        if (line == null) {
+            return "";
+        }
+        String value = line.trim()
+                .replace("**", "")
+                .replace("__", "")
+                .replaceAll("^#{1,6}\\s*", "")
+                .replaceAll("^[-+•]\\s*", "")
+                .replaceAll("^\\*\\s+", "")
+                .replaceAll("^\\d+[.、)]\\s*", "")
+                .trim();
+        return value.replaceAll("^[`\"'“”‘’《》]+|[`\"'“”‘’《》]+$", "").trim();
+    }
+
+    /**
+     * 判断单行文本是否像真实作品标题，而不是模型解释或页面结构描述。
+     *
+     * @param title 归一化后的标题候选。
+     * @return 可作为搜索关键词时返回 true。
+     */
+    private static boolean isLikelyTitleCandidate(String title) {
+        if (title == null || title.isBlank()) {
+            return false;
+        }
+        if (NO_TITLES.equalsIgnoreCase(title) || title.length() > MAX_TITLE_LENGTH) {
+            return false;
+        }
+        if (title.endsWith(":") || title.endsWith("：")) {
+            return false;
+        }
+        if (title.contains("。") || title.contains("，") || title.contains("；")) {
+            return false;
+        }
+        if (title.matches("^[\\p{Punct}\\s]+$")) {
+            return false;
+        }
+        return !containsAny(title, NON_TITLE_MARKERS);
+    }
+
+    /**
+     * 判断文本是否包含任一失败或说明性标记。
+     *
+     * @param value 待检查文本。
+     * @param markers 标记词列表。
+     * @return 命中任一标记时返回 true。
+     */
+    private static boolean containsAny(String value, List<String> markers) {
+        return markers.stream().anyMatch(value::contains);
     }
 
     /**
