@@ -293,6 +293,12 @@ export default function SettingsPage() {
     setSourceValues(prev => ({ ...prev, [key]: value }));
   };
 
+  const setSearchProvider = (provider: SourceValues['searchProvider']) => {
+    setSourceValues(prev => ({ ...prev, searchProvider: provider }));
+    setShowSerperSecret(false);
+    setShowTavilySecret(false);
+  };
+
   const buildAiConfigRequest = (): AiProviderSettingRequest => {
     const req: AiProviderSettingRequest = {
       baseUrl: aiDraft.baseUrl.trim(),
@@ -727,31 +733,35 @@ export default function SettingsPage() {
       <div className="settings-form">
         <SettingsRow title="搜索源">
           <div className="settings-segmented">
-            <button type="button" className={sourceValues.searchProvider === 'disabled' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'disabled')}>不使用</button>
-            <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'serper')}>Serper</button>
-            <button type="button" className={sourceValues.searchProvider === 'tavily' ? 'is-active' : ''} onClick={() => setSource('searchProvider', 'tavily')}>Tavily</button>
+            <button type="button" className={sourceValues.searchProvider === 'disabled' ? 'is-active' : ''} onClick={() => setSearchProvider('disabled')}>不使用</button>
+            <button type="button" className={sourceValues.searchProvider === 'serper' ? 'is-active' : ''} onClick={() => setSearchProvider('serper')}>Serper</button>
+            <button type="button" className={sourceValues.searchProvider === 'tavily' ? 'is-active' : ''} onClick={() => setSearchProvider('tavily')}>Tavily</button>
           </div>
         </SettingsRow>
 
-        <SettingsRow title="Serper API Key">
-          <SecretInput
-            value={sourceValues.serperApiKey}
-            visible={showSerperSecret}
-            placeholder="Serper API Key"
-            onVisibilityChange={setShowSerperSecret}
-            onChange={value => setSource('serperApiKey', value)}
-          />
-        </SettingsRow>
+        {sourceValues.searchProvider === 'serper' && (
+          <SettingsRow title="Serper API Key">
+            <SecretInput
+              value={sourceValues.serperApiKey}
+              visible={showSerperSecret}
+              placeholder="Serper API Key"
+              onVisibilityChange={setShowSerperSecret}
+              onChange={value => setSource('serperApiKey', value)}
+            />
+          </SettingsRow>
+        )}
 
-        <SettingsRow title="Tavily API Key">
-          <SecretInput
-            value={sourceValues.tavilyApiKey}
-            visible={showTavilySecret}
-            placeholder="Tavily API Key"
-            onVisibilityChange={setShowTavilySecret}
-            onChange={value => setSource('tavilyApiKey', value)}
-          />
-        </SettingsRow>
+        {sourceValues.searchProvider === 'tavily' && (
+          <SettingsRow title="Tavily API Key">
+            <SecretInput
+              value={sourceValues.tavilyApiKey}
+              visible={showTavilySecret}
+              placeholder="Tavily API Key"
+              onVisibilityChange={setShowTavilySecret}
+              onChange={value => setSource('tavilyApiKey', value)}
+            />
+          </SettingsRow>
+        )}
 
         <SettingsRow title="Bangumi 代理地址">
           <input className="settings-input" value={sourceValues.bangumiProxy} placeholder="https://api.bgm.tv/v0" onChange={event => setSource('bangumiProxy', event.target.value)} />
