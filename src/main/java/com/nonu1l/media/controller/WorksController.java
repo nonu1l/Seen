@@ -30,10 +30,10 @@ public class WorksController {
     /**
      * 获取默认作品列表卡片。
      *
-     * @return 按当前策略返回 {@link WorkListItemDTO} 列表；异常时返回 500。
+     * @return 按当前策略返回 {@link WorkListItemResponse} 列表；异常时返回 500。
      */
     @PostMapping("/list")
-    public ResponseEntity<List<WorkListItemDTO>> list() {
+    public ResponseEntity<List<WorkListItemResponse>> list() {
         try { return ResponseEntity.ok(workService.listAll()); }
         catch (Exception e) { log.error("list failed", e); return ResponseEntity.internalServerError().build(); }
     }
@@ -45,10 +45,10 @@ public class WorksController {
      * @return 匹配结果；为空时返回空列表；异常时返回 500。
      */
     @PostMapping("/search")
-    public ResponseEntity<SearchDTO> search(@RequestBody Map<String, String> body) {
+    public ResponseEntity<WorkSearchResponse> search(@RequestBody Map<String, String> body) {
         try {
             String q = body.get("q");
-            if (q == null || q.isBlank()) return ResponseEntity.ok(new SearchDTO(List.of(), List.of()));
+            if (q == null || q.isBlank()) return ResponseEntity.ok(new WorkSearchResponse(List.of(), List.of()));
             return ResponseEntity.ok(workService.search(q.trim()));
         } catch (Exception e) { log.error("search failed", e); return ResponseEntity.internalServerError().build(); }
     }
@@ -60,11 +60,11 @@ public class WorksController {
      * @return 找到则返回明细；未找到返回 404；异常返回 500。
      */
     @PostMapping("/details")
-    public ResponseEntity<WorkDetailDTO> details(@RequestBody Map<String, String> body) {
+    public ResponseEntity<WorkDetailResponse> details(@RequestBody Map<String, String> body) {
         try {
             String id = body.get("id");
             if (id == null) return ResponseEntity.badRequest().build();
-            WorkDetailDTO d = workService.getDetail(id);
+            WorkDetailResponse d = workService.getDetail(id);
             return d == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(d);
         } catch (Exception e) { log.error("details failed", e); return ResponseEntity.internalServerError().build(); }
     }
@@ -76,7 +76,7 @@ public class WorksController {
      * @return 更新后的作品条目；参数非法返回 400；业务冲突/异常返回 500。
      */
     @PostMapping("/mark")
-    public ResponseEntity<WorkListItemDTO> mark(@RequestBody MarkRequest req) {
+    public ResponseEntity<WorkListItemResponse> mark(@RequestBody MarkRequest req) {
         try { return ResponseEntity.ok(workService.mark(req)); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().build(); }
         catch (Exception e) { log.error("mark failed", e); return ResponseEntity.internalServerError().build(); }
@@ -105,7 +105,7 @@ public class WorksController {
      * @return 更新后的作品条目；冲突返回 409，异常返回 500。
      */
     @PostMapping("/update-review")
-    public ResponseEntity<WorkListItemDTO> updateReview(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<WorkListItemResponse> updateReview(@RequestBody Map<String, Object> body) {
         try {
             Number workId = (Number) body.get("workId");
             if (workId == null) return ResponseEntity.badRequest().build();

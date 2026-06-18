@@ -1,8 +1,7 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.model.dto.CompactResultDTO;
-import com.nonu1l.media.model.dto.CompactSubjectDTO;
-import com.nonu1l.media.model.dto.WorkSearchResultDTO;
+import com.nonu1l.media.model.dto.BangumiCompactSubjectDTO;
+import com.nonu1l.media.model.dto.BangumiSubjectSummaryDTO;
 import com.nonu1l.media.service.BangumiService;
 import com.nonu1l.media.service.SearchResultPreprocessor;
 import org.slf4j.Logger;
@@ -37,12 +36,11 @@ public class AiBangumiTools {
      * @param keyword 关键词
      * @return 紧凑条目列表
      */
-    public List<CompactResultDTO> searchBangumi(String keyword) {
+    public List<BangumiCompactSubjectDTO> searchBangumi(String keyword) {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
-        List<WorkSearchResultDTO> raw = bangumiService.search(keyword);
+        List<BangumiSubjectSummaryDTO> raw = bangumiService.search(keyword);
 
-        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw);
-        return compact.stream().map(CompactResultDTO::from).toList();
+        return preprocessor.preprocess(raw);
     }
 
     /**
@@ -51,17 +49,17 @@ public class AiBangumiTools {
      * @param keyword 关键词
      * @return 命中的紧凑条目，未命中返回 null
      */
-    public CompactResultDTO searchBangumiOneResult(String keyword) {
+    public BangumiCompactSubjectDTO searchBangumiOneResult(String keyword) {
         log.debug("Tool: searchBangumiOneResult keyword='{}'", keyword);
-        List<WorkSearchResultDTO> raw = bangumiService.search(keyword, 1);
+        List<BangumiSubjectSummaryDTO> raw = bangumiService.search(keyword, 1);
         if (raw.isEmpty()) {
             return null;
         }
-        List<CompactSubjectDTO> compact = preprocessor.preprocess(raw);
+        List<BangumiCompactSubjectDTO> compact = preprocessor.preprocess(raw);
         if (compact.isEmpty()) {
             return null;
         }
-        return compact.stream().map(CompactResultDTO::from).toList().getFirst();
+        return compact.getFirst();
     }
 
 }

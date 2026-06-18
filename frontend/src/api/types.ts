@@ -30,7 +30,7 @@ export interface CastMember {
   actorId: number | null;
 }
 
-export interface WorkSearchResultDTO {
+export interface BangumiSubjectSummaryDTO {
   id: number;
   platform: string;
   nameCn: string;
@@ -43,7 +43,7 @@ export interface WorkSearchResultDTO {
   source?: 'local' | 'bangumi';
 }
 
-export interface WorkListItemDTO {
+export interface WorkListItemResponse {
   id: number;
   platform: string;
   nameCn: string;
@@ -60,12 +60,12 @@ export interface WorkListItemDTO {
   latestRecordAt: string | null;
 }
 
-export interface SearchDTO {
-  local: WorkListItemDTO[];
-  works: WorkSearchResultDTO[];
+export interface WorkSearchResponse {
+  local: WorkListItemResponse[];
+  works: BangumiSubjectSummaryDTO[];
 }
 
-export interface WorkDetailDTO {
+export interface WorkDetailResponse {
   id: number | null;
   platform: string;
   nameCn: string;
@@ -91,7 +91,7 @@ export interface MarkRequest {
   id: string;
   platform: string;
   status: Status;
-  meta?: WorkSearchResultDTO;
+  meta?: BangumiSubjectSummaryDTO;
 }
 
 // ── Conversation ──

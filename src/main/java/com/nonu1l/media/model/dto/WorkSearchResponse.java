@@ -13,9 +13,9 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SearchDTO {
+public class WorkSearchResponse {
     /** 本地已标记作品中匹配的作品列表 */
-    private List<WorkListItemDTO> local;
+    private List<WorkListItemResponse> local;
     /** Bangumi 远程搜索结果 */
-    private List<WorkSearchResultDTO> works;
+    private List<BangumiSubjectSummaryDTO> works;
 }

@@ -15,11 +15,11 @@ import java.util.List;
  * @param hint 给 Agent 的下一步建议。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record FindWorksToolResultDTO(
+public record AgentFindWorksResultDTO(
         boolean ok,
         String query,
         String mode,
-        List<MatchedEntryDTO> cards,
+        List<FindWorksCandidateDTO> cards,
         String failReason,
         String hint
 ) {

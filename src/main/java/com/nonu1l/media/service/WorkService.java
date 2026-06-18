@@ -74,9 +74,9 @@ public class WorkService {
      *
      * <p>会优先加载每部作品的最新记录用于列表展示；单条作品组装失败时会记录告警并跳过，避免整体失败。</p>
      *
-     * @return 过滤后的 {@link WorkListItemDTO} 列表
+     * @return 过滤后的 {@link WorkListItemResponse} 列表
      */
-    public List<WorkListItemDTO> listAll() {
+    public List<WorkListItemResponse> listAll() {
         List<Work> works = workRepo.findAllOrderByLatestRecord();
         if (works.isEmpty()) return List.of();
 
@@ -88,10 +88,10 @@ public class WorkService {
             recordMap.put(r.getWorkId(), r);
         }
 
-        List<WorkListItemDTO> results = new ArrayList<>();
+        List<WorkListItemResponse> results = new ArrayList<>();
         for (Work w : works) {
             try {
-                WorkListItemDTO it = buildListItem(w, recordMap.get(w.getId()));
+                WorkListItemResponse it = buildListItem(w, recordMap.get(w.getId()));
                 if (it != null) results.add(it);
             } catch (Exception e) {
                 log.warn("listAll item failed workId={}: {}", w.getId(), e.getMessage());
@@ -107,10 +107,10 @@ public class WorkService {
      * 先命中本地库的作品会按本地数据返回；否则返回远端候选。</p>
      *
      * @param query 用户输入关键词
-     * @return {@link SearchDTO}，其中本地与远端两类结果会合并返回
+     * @return {@link WorkSearchResponse}，其中本地与远端两类结果会合并返回
      */
-    public SearchDTO search(String query) {
-        List<WorkSearchResultDTO> remote = bangumiService.search(query);
+    public WorkSearchResponse search(String query) {
+        List<BangumiSubjectSummaryDTO> remote = bangumiService.search(query);
 
         List<Work> allWorks = workRepo.findAll();
         Set<Long> localIds = new HashSet<>();
@@ -128,14 +128,14 @@ public class WorkService {
             }
         }
 
-        List<WorkListItemDTO> local = new ArrayList<>();
-        List<WorkSearchResultDTO> works = new ArrayList<>();
+        List<WorkListItemResponse> local = new ArrayList<>();
+        List<BangumiSubjectSummaryDTO> works = new ArrayList<>();
 
-        for (WorkSearchResultDTO r : remote) {
+        for (BangumiSubjectSummaryDTO r : remote) {
             if (r.getId() != null && localIds.contains(r.getId())) {
                 Work w = workRepo.findById(r.getId()).orElse(null);
                 if (w != null) {
-                    WorkListItemDTO it = buildListItem(w, recordMap.get(w.getId()));
+                    WorkListItemResponse it = buildListItem(w, recordMap.get(w.getId()));
                     if (it != null) local.add(it);
                 }
             } else {
@@ -145,17 +145,17 @@ public class WorkService {
 
         // 补充本地模糊匹配到但 Bangumi 未返回的作品
         Set<Long> remoteIds = new HashSet<>();
-        for (WorkSearchResultDTO r : remote) {
+        for (BangumiSubjectSummaryDTO r : remote) {
             if (r.getId() != null) remoteIds.add(r.getId());
         }
         for (Work w : allWorks) {
             if (w.getId() != null && !remoteIds.contains(w.getId()) && matches(w, query)) {
-                WorkListItemDTO it = buildListItem(w, recordMap.get(w.getId()));
+                WorkListItemResponse it = buildListItem(w, recordMap.get(w.getId()));
                 if (it != null) local.add(it);
             }
         }
 
-        return new SearchDTO(local, works);
+        return new WorkSearchResponse(local, works);
     }
 
     /**
@@ -164,14 +164,14 @@ public class WorkService {
      * <p>先读取 Bangumi 详情，再按本地作品ID补充状态、评分、影评和已看集数；未找到本地数据则返回纯远端字段。</p>
      *
      * @param subjectId 条目ID（字符串）
-     * @return 包含详情信息的 {@link WorkDetailDTO}，若远端不存在则返回 {@code null}
+     * @return 包含详情信息的 {@link WorkDetailResponse}，若远端不存在则返回 {@code null}
      */
-    public WorkDetailDTO getDetail(String subjectId) {
-        DetailedWorkDTO remote = bangumiService.getDetailed(subjectId);
+    public WorkDetailResponse getDetail(String subjectId) {
+        BangumiSubjectDetailDTO remote = bangumiService.getDetailed(subjectId);
         if (remote == null || remote.getBase() == null) return null;
 
-        WorkDetailDTO d = new WorkDetailDTO();
-        WorkSearchResultDTO base = remote.getBase();
+        WorkDetailResponse d = new WorkDetailResponse();
+        BangumiSubjectSummaryDTO base = remote.getBase();
         d.setId(base.getId());
         d.setPlatform(base.getPlatform());
         d.setNameOrig(base.getNameOrig());
@@ -211,21 +211,21 @@ public class WorkService {
      * 该方法不会新增历史记录快照（与 {@link #markNew} 行为不同）。</p>
      *
      * @param req 标记参数，需包含作品ID与目标状态
-     * @return 标记后的 {@link WorkListItemDTO}
+     * @return 标记后的 {@link WorkListItemResponse}
      */
-    public WorkListItemDTO mark(MarkRequest req) {
+    public WorkListItemResponse mark(MarkRequest req) {
         if (req.getId() == null || req.getStatus() == null)
             throw new IllegalArgumentException("id, status required");
         Long id = parseId(req.getId());
         if (id == null) throw new IllegalArgumentException("invalid id");
 
-        WorkSearchResultDTO meta = resolveMetaForInsert(id, req.getMeta());
-        WorkListItemDTO item = Objects.requireNonNull(transactionTemplate.execute(tx -> markInTransaction(req, id, meta)));
+        BangumiSubjectSummaryDTO meta = resolveMetaForInsert(id, req.getMeta());
+        WorkListItemResponse item = Objects.requireNonNull(transactionTemplate.execute(tx -> markInTransaction(req, id, meta)));
         preferenceMemoryService.recordChanged(id);
         return item;
     }
 
-    private WorkListItemDTO markInTransaction(MarkRequest req, Long id, WorkSearchResultDTO meta) {
+    private WorkListItemResponse markInTransaction(MarkRequest req, Long id, BangumiSubjectSummaryDTO meta) {
         Work work = upsertWork(id, meta);
         Record saved;
 
@@ -278,13 +278,13 @@ public class WorkService {
         Long id = parseId(req.getId());
         if (id == null) throw new IllegalArgumentException("invalid id");
 
-        WorkSearchResultDTO meta = resolveMetaForInsert(id, req.getMeta());
+        BangumiSubjectSummaryDTO meta = resolveMetaForInsert(id, req.getMeta());
         MarkResult result = Objects.requireNonNull(transactionTemplate.execute(tx -> markNewInTransaction(req, rating, review, id, meta)));
         preferenceMemoryService.recordChanged(id);
         return result;
     }
 
-    private MarkResult markNewInTransaction(MarkRequest req, Double rating, String review, Long id, WorkSearchResultDTO meta) {
+    private MarkResult markNewInTransaction(MarkRequest req, Double rating, String review, Long id, BangumiSubjectSummaryDTO meta) {
         Work work = upsertWork(id, meta);
         Record previous = recordRepo.findLatestByWorkId(id).orElse(null);
 
@@ -333,14 +333,14 @@ public class WorkService {
      * @return 更新后的列表项
      */
     @Transactional
-    public WorkListItemDTO updateReview(Long workId, Double rating, String review) {
+    public WorkListItemResponse updateReview(Long workId, Double rating, String review) {
         Record r = recordRepo.findLatestByWorkId(workId)
                 .orElseThrow(() -> new IllegalStateException("no record to update"));
         r.setRating(rating);
         r.setReview(review);
         recordRepo.save(r);
         Work w = workRepo.findById(workId).orElse(null);
-        WorkListItemDTO item = buildListItem(w, r);
+        WorkListItemResponse item = buildListItem(w, r);
         preferenceMemoryService.recordChanged(workId);
         return item;
     }
@@ -348,7 +348,7 @@ public class WorkService {
     /**
      * 标记返回值：返回新记录对应列表项及其前序记录，用于前端展示变更对比。
      */
-    public record MarkResult(WorkListItemDTO item, Record previousRecord) {}
+    public record MarkResult(WorkListItemResponse item, Record previousRecord) {}
 
     /**
      * 查询角色中文名（透传 Bangumi API）。
@@ -385,10 +385,10 @@ public class WorkService {
 
     // ── private helpers ────────────────────────────────────────────
 
-    /** 从 Work 实体 + Record 直接组装 WorkListItemDTO，不再调用 Bangumi API */
-    private WorkListItemDTO buildListItem(Work w, Record latestRecord) {
+    /** 从 Work 实体 + Record 直接组装 WorkListItemResponse，不再调用 Bangumi API */
+    private WorkListItemResponse buildListItem(Work w, Record latestRecord) {
         if (w == null) return null;
-        WorkListItemDTO it = new WorkListItemDTO();
+        WorkListItemResponse it = new WorkListItemResponse();
         it.setId(w.getId());
         it.setPlatform(w.getPlatform());
         it.setNameOrig(w.getName());
@@ -420,7 +420,7 @@ public class WorkService {
         }
     }
 
-    private Work upsertWork(Long id, WorkSearchResultDTO meta) {
+    private Work upsertWork(Long id, BangumiSubjectSummaryDTO meta) {
         Optional<Work> existing = workRepo.findById(id);
         Instant now = Instant.now();
         if (existing.isPresent()) {
@@ -438,14 +438,14 @@ public class WorkService {
         return workRepo.save(w);
     }
 
-    private WorkSearchResultDTO resolveMetaForInsert(Long id, WorkSearchResultDTO meta) {
+    private BangumiSubjectSummaryDTO resolveMetaForInsert(Long id, BangumiSubjectSummaryDTO meta) {
         if (meta != null || workRepo.existsById(id)) return meta;
-        WorkSearchResultDTO fetched = bangumiService.getById(String.valueOf(id));
+        BangumiSubjectSummaryDTO fetched = bangumiService.getById(String.valueOf(id));
         if (fetched == null) throw new IllegalStateException("Subject not found: " + id);
         return fetched;
     }
 
-    private void applyMeta(Work w, WorkSearchResultDTO meta) {
+    private void applyMeta(Work w, BangumiSubjectSummaryDTO meta) {
         if (meta.getNameOrig() != null) w.setName(meta.getNameOrig());
         if (meta.getNameCn() != null) w.setNameCn(meta.getNameCn());
         if (meta.getPlatform() != null) w.setPlatform(meta.getPlatform());

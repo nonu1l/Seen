@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.model.dto.WebSearchResultDTO;
 
 /**
  * Web 搜索源策略，供统一搜索入口按运行时设置选择具体 provider。
@@ -23,5 +23,5 @@ public interface WebSearchProvider {
      * @param query 搜索关键词
      * @return 结构化搜索诊断结果
      */
-    WebSearchToolResultDTO searchWithDiagnostics(String query);
+    WebSearchResultDTO searchWithDiagnostics(String query);
 }

@@ -1,7 +1,7 @@
 import { type ChangeEvent, type FocusEvent, type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
-import type { Status, WorkDetailDTO } from '../api/types';
+import type { Status, WorkDetailResponse } from '../api/types';
 import { Cover } from './Cover';
 import { useConfirm } from './ConfirmProvider';
 import { StarRating } from './StarRating';
@@ -11,7 +11,7 @@ interface Props { id: number; platform: string; onClose: (changed: boolean) => v
 
 export function WorkDetailModal({ id, platform, onClose }: Props) {
   const confirm = useConfirm();
-  const [d, setD] = useState<WorkDetailDTO | null>(null);
+  const [d, setD] = useState<WorkDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rating, setRating] = useState<number | null>(null);

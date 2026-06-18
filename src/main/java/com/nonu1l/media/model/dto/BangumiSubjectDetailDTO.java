@@ -10,8 +10,8 @@ import java.util.List;
  * 包含作品基础信息、附加详情与用户标记字段。
  */
 @Data
-public class DetailedWorkDTO {
-    private WorkSearchResultDTO base;
+public class BangumiSubjectDetailDTO {
+    private BangumiSubjectSummaryDTO base;
     private List<String> regions;
     private Integer episodes;
     private Integer seasonsCount;

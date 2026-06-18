@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.FetchUrlResultDTO;
+import com.nonu1l.media.model.dto.WebFetchResultDTO;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
@@ -42,7 +42,7 @@ public class WebFetchService {
      * @param maxChars 返回给模型的最大字符数，可为空
      * @return 抓取结果；失败时包含错误原因
      */
-    public FetchUrlResultDTO fetch(String url, Integer maxChars) {
+    public WebFetchResultDTO fetch(String url, Integer maxChars) {
         int limit = clampMaxChars(maxChars);
         try {
             URI uri = normalizeAndValidate(url);
@@ -60,11 +60,11 @@ public class WebFetchService {
      * @return 清洗后的文本，失败时为空字符串
      */
     public String fetchText(String url) {
-        FetchUrlResultDTO result = fetch(url, DEFAULT_MAX_CHARS);
+        WebFetchResultDTO result = fetch(url, DEFAULT_MAX_CHARS);
         return result.error() == null ? result.text() : "";
     }
 
-    private FetchUrlResultDTO fetchFollowingRedirects(URI uri, int maxChars, int redirects) throws Exception {
+    private WebFetchResultDTO fetchFollowingRedirects(URI uri, int maxChars, int redirects) throws Exception {
         validateResolvedAddress(uri);
         HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
         conn.setInstanceFollowRedirects(false);
@@ -98,8 +98,10 @@ public class WebFetchService {
         boolean truncated = byteTruncated || cleaned.truncated();
         log.info("fetchWeb status={} chars={} truncated={} url={}",
                 status, cleaned.text().length(), truncated, uri);
-        return new FetchUrlResultDTO(uri.toString(), status, contentType, cleaned.title(), cleaned.text(), truncated,
-                status >= 400 ? "HTTP " + status : null);
+        String error = status >= 400 ? "HTTP " + status : null;
+        boolean ok = error == null && !cleaned.text().isBlank();
+        return new WebFetchResultDTO(ok, uri.toString(), status, contentType, cleaned.title(), cleaned.text(), truncated,
+                error, ok ? null : "页面没有返回可用正文。");
     }
 
     private URI normalizeAndValidate(String rawUrl) {
@@ -200,8 +202,9 @@ public class WebFetchService {
         return Math.min(value, MAX_CHARS);
     }
 
-    private FetchUrlResultDTO failure(String url, int status, String contentType, String error) {
-        return new FetchUrlResultDTO(url, status, contentType != null ? contentType : "", "", "", false, error);
+    private WebFetchResultDTO failure(String url, int status, String contentType, String error) {
+        return new WebFetchResultDTO(false, url, status, contentType != null ? contentType : "", "", "", false,
+                error, "可以换一个公开资料源，或先调用 searchWeb 查找可访问页面。");
     }
 
     private record CleanedText(String title, String text, boolean truncated) {

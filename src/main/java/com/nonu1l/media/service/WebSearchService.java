@@ -1,6 +1,6 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.model.dto.WebSearchResultDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,28 +47,28 @@ public class WebSearchService {
      * @param query 检索关键词
      * @return 包含搜索结果、搜索源或失败原因的结构化结果
      */
-    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
+    public WebSearchResultDTO searchWithDiagnostics(String query) {
         if (!isSearchEnabled()) {
             log.warn("Web search disabled by app.search.enabled=false");
-            return new WebSearchToolResultDTO(false, query, "disabled", 0, List.of(),
+            return new WebSearchResultDTO(false, query, "disabled", 0, List.of(),
                     "Web search disabled by app.search.enabled=false", "请告知用户当前外部搜索已关闭，或改用本地记录/已有知识。");
         }
         String provider = settingsService.getString(SettingsService.SEARCH_PROVIDER);
         WebSearchProvider strategy = providers.get(provider);
         if (strategy == null) {
-            return new WebSearchToolResultDTO(false, query, provider, 0, List.of(),
+            return new WebSearchResultDTO(false, query, provider, 0, List.of(),
                     "Unsupported web search provider: " + provider, "请在设置页选择 Serper 或 Tavily。");
         }
         if (!strategy.isAvailable()) {
-            return new WebSearchToolResultDTO(false, query, strategy.providerKey(), 0, List.of(),
+            return new WebSearchResultDTO(false, query, strategy.providerKey(), 0, List.of(),
                     displayName(strategy.providerKey()) + " API key is missing", null);
         }
         return searchWithProvider(strategy, query);
     }
 
-    private WebSearchToolResultDTO searchWithProvider(WebSearchProvider strategy, String query) {
+    private WebSearchResultDTO searchWithProvider(WebSearchProvider strategy, String query) {
         long start = System.nanoTime();
-        WebSearchToolResultDTO result = strategy.searchWithDiagnostics(query);
+        WebSearchResultDTO result = strategy.searchWithDiagnostics(query);
         log.info("Web search provider={} query='{}' results={} ok={} elapsedMs={}",
                 strategy.providerKey(), query, result.count(), result.ok(), (System.nanoTime() - start) / 1_000_000);
         return result;

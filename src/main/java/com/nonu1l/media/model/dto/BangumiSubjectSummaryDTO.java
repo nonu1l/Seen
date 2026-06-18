@@ -9,11 +9,11 @@ import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 /**
  * Bangumi 搜索结果 / 基础作品信息 DTO。
- * 由 BangumiService 的 search 和 getById 返回，被 WorkListItemDTO / WorkDetailDTO 复用。
+ * 由 BangumiService 的 search 和 getById 返回，被 WorkListItemResponse / WorkDetailResponse 复用。
  */
 @Data
 @JsonInclude(NON_NULL)
-public class WorkSearchResultDTO {
+public class BangumiSubjectSummaryDTO {
     private Long id;
     private String platform;
     private String nameCn;

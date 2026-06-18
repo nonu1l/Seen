@@ -13,5 +13,5 @@ public class MarkRequest {
     private String platform;
     /** wish / doing / collect / on_hold / dropped */
     private String status;
-    private WorkSearchResultDTO meta;
+    private BangumiSubjectSummaryDTO meta;
 }

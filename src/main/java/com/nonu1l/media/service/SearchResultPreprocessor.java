@@ -1,7 +1,7 @@
 package com.nonu1l.media.service;
 
-import com.nonu1l.media.model.dto.CompactSubjectDTO;
-import com.nonu1l.media.model.dto.WorkSearchResultDTO;
+import com.nonu1l.media.model.dto.BangumiCompactSubjectDTO;
+import com.nonu1l.media.model.dto.BangumiSubjectSummaryDTO;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -20,16 +20,17 @@ public class SearchResultPreprocessor {
      * @param rawResults Bangumi 原始搜索结果
      * @return 预处理后的精简条目列表
      */
-    public List<CompactSubjectDTO> preprocess(List<WorkSearchResultDTO> rawResults) {
+    public List<BangumiCompactSubjectDTO> preprocess(List<BangumiSubjectSummaryDTO> rawResults) {
         if (rawResults == null || rawResults.isEmpty()) return List.of();
 
-        List<CompactSubjectDTO> subjects = new ArrayList<>();
-        for (WorkSearchResultDTO r : rawResults) {
+        List<BangumiCompactSubjectDTO> subjects = new ArrayList<>();
+        for (BangumiSubjectSummaryDTO r : rawResults) {
             if (r.getId() == null) continue;
             String category = classify(r);
-            subjects.add(new CompactSubjectDTO(
+            subjects.add(new BangumiCompactSubjectDTO(
                     r.getId(),
                     coalesceName(r),
+                    r.getNameOrig(),
                     category,
                     normalizeDate(r.getAirDate()),
                     r.getEpsCount(),
@@ -46,11 +47,11 @@ public class SearchResultPreprocessor {
 
 //        // 按 rank 升序（高排名优先），无排名排最后；同 rank 按日期升序
 //        subjects.sort(Comparator
-//                .comparing(CompactSubjectDTO::rank, Comparator.nullsLast(
+//                .comparing(BangumiCompactSubjectDTO::rank, Comparator.nullsLast(
 //                        Comparator.naturalOrder()))
-//                .thenComparing(CompactSubjectDTO::airDate, Comparator.nullsLast(
+//                .thenComparing(BangumiCompactSubjectDTO::airDate, Comparator.nullsLast(
 //                        Comparator.naturalOrder()))
-//                .thenComparing(CompactSubjectDTO::id));
+//                .thenComparing(BangumiCompactSubjectDTO::id));
 //
         return subjects;
     }
@@ -61,7 +62,7 @@ public class SearchResultPreprocessor {
      * @param item 条目
      * @return 分类标识字符串
      */
-    public String classify(WorkSearchResultDTO item) {
+    public String classify(BangumiSubjectSummaryDTO item) {
         String airDate = item.getAirDate();
         // 未上映：无日期或日期为 0000-00-00
         if (airDate == null || airDate.isBlank() || airDate.startsWith("0000")) {
@@ -93,7 +94,7 @@ public class SearchResultPreprocessor {
         return "SPECIAL";
     }
 
-    private String coalesceName(WorkSearchResultDTO r) {
+    private String coalesceName(BangumiSubjectSummaryDTO r) {
         if (r.getNameCn() != null && !r.getNameCn().isBlank()) return r.getNameCn();
         return r.getNameOrig();
     }

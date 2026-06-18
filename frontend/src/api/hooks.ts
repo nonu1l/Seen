@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from './client';
-import type { WorkListItemDTO, SearchDTO } from './types';
+import type { WorkListItemResponse, WorkSearchResponse } from './types';
 
 /**
  * 首页数据 hook：
@@ -11,8 +11,8 @@ import type { WorkListItemDTO, SearchDTO } from './types';
  */
 export function useHomeList() {
   const [query, setQuery] = useState('');
-  const [marked, setMarked] = useState<WorkListItemDTO[]>([]);
-  const [search, setSearch] = useState<SearchDTO | null>(null);
+  const [marked, setMarked] = useState<WorkListItemResponse[]>([]);
+  const [search, setSearch] = useState<WorkSearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();

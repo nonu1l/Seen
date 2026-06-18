@@ -1,8 +1,8 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.model.dto.CastMemberDTO;
-import com.nonu1l.media.model.dto.DetailedWorkDTO;
-import com.nonu1l.media.model.dto.WorkSearchResultDTO;
+import com.nonu1l.media.model.dto.BangumiSubjectDetailDTO;
+import com.nonu1l.media.model.dto.BangumiSubjectSummaryDTO;
 import com.nonu1l.media.model.entity.SubjectType;
 import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.util.CachedHttpClient;
@@ -52,9 +52,9 @@ public class BangumiService {
     /** 搜索 bangumi，默认返回 20 条结果。
      *
      * @param query 查询关键字
-     * @return 映射后的 {@link WorkSearchResultDTO} 列表
+     * @return 映射后的 {@link BangumiSubjectSummaryDTO} 列表
      */
-    public List<WorkSearchResultDTO> search(String query) {
+    public List<BangumiSubjectSummaryDTO> search(String query) {
         return  search(query,20);
     }
 
@@ -66,10 +66,10 @@ public class BangumiService {
      *
      * @param query 查询关键字
      * @param limit 返回条数上限
-     * @return 映射后的 {@link WorkSearchResultDTO} 列表
+     * @return 映射后的 {@link BangumiSubjectSummaryDTO} 列表
      */
-    public List<WorkSearchResultDTO> search(String query, int limit) {
-        List<WorkSearchResultDTO> results = new ArrayList<>();
+    public List<BangumiSubjectSummaryDTO> search(String query, int limit) {
+        List<BangumiSubjectSummaryDTO> results = new ArrayList<>();
         List<Integer> types = getSearchTypes();
         if (types.isEmpty()) return results;
         String base = settingsService.bangumiApiBase();
@@ -92,7 +92,7 @@ public class BangumiService {
             }
 
             List<Long> ids = results.stream()
-                    .map(WorkSearchResultDTO::getId)
+                    .map(BangumiSubjectSummaryDTO::getId)
                     .filter(Objects::nonNull)
                     .toList();
             if (!ids.isEmpty()) preCacheService.preCache(ids);
@@ -109,7 +109,7 @@ public class BangumiService {
      * @param subjectId 条目ID
      * @return 条目基础字段映射结果，异常或未命中返回 {@code null}
      */
-    public WorkSearchResultDTO getById(String subjectId) {
+    public BangumiSubjectSummaryDTO getById(String subjectId) {
         String base = settingsService.bangumiApiBase();
         try {
             String json = get(base + "/subjects/" + subjectId, 1800);
@@ -127,9 +127,9 @@ public class BangumiService {
      * <p>角色与基础信息并行请求，提高首屏响应速度。</p>
      *
      * @param subjectId 条目ID
-     * @return 组合后的 {@link DetailedWorkDTO}，无数据返回 {@code null}
+     * @return 组合后的 {@link BangumiSubjectDetailDTO}，无数据返回 {@code null}
      */
-    public DetailedWorkDTO getDetailed(String subjectId) {
+    public BangumiSubjectDetailDTO getDetailed(String subjectId) {
         String base = settingsService.bangumiApiBase();
         boolean castEnabled = settingsService.getBoolean(SettingsService.DETAIL_CAST_ENABLED);
         try {
@@ -144,7 +144,7 @@ public class BangumiService {
             if (json == null) return null;
             JsonNode item = objectMapper.readTree(json);
 
-            DetailedWorkDTO d = new DetailedWorkDTO();
+            BangumiSubjectDetailDTO d = new BangumiSubjectDetailDTO();
             d.setBase(mapSubject(item));
 
             // 从 infobox 提取地区/国家信息
@@ -268,10 +268,10 @@ public class BangumiService {
      * 将 Bangumi 搜索条目映射为统一 DTO。
      *
      * @param item Bangumi 原始条目节点
-     * @return 标准化后的 {@link WorkSearchResultDTO}
+     * @return 标准化后的 {@link BangumiSubjectSummaryDTO}
      */
-    private WorkSearchResultDTO mapSubject(JsonNode item) {
-        WorkSearchResultDTO r = new WorkSearchResultDTO();
+    private BangumiSubjectSummaryDTO mapSubject(JsonNode item) {
+        BangumiSubjectSummaryDTO r = new BangumiSubjectSummaryDTO();
         r.setId(Long.parseLong(String.valueOf(item.get("id"))));
         r.setPlatform(text(item, "platform"));
         r.setSource("bangumi");

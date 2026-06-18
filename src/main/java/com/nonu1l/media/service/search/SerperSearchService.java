@@ -2,7 +2,7 @@ package com.nonu1l.media.service.search;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
-import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.model.dto.WebSearchResultDTO;
 import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
@@ -112,12 +112,12 @@ public class SerperSearchService implements WebSearchProvider {
      * @param query 搜索关键词
      * @return 包含结果或失败原因的结构化结果
      */
-    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
+    public WebSearchResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
         String apiKey = settingsService.getString(SettingsService.SERPER_API_KEY);
         if (apiKey.isBlank()) {
             log.warn("Serper search skipped: no API key");
-            return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+            return new WebSearchResultDTO(false, query, "serper", 0, results,
                     "Serper API key is missing", null);
         }
         try {
@@ -131,14 +131,14 @@ public class SerperSearchService implements WebSearchProvider {
             String json = restTemplate.postForObject(
                     endpointProperties.getSerperSearchUrl(), request, String.class);
             if (json == null || json.isBlank()) {
-                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                return new WebSearchResultDTO(false, query, "serper", 0, results,
                         "Serper returned empty response", null);
             }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode organic = root.get("organic");
             if (organic == null || !organic.isArray()) {
-                return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+                return new WebSearchResultDTO(false, query, "serper", 0, results,
                         "Serper response has no organic results", null);
             }
 
@@ -155,10 +155,10 @@ public class SerperSearchService implements WebSearchProvider {
             log.debug("Serper results:\n{}", results.stream()
                 .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                 .reduce("", (a, b) -> a + b + "\n"));
-            return new WebSearchToolResultDTO(true, query, "serper", results.size(), results, null, null);
+            return new WebSearchResultDTO(true, query, "serper", results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Serper search failed '{}': {}", query, e.getMessage());
-            return new WebSearchToolResultDTO(false, query, "serper", 0, results,
+            return new WebSearchResultDTO(false, query, "serper", 0, results,
                     "Serper search failed: " + e.getMessage(), null);
         }
     }

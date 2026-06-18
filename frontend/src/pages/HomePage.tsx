@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useHomeList } from '../api/hooks';
 import { setBangumiProxy } from '../api/proxy';
-import type { Status, WorkListItemDTO, WorkSearchResultDTO } from '../api/types';
+import type { Status, WorkListItemResponse, BangumiSubjectSummaryDTO } from '../api/types';
 import { WorkCard } from '../components/WorkCard';
 import { WorkDetailModal } from '../components/WorkDetailModal';
 import { RobotLogo } from '../components/RobotLogo';
@@ -34,25 +34,25 @@ export default function HomePage() {
   useEffect(() => { setDisplayQuery(query); }, [query]);
 
   const merged = useMemo(() => {
-    if (!showingSearch || !search) return { marked, unmarked: [] as WorkSearchResultDTO[] };
+    if (!showingSearch || !search) return { marked, unmarked: [] as BangumiSubjectSummaryDTO[] };
     const keys = new Set(search.local.map(w => `${w.platform}:${w.id}`));
     return { marked: search.local, unmarked: search.works.filter(w => !keys.has(`${w.platform}:${w.id}`)) };
   }, [showingSearch, search, marked]);
 
   const filteredMarked = useMemo(() => {
-    if (!showingSearch && filter !== 'all') return merged.marked.filter(w => (w as WorkListItemDTO).status === filter);
+    if (!showingSearch && filter !== 'all') return merged.marked.filter(w => (w as WorkListItemResponse).status === filter);
     return merged.marked;
   }, [merged.marked, filter, showingSearch]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const w of merged.marked) { const s = (w as WorkListItemDTO).status; if (s) c[s] = (c[s] || 0) + 1; }
+    for (const w of merged.marked) { const s = (w as WorkListItemResponse).status; if (s) c[s] = (c[s] || 0) + 1; }
     return c;
   }, [merged.marked]);
 
-  const handleMark = async (item: WorkListItemDTO | WorkSearchResultDTO, status: Status, unmarked: boolean) => {
+  const handleMark = async (item: WorkListItemResponse | BangumiSubjectSummaryDTO, status: Status, unmarked: boolean) => {
     try {
-      await api.mark({ id: String(item.id), platform: item.platform, status, meta: unmarked ? (item as WorkSearchResultDTO) : undefined });
+      await api.mark({ id: String(item.id), platform: item.platform, status, meta: unmarked ? (item as BangumiSubjectSummaryDTO) : undefined });
       showingSearch ? await refreshSearch() : await refresh();
     } catch (e) { console.error(e); }
   };

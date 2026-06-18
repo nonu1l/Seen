@@ -1,5 +1,6 @@
 package com.nonu1l.media.agent.tool;
 
+import com.nonu1l.media.config.TokenUsageAdvisor;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.stereotype.Component;
@@ -12,18 +13,22 @@ public class AiToolRegistry {
 
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
+    private final AiLocalLibraryTools localLibraryTools;
     private final AiAutonomousTools autonomousTools;
 
     /**
      * @param bangumiTools Bangumi 查询工具
      * @param webSearchTools Web 搜索工具
+     * @param localLibraryTools 本地记录查询工具
      * @param autonomousTools 自主 Agent 工具门面
      */
     public AiToolRegistry(AiBangumiTools bangumiTools,
                           AiWebSearchTools webSearchTools,
+                          AiLocalLibraryTools localLibraryTools,
                           AiAutonomousTools autonomousTools) {
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
+        this.localLibraryTools = localLibraryTools;
         this.autonomousTools = autonomousTools;
     }
 
@@ -40,7 +45,7 @@ public class AiToolRegistry {
                 .inputType(SearchReq.class).build(),
 
             FunctionToolCallback.builder("searchLocal",
-                    (SearchReq req) -> autonomousTools.searchLocal(req.keyword()))
+                    (SearchReq req) -> searchLocal(req.keyword()))
                 .description("查询本地已标记的作品记录")
                 .inputType(SearchReq.class).build(),
 
@@ -94,4 +99,13 @@ public class AiToolRegistry {
     public record UnmarkWorkReq(Long subjectId, String reason) {}
     public record MemoryReq(String query) {}
     public record FetchUrlReq(String url, String purpose, Integer maxChars) {}
+
+    private Object searchLocal(String keyword) {
+        TokenUsageAdvisor.setCurrentNode("tool-searchLocal");
+        try {
+            return localLibraryTools.searchLocal(keyword);
+        } finally {
+            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
+        }
+    }
 }

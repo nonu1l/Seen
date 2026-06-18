@@ -16,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param hint 给 Agent 的下一步建议。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record FetchToolResultDTO(
+public record WebFetchResultDTO(
         boolean ok,
         String url,
         int status,

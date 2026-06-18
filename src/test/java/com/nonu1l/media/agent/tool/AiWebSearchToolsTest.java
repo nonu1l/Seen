@@ -1,7 +1,7 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.model.dto.FetchUrlResultDTO;
-import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.model.dto.WebFetchResultDTO;
+import com.nonu1l.media.model.dto.WebSearchResultDTO;
 import com.nonu1l.media.service.WebFetchService;
 import com.nonu1l.media.service.WebSearchService;
 import org.junit.jupiter.api.Test;
@@ -23,8 +23,8 @@ class AiWebSearchToolsTest {
         WebSearchService searchService = mock(WebSearchService.class);
         WebFetchService fetchService = mock(WebFetchService.class);
         when(fetchService.fetch("https://example.com/slow", 1000))
-                .thenReturn(new FetchUrlResultDTO("https://example.com/slow", 0, "", "", "", false,
-                        "Connect timed out"));
+                .thenReturn(new WebFetchResultDTO(false, "https://example.com/slow", 0, "", "", "", false,
+                        "Connect timed out", "可以换一个公开资料源。"));
 
         AiWebSearchTools tools = new AiWebSearchTools(searchService, fetchService);
         var result = tools.fetchWeb("https://example.com/slow", "debug", 1000);
@@ -38,7 +38,7 @@ class AiWebSearchToolsTest {
         WebSearchService searchService = mock(WebSearchService.class);
         WebFetchService fetchService = mock(WebFetchService.class);
         when(searchService.searchWithDiagnostics("no result"))
-                .thenReturn(new WebSearchToolResultDTO(false, "no result", "tavily", 0, List.of(),
+                .thenReturn(new WebSearchResultDTO(false, "no result", "tavily", 0, List.of(),
                         "Tavily returned 0 usable results", "换关键词"));
 
         AiWebSearchTools tools = new AiWebSearchTools(searchService, fetchService);

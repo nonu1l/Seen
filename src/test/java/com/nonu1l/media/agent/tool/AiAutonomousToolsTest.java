@@ -27,7 +27,6 @@ class AiAutonomousToolsTest {
                 mock(AiChatClientFactory.class),
                 mock(AiBangumiTools.class),
                 mock(AiWebSearchTools.class),
-                mock(AiLocalLibraryTools.class),
                 mock(AiPreferenceMemoryService.class),
                 operationService,
                 mock(RecordRepository.class),

@@ -4,7 +4,7 @@ import com.nonu1l.media.agent.tool.AiToolContextHolder;
 import com.nonu1l.media.agent.tool.AiToolExecutionContext;
 import com.nonu1l.media.model.dto.ConversationCardDTO;
 import com.nonu1l.media.model.dto.SaveCardRequest;
-import com.nonu1l.media.model.dto.WorkSearchResultDTO;
+import com.nonu1l.media.model.dto.BangumiSubjectSummaryDTO;
 import com.nonu1l.media.model.entity.AiWorkSnapshot;
 import com.nonu1l.media.model.entity.ConversationCard;
 import com.nonu1l.media.model.entity.Record;
@@ -81,7 +81,7 @@ public class AiWorkOperationService {
     public ConversationCardDTO presentWork(Long subjectId, String reason) {
         AiToolExecutionContext context = AiToolContextHolder.require();
         context.listener().status("正在生成候选卡片");
-        WorkSearchResultDTO meta = fetchMeta(subjectId);
+        BangumiSubjectSummaryDTO meta = fetchMeta(subjectId);
         Record previous = recordRepo.findLatestByWorkId(subjectId).orElse(null);
 
         ConversationCard card = newCard(context, subjectId, "PRESENT", "PENDING");
@@ -107,7 +107,7 @@ public class AiWorkOperationService {
     public ConversationCardDTO markWork(Long subjectId, String status, Double rating, String review, String reason) {
         AiToolExecutionContext context = AiToolContextHolder.require();
         context.listener().status("正在保存标记");
-        WorkSearchResultDTO meta = fetchMeta(subjectId);
+        BangumiSubjectSummaryDTO meta = fetchMeta(subjectId);
         ensureSnapshot(context, subjectId);
         Record previous = recordRepo.findLatestByWorkId(subjectId).orElse(null);
         Work work = upsertWork(subjectId, meta);
@@ -377,7 +377,7 @@ public class AiWorkOperationService {
         }
     }
 
-    private WorkSearchResultDTO fetchMeta(Long subjectId) {
+    private BangumiSubjectSummaryDTO fetchMeta(Long subjectId) {
         try {
             return bangumiService.getById(String.valueOf(subjectId));
         } catch (Exception e) {
@@ -386,7 +386,7 @@ public class AiWorkOperationService {
         }
     }
 
-    private Work upsertWork(Long subjectId, WorkSearchResultDTO meta) {
+    private Work upsertWork(Long subjectId, BangumiSubjectSummaryDTO meta) {
         Work work = workRepo.findById(subjectId).orElseGet(Work::new);
         work.setId(subjectId);
         if (meta != null) {
@@ -416,7 +416,7 @@ public class AiWorkOperationService {
         return workRepo.save(work);
     }
 
-    private void applyMeta(Work work, WorkSearchResultDTO meta) {
+    private void applyMeta(Work work, BangumiSubjectSummaryDTO meta) {
         if (meta.getNameOrig() != null) work.setName(meta.getNameOrig());
         if (meta.getNameCn() != null) work.setNameCn(meta.getNameCn());
         if (meta.getPlatform() != null) work.setPlatform(meta.getPlatform());
@@ -427,7 +427,7 @@ public class AiWorkOperationService {
         if (meta.getTags() != null) work.setTagsCache(serializeTags(cleanTags(meta.getTags(), meta.getPlatform())));
     }
 
-    private void applyMeta(ConversationCard card, WorkSearchResultDTO meta) {
+    private void applyMeta(ConversationCard card, BangumiSubjectSummaryDTO meta) {
         if (meta == null) {
             Work work = workRepo.findById(card.getSubjectId()).orElse(null);
             if (work != null) applyWork(card, work);

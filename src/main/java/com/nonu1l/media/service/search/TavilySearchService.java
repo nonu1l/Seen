@@ -2,7 +2,7 @@ package com.nonu1l.media.service.search;
 
 import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
-import com.nonu1l.media.model.dto.WebSearchToolResultDTO;
+import com.nonu1l.media.model.dto.WebSearchResultDTO;
 import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
@@ -77,12 +77,12 @@ public class TavilySearchService implements WebSearchProvider {
      * @return 统一搜索诊断结果
      */
     @Override
-    public WebSearchToolResultDTO searchWithDiagnostics(String query) {
+    public WebSearchResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
         String apiKey = settingsService.getString(SettingsService.TAVILY_API_KEY);
         if (apiKey.isBlank()) {
             log.warn("Tavily search skipped: no API key");
-            return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
+            return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                     "Tavily API key is missing", null);
         }
         try {
@@ -104,14 +104,14 @@ public class TavilySearchService implements WebSearchProvider {
                     String.class
             );
             if (json == null || json.isBlank()) {
-                return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
+                return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                         "Tavily returned empty response", null);
             }
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode items = root.get("results");
             if (items == null || !items.isArray()) {
-                return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
+                return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                         "Tavily response has no results", null);
             }
 
@@ -129,10 +129,10 @@ public class TavilySearchService implements WebSearchProvider {
             log.debug("Tavily results:\n{}", results.stream()
                     .map(r -> String.format("  [%s] %s", r.title(), r.url()))
                     .reduce("", (a, b) -> a + b + "\n"));
-            return new WebSearchToolResultDTO(true, query, providerKey(), results.size(), results, null, null);
+            return new WebSearchResultDTO(true, query, providerKey(), results.size(), results, null, null);
         } catch (Exception e) {
             log.warn("Tavily search failed '{}': {}", query, e.getMessage());
-            return new WebSearchToolResultDTO(false, query, providerKey(), 0, results,
+            return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                     "Tavily search failed: " + e.getMessage(), null);
         }
     }

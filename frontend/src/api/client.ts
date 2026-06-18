@@ -1,7 +1,7 @@
 import type {
-  WorkListItemDTO,
-  SearchDTO,
-  WorkDetailDTO,
+  WorkListItemResponse,
+  WorkSearchResponse,
+  WorkDetailResponse,
   MarkRequest,
   DictResponse,
   AppConfigDTO,
@@ -106,22 +106,22 @@ function handleSseBlock(block: string, handlers?: AiStreamHandlers) {
 
 export const api = {
   listWorks: () =>
-    request<WorkListItemDTO[]>('/works/list', { method: 'POST' }),
+    request<WorkListItemResponse[]>('/works/list', { method: 'POST' }),
 
   searchAll: (q: string) =>
-    request<SearchDTO>('/works/search', { method: 'POST', body: JSON.stringify({ q }) }),
+    request<WorkSearchResponse>('/works/search', { method: 'POST', body: JSON.stringify({ q }) }),
 
   getDetail: (id: string, platform: string) =>
-    request<WorkDetailDTO>('/works/details', { method: 'POST', body: JSON.stringify({ id, platform }) }),
+    request<WorkDetailResponse>('/works/details', { method: 'POST', body: JSON.stringify({ id, platform }) }),
 
   mark: (req: MarkRequest) =>
-    request<WorkListItemDTO>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
+    request<WorkListItemResponse>('/works/mark', { method: 'POST', body: JSON.stringify(req) }),
 
   unmark: (workId: number) =>
     request<{ ok: boolean }>('/works/unmark', { method: 'POST', body: JSON.stringify({ workId }) }),
 
   updateReview: (workId: number, rating: number | null, review: string | null) =>
-    request<WorkListItemDTO>('/works/update-review', { method: 'POST', body: JSON.stringify({ workId, rating, review }) }),
+    request<WorkListItemResponse>('/works/update-review', { method: 'POST', body: JSON.stringify({ workId, rating, review }) }),
 
   getDict: () =>
     request<DictResponse>('/works/dict'),
