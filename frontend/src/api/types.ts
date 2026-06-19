@@ -200,7 +200,7 @@ export interface AiProviderSettingDTO {
   apiKey: string;
 }
 
-export type ThinkingMode = 'enabled' | 'disabled';
+export type ThinkingMode = 'default' | 'enabled' | 'disabled';
 
 export interface AiProviderSettingRequest {
   baseUrl: string;

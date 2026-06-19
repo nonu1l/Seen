@@ -54,7 +54,7 @@ const EMPTY_AI_CONFIG: EditableAiConfig = {
   baseUrl: '',
   model: '',
   temperature: 0,
-  thinkingMode: 'enabled',
+  thinkingMode: 'default',
   apiKey: '',
 };
 
@@ -81,7 +81,7 @@ function toAiConfigDraft(settings: SettingsDTO | null): EditableAiConfig {
     baseUrl: profile.baseUrl,
     model: profile.model ?? '',
     temperature: Number.isFinite(profile.temperature) ? profile.temperature : 0,
-    thinkingMode: profile.thinkingMode ?? 'enabled',
+    thinkingMode: profile.thinkingMode ?? 'default',
     apiKey: profile.apiKey ?? '',
   };
 }
@@ -613,8 +613,9 @@ export default function SettingsPage() {
             </div>
           </SettingsRow>
 
-          <SettingsRow title="思考模式" description="按当前 provider 策略控制模型推理能力；不支持该能力的模型会自动忽略。">
-            <div className="settings-segmented settings-segmented--two">
+          <SettingsRow title="思考模式" description="仅控制文本型 LLM 任务；默认表示按调用处参数决定，开启 / 关闭会强制覆盖。">
+            <div className="settings-segmented">
+              <button type="button" className={aiDraft.thinkingMode === 'default' ? 'is-active' : ''} onClick={() => setAiConfig('thinkingMode', 'default')}>默认</button>
               <button type="button" className={aiDraft.thinkingMode === 'enabled' ? 'is-active' : ''} onClick={() => setAiConfig('thinkingMode', 'enabled')}>开启</button>
               <button type="button" className={aiDraft.thinkingMode === 'disabled' ? 'is-active' : ''} onClick={() => setAiConfig('thinkingMode', 'disabled')}>关闭</button>
             </div>

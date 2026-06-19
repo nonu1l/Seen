@@ -9,7 +9,6 @@ import com.nonu1l.media.model.entity.Record;
 import com.nonu1l.media.model.entity.Work;
 import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
-import com.nonu1l.media.service.AiChatClientFactory;
 import com.nonu1l.media.service.AiPreferenceMemoryService;
 import com.nonu1l.media.service.AiWorkOperationService;
 import org.springframework.stereotype.Component;
@@ -32,30 +31,25 @@ public class AiAutonomousTools {
     /**
      * 创建自主 Agent 工具集合。
      *
-     * @param chatClientFactory AI 客户端工厂
-     * @param bangumiTools Bangumi 工具
-     * @param webSearchTools Web 搜索工具
      * @param memoryService 长期记忆服务
      * @param operationService AI 写库操作服务
      * @param recordRepo 记录仓储
      * @param workRepo 作品仓储
+     * @param searchPipeline 推荐/搜索流水线
      * @param safetyService AI 工具安全策略
      */
-    public AiAutonomousTools(AiChatClientFactory chatClientFactory,
-                             AiBangumiTools bangumiTools,
-                             AiWebSearchTools webSearchTools,
-                             AiPreferenceMemoryService memoryService,
+    public AiAutonomousTools(AiPreferenceMemoryService memoryService,
                              AiWorkOperationService operationService,
                              RecordRepository recordRepo,
                              WorkRepository workRepo,
+                             SearchPipeline searchPipeline,
                              AiToolSafetyService safetyService) {
         this.memoryService = memoryService;
         this.operationService = operationService;
         this.recordRepo = recordRepo;
         this.workRepo = workRepo;
+        this.searchPipeline = searchPipeline;
         this.safetyService = safetyService;
-        this.searchPipeline = new SearchPipeline(chatClientFactory::currentClient,
-                chatClientFactory::cleanAssistantContent, bangumiTools, webSearchTools);
     }
 
     /**

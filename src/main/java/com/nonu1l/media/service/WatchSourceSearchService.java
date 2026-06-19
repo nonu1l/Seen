@@ -35,7 +35,7 @@ public class WatchSourceSearchService {
     private static final int FETCH_CONTENT_MAX_CHARS = 3000;
     private static final int VALIDATION_CONTENT_MAX_CHARS = 2000;
 
-    private final AiChatClientFactory chatClientFactory;
+    private final AiTextTaskService aiTextTaskService;
     private final WebSearchService webSearchService;
     private final WebFetchService webFetchService;
     private final String titlePrompt;
@@ -44,14 +44,14 @@ public class WatchSourceSearchService {
     /**
      * 创建片源搜索服务。
      *
-     * @param chatClientFactory AI 客户端工厂，用于从用户问题中抽取影视名称
+     * @param aiTextTaskService 文本型 LLM 任务服务，用于校验候选页面内容
      * @param webSearchService Web 搜索服务，用于搜索候选观看链接
      * @param webFetchService Web 抓取服务，用于并发读取候选页面内容
      */
-    public WatchSourceSearchService(AiChatClientFactory chatClientFactory,
+    public WatchSourceSearchService(AiTextTaskService aiTextTaskService,
                                     WebSearchService webSearchService,
                                     WebFetchService webFetchService) {
-        this.chatClientFactory = chatClientFactory;
+        this.aiTextTaskService = aiTextTaskService;
         this.webSearchService = webSearchService;
         this.webFetchService = webFetchService;
         this.titlePrompt = loadPrompt("prompts/watch-source-title.st");
@@ -105,12 +105,12 @@ public class WatchSourceSearchService {
      */
     private TitleGuess resolveTitle(String query) {
         try {
-            String content = chatClientFactory.currentClient(ThinkingMode.DISABLED).prompt()
+            String cleaned = aiTextTaskService.task()
+                    .node("watch-source-title")
                     .system(titlePrompt)
                     .user(query)
-                    .call()
-                    .content();
-            String cleaned = chatClientFactory.cleanAssistantContent(content);
+                    .thinking(ThinkingMode.DISABLED)
+                    .call();
             TitleGuess parsed = parseGuess(cleaned);
             if (hasText(parsed.title())) {
                 return parsed;
@@ -234,31 +234,28 @@ public class WatchSourceSearchService {
      * 调用 LLM 根据目标影视名称和实际打开后的页面内容筛选候选。
      */
     private List<Integer> validateFetchedContent(String title, List<FetchedWatchSource> fetched) {
-        String input  = validationInput(title, fetched);
-
-        // 防止LLM报错，LLM输出不符合的格式
-        for (int i = 0; i < 3; i++) {
-            try {
-                String content = chatClientFactory.currentClient(ThinkingMode.DISABLED).prompt()
-                        .system(validatePrompt)
-                        .user(input)
-                        .call()
-                        .content();
-                String cleaned = chatClientFactory.cleanAssistantContent(content);
-                Matcher keepMatcher = KEEP_PATTERN.matcher(cleaned);
-                if (!keepMatcher.find()) {
-                    return List.of();
-                }
-                return INTEGER_PATTERN.matcher(keepMatcher.group(1))
-                        .results()
-                        .map(match -> Integer.parseInt(match.group()))
-                        .distinct()
-                        .toList();
-            } catch (Exception e) {
-                log.warn("watch source content validate failed, attempt={}: {}", i + 1, e.getMessage());
-            }
+        try {
+            return aiTextTaskService.task()
+                    .node("watch-source-validate")
+                    .system(validatePrompt)
+                    .user(validationInput(title, fetched))
+                    .thinking(ThinkingMode.DISABLED)
+                    .maxAttempts(3)
+                    .call(cleaned -> {
+                        Matcher keepMatcher = KEEP_PATTERN.matcher(cleaned);
+                        if (!keepMatcher.find()) {
+                            return List.of();
+                        }
+                        return INTEGER_PATTERN.matcher(keepMatcher.group(1))
+                                .results()
+                                .map(match -> Integer.parseInt(match.group()))
+                                .distinct()
+                                .toList();
+                    });
+        } catch (Exception e) {
+            log.warn("watch source content validate failed: {}", e.getMessage());
+            return List.of();
         }
-        return List.of();
     }
 
     /**

@@ -1,22 +1,20 @@
 package com.nonu1l.media.agent;
 
-import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.model.dto.FindWorksCandidateDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
+import com.nonu1l.media.service.AiTextTaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -27,12 +25,12 @@ import java.util.stream.Collectors;
  * 2. 依次搜索 → 多线程抓取 → LLM 提炼片名 → 多线程 Bangumi 匹配
  * 3. 可用结果提前返回；全空则通过 LLM 生成失败原因
  */
+@Service
 public class SearchPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
 
-    private final Supplier<ChatClient> chatClientSupplier;
-    private final Function<String, String> contentCleaner;
+    private final AiTextTaskService aiTextTaskService;
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
     private final static int maxCards = 5;
@@ -44,28 +42,14 @@ public class SearchPipeline {
     private final String promptFail;
 
     /**
-     * @param chatClientSupplier 用于关键词、标题提炼、校验和失败文案生成的 LLM 客户端供应器
+     * @param aiTextTaskService 文本型 LLM 任务服务
      * @param bangumiTools AI Bangumi 查询工具
      * @param webSearchTools AI Web 搜索工具
      */
-    public SearchPipeline(Supplier<ChatClient> chatClientSupplier,
+    public SearchPipeline(AiTextTaskService aiTextTaskService,
                           AiBangumiTools bangumiTools,
                           AiWebSearchTools webSearchTools) {
-        this(chatClientSupplier, Function.identity(), bangumiTools, webSearchTools);
-    }
-
-    /**
-     * @param chatClientSupplier 用于关键词、标题提炼、校验和失败文案生成的 LLM 客户端供应器
-     * @param contentCleaner provider 级模型正文清理器
-     * @param bangumiTools AI Bangumi 查询工具
-     * @param webSearchTools AI Web 搜索工具
-     */
-    public SearchPipeline(Supplier<ChatClient> chatClientSupplier,
-                          Function<String, String> contentCleaner,
-                          AiBangumiTools bangumiTools,
-                          AiWebSearchTools webSearchTools) {
-        this.chatClientSupplier = chatClientSupplier;
-        this.contentCleaner = contentCleaner != null ? contentCleaner : Function.identity();
+        this.aiTextTaskService = aiTextTaskService;
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
         this.promptKeywords = load("prompts/pipeline-keywords.st");
@@ -231,7 +215,6 @@ public class SearchPipeline {
      * @return 通过校验的 subjectId 集合；若 LLM 返回空则退化为不变更原集合
      */
     java.util.Set<Long> validateMatchIds(Map<String, FindWorksCandidateDTO> cardMap, String context) {
-        TokenUsageAdvisor.setCurrentNode("pipeline-validateMatch");
         if (cardMap.isEmpty()) return java.util.Set.of();
         StringBuilder sb = new StringBuilder();
         cardMap.forEach((title, c) -> sb.append(title).append(" → ").append(c.nameCn())
@@ -240,7 +223,11 @@ public class SearchPipeline {
             .append(")\n"));
         String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", context);
-        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(sb.toString()).call().content());
+        String result = aiTextTaskService.task()
+                .node("pipeline-validateMatch")
+                .system(prompt)
+                .user(sb.toString())
+                .call();
         if (result == null || result.isBlank()) {
             return new java.util.HashSet<>(cardMap.values().stream().map(FindWorksCandidateDTO::subjectId).collect(Collectors.toSet()));
         }
@@ -257,9 +244,12 @@ public class SearchPipeline {
      * @return 非空行列表；空时回退为输入原文
      */
     List<String> generateKeywords(String userInput) {
-        TokenUsageAdvisor.setCurrentNode("pipeline-generateKeywords");
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
-        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(userInput).call().content());
+        String result = aiTextTaskService.task()
+                .node("pipeline-generateKeywords")
+                .system(prompt)
+                .user(userInput)
+                .call();
         if (result == null || result.isBlank()) return List.of(userInput);
         return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
     }
@@ -272,7 +262,6 @@ public class SearchPipeline {
      * @return 可用于标题提炼的页面文本
      */
     List<String> fetchDirectUrls(String context, String keyword) {
-        TokenUsageAdvisor.setCurrentNode("pipeline-directFetchUrls");
         String system = """
                 你是影视资料检索助手。当前配置的 Web 搜索源没有可用结果。
                 请根据用户需求和你的知识，选择最多 3 个公开 HTTP(S) URL，用于直接获取影视榜单、热门列表或资料页面。
@@ -281,7 +270,11 @@ public class SearchPipeline {
                 今日日期: %s
                 """.formatted(LocalDate.now());
         String user = "用户上下文：\n" + context + "\n\n失败关键词：\n" + keyword;
-        String result = cleanAssistantContent(chatClient().prompt().system(system).user(user).call().content());
+        String result = aiTextTaskService.task()
+                .node("pipeline-directFetchUrls")
+                .system(system)
+                .user(user)
+                .call();
         if (result == null || result.isBlank()) return List.of();
         List<String> urls = result.lines()
                 .map(String::trim)
@@ -307,11 +300,14 @@ public class SearchPipeline {
      * @return 过滤后的标题列表
      */
     List<String> extractTitles(String text, String userInput) {
-        TokenUsageAdvisor.setCurrentNode("pipeline-extractTitles");
         if (text.length() > 8000) text = text.substring(0, 8000);
         String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", userInput);
-        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(text).call().content());
+        String result = aiTextTaskService.task()
+                .node("pipeline-extractTitles")
+                .system(prompt)
+                .user(text)
+                .call();
         if (result == null || result.isBlank()) return List.of();
         return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
     }
@@ -324,17 +320,12 @@ public class SearchPipeline {
      * @return 向用户展示的中文说明
      */
     String failMessage(String userInput, String reason) {
-        TokenUsageAdvisor.setCurrentNode("pipeline-failMessage");
         String prompt = promptFail.replace("{reason}", reason);
-        String result = cleanAssistantContent(chatClient().prompt().system(prompt).user(userInput).call().content());
+        String result = aiTextTaskService.task()
+                .node("pipeline-failMessage")
+                .system(prompt)
+                .user(userInput)
+                .call();
         return result != null && !result.isBlank() ? result : "抱歉，未找到相关影视作品。";
-    }
-
-    private ChatClient chatClient() {
-        return chatClientSupplier.get();
-    }
-
-    private String cleanAssistantContent(String content) {
-        return content == null ? null : contentCleaner.apply(content);
     }
 }

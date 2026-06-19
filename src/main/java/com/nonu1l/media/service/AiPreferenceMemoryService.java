@@ -12,7 +12,6 @@ import com.nonu1l.media.repository.WorkRepository;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -52,7 +51,7 @@ public class AiPreferenceMemoryService {
     private final UserPreferenceEvidenceRepository evidenceRepo;
     private final WorkRepository workRepo;
     private final RecordRepository recordRepo;
-    private final AiChatClientFactory chatClientFactory;
+    private final AiTextTaskService aiTextTaskService;
     private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
     private final String memoryPrompt;
@@ -67,7 +66,7 @@ public class AiPreferenceMemoryService {
      * @param evidenceRepo 画像证据仓储
      * @param workRepo 作品仓储
      * @param recordRepo 记录仓储
-     * @param chatClientFactory AI 客户端工厂
+     * @param aiTextTaskService 文本型 LLM 任务服务
      * @param settingsService 运行时设置服务
      * @param objectMapper JSON 映射工具
      */
@@ -75,14 +74,14 @@ public class AiPreferenceMemoryService {
                                      UserPreferenceEvidenceRepository evidenceRepo,
                                      WorkRepository workRepo,
                                      RecordRepository recordRepo,
-                                     AiChatClientFactory chatClientFactory,
+                                     AiTextTaskService aiTextTaskService,
                                      SettingsService settingsService,
                                      ObjectMapper objectMapper) {
         this.memoryRepo = memoryRepo;
         this.evidenceRepo = evidenceRepo;
         this.workRepo = workRepo;
         this.recordRepo = recordRepo;
-        this.chatClientFactory = chatClientFactory;
+        this.aiTextTaskService = aiTextTaskService;
         this.settingsService = settingsService;
         this.objectMapper = objectMapper;
         this.memoryPrompt = loadPrompt("prompts/preference-memory.st");
@@ -332,26 +331,30 @@ public class AiPreferenceMemoryService {
     }
 
     private GeneratedMemory generateMemory(List<UserPreferenceEvidence> evidences) throws Exception {
-        ChatClient chatClient = chatClientFactory.currentClient();
-        String content = chatClient.prompt()
+        return aiTextTaskService.task()
+                .node("preference-memory")
                 .system(memoryPrompt)
                 .user(buildEvidencePrompt(evidences))
-                .call()
-                .content();
-        if (!hasText(content)) {
-            throw new IllegalStateException("LLM returned empty preference memory");
-        }
-
-        String json = IntentAnalysisService.extractJsonObject(content);
-        JsonNode root = objectMapper.readTree(json);
-        String summary = root.has("summary") ? root.get("summary").asText() : "";
-        return new GeneratedMemory(
-                trimTo(summary, 240),
-                jsonArray(root, "likes"),
-                jsonArray(root, "dislikes"),
-                jsonArray(root, "recentShift"),
-                jsonArray(root, "recommendationRules")
-        );
+                .maxAttempts(3)
+                .call(content -> {
+                    if (!hasText(content)) {
+                        throw new IllegalStateException("LLM returned empty preference memory");
+                    }
+                    try {
+                        String json = IntentAnalysisService.extractJsonObject(content);
+                        JsonNode root = objectMapper.readTree(json);
+                        String summary = root.has("summary") ? root.get("summary").asText() : "";
+                        return new GeneratedMemory(
+                                trimTo(summary, 240),
+                                jsonArray(root, "likes"),
+                                jsonArray(root, "dislikes"),
+                                jsonArray(root, "recentShift"),
+                                jsonArray(root, "recommendationRules")
+                        );
+                    } catch (Exception e) {
+                        throw new IllegalStateException("Failed to parse preference memory JSON", e);
+                    }
+                });
     }
 
     private String buildEvidencePrompt(List<UserPreferenceEvidence> evidences) {

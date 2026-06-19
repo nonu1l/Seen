@@ -29,6 +29,9 @@ public class SettingsService {
     public static final String AI_MODEL = "ai.model";
     public static final String AI_TEMPERATURE = "ai.temperature";
     public static final String AI_THINKING_SETTING = "ai.thinking-mode";
+    public static final String AI_THINKING_DEFAULT = "default";
+    public static final String AI_THINKING_ENABLED = "enabled";
+    public static final String AI_THINKING_DISABLED = "disabled";
     public static final String SEARCH_PROVIDER = "search.provider";
     public static final String SEARCH_PROVIDER_DISABLED = "disabled";
     public static final String SERPER_API_KEY = "search.serper-api-key";
@@ -159,6 +162,22 @@ public class SettingsService {
      */
     public ThinkingMode currentThinkingMode() {
         return parseThinkingMode(getString(AI_THINKING_SETTING));
+    }
+
+    /**
+     * 返回文本型 LLM 任务的全局思考模式覆盖。
+     *
+     * <p>default 表示尊重 {@link AiTextTaskService} 单次调用传入的 thinking 参数；
+     * enabled/disabled 会强制覆盖文本任务的单次参数。工具调用型 Agent 暂不使用该覆盖。</p>
+     *
+     * @return 空表示不覆盖；非空表示文本任务必须使用的思考模式
+     */
+    public Optional<ThinkingMode> currentAiTextTaskThinkingOverride() {
+        String value = getString(AI_THINKING_SETTING);
+        if (AI_THINKING_DEFAULT.equalsIgnoreCase(value)) {
+            return Optional.empty();
+        }
+        return Optional.of(parseThinkingMode(value));
     }
 
     public boolean getBoolean(String key) {
@@ -301,11 +320,14 @@ public class SettingsService {
     }
 
     private static String normalizeThinkingMode(String value) {
+        if (value != null && AI_THINKING_DEFAULT.equalsIgnoreCase(value.trim())) {
+            return AI_THINKING_DEFAULT;
+        }
         return parseThinkingMode(value).name().toLowerCase(Locale.ROOT);
     }
 
     private static ThinkingMode parseThinkingMode(String value) {
-        if (value != null && "disabled".equalsIgnoreCase(value.trim())) {
+        if (value != null && AI_THINKING_DISABLED.equalsIgnoreCase(value.trim())) {
             return ThinkingMode.DISABLED;
         }
         return ThinkingMode.ENABLED;
@@ -338,7 +360,7 @@ public class SettingsService {
         map.put(AI_API_KEY, new SettingDefinition(AI_API_KEY, "AI API Key", "string", true, ""));
         map.put(AI_MODEL, new SettingDefinition(AI_MODEL, "AI 模型", "string", false, ""));
         map.put(AI_TEMPERATURE, new SettingDefinition(AI_TEMPERATURE, "AI Temperature", "number", false, 0.0d));
-        map.put(AI_THINKING_SETTING, new SettingDefinition(AI_THINKING_SETTING, "AI 思考模式", "thinking-mode", false, "enabled"));
+        map.put(AI_THINKING_SETTING, new SettingDefinition(AI_THINKING_SETTING, "AI 思考模式", "thinking-mode", false, AI_THINKING_DEFAULT));
         map.put(SEARCH_PROVIDER, new SettingDefinition(SEARCH_PROVIDER, "搜索源", "select", false, "serper"));
         map.put(SERPER_API_KEY, new SettingDefinition(SERPER_API_KEY, "Serper API Key", "string", true, ""));
         map.put(TAVILY_API_KEY, new SettingDefinition(TAVILY_API_KEY, "Tavily API Key", "string", true, ""));
