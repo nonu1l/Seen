@@ -12,6 +12,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ public class TavilySearchService implements WebSearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(TavilySearchService.class);
     private static final int MAX_RESULTS = 10;
+    private static final int MAX_ATTEMPTS = 3;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -76,6 +78,7 @@ public class TavilySearchService implements WebSearchProvider {
      * @param query 搜索关键词
      * @return 统一搜索诊断结果
      */
+    @SuppressWarnings("all")
     @Override
     public WebSearchResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
@@ -98,17 +101,26 @@ public class TavilySearchService implements WebSearchProvider {
             body.put("include_raw_content", false);
             body.put("include_images", false);
 
-            String json = restTemplate.postForObject(
-                    endpointProperties.getTavilySearchUrl(),
-                    new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
-                    String.class
-            );
-            if (json == null || json.isBlank()) {
-                return new WebSearchResultDTO(false, query, providerKey(), 0, results,
-                        "Tavily returned empty response", null);
+            JsonNode root = null;
+            for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+                try {
+                    root = requestTavily(body, headers);
+                } catch (Exception e) {
+                    log.warn("Tavily search failed '{}' (attempt {}/{}): {}",
+                            query, attempt, MAX_ATTEMPTS, e.getMessage());
+                }
+            }
+            if (root == null) {
+                try {
+                    root = requestTavily(body, headers);
+                } catch (Exception e) {
+                    log.warn("Tavily search failed '{}' (attempt {}/{}): {}",
+                            query, MAX_ATTEMPTS, MAX_ATTEMPTS, e.getMessage());
+                    return new WebSearchResultDTO(false, query, providerKey(), 0, results,
+                            "Tavily search failed: " + e.getMessage(), null);
+                }
             }
 
-            JsonNode root = objectMapper.readTree(json);
             JsonNode items = root.get("results");
             if (items == null || !items.isArray()) {
                 return new WebSearchResultDTO(false, query, providerKey(), 0, results,
@@ -116,9 +128,9 @@ public class TavilySearchService implements WebSearchProvider {
             }
 
             for (JsonNode item : items) {
-                String title = item.has("title") ? item.get("title").asText() : null;
-                String url = item.has("url") ? item.get("url").asText() : null;
-                String content = item.has("content") ? item.get("content").asText() : "";
+                String title = item.has("title") ? item.get("title").asString() : null;
+                String url = item.has("url") ? item.get("url").asString() : null;
+                String content = item.has("content") ? item.get("content").asString() : "";
                 if (title != null && !title.isBlank() && url != null && !url.isBlank()) {
                     results.add(new WebSearchItemDTO(title, content, url));
                     if (results.size() >= MAX_RESULTS) break;
@@ -135,5 +147,25 @@ public class TavilySearchService implements WebSearchProvider {
             return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                     "Tavily search failed: " + e.getMessage(), null);
         }
+    }
+
+    /**
+     * 执行一次 Tavily HTTP 请求并解析响应；调用方负责重试和失败返回。
+     *
+     * @param body Tavily Search API 请求体
+     * @param headers 包含认证信息的请求头
+     * @return Tavily 响应根节点
+     * @throws Exception 网络、空响应或 JSON 解析失败时抛出
+     */
+    private JsonNode requestTavily(Map<String, Object> body, HttpHeaders headers) throws Exception {
+        String json = restTemplate.postForObject(
+                endpointProperties.getTavilySearchUrl(),
+                new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
+                String.class
+        );
+        if (json == null || json.isBlank()) {
+            throw new IllegalStateException("Tavily returned empty response");
+        }
+        return objectMapper.readTree(json);
     }
 }
