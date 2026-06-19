@@ -12,7 +12,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
 import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -78,7 +77,6 @@ public class TavilySearchService implements WebSearchProvider {
      * @param query 搜索关键词
      * @return 统一搜索诊断结果
      */
-    @SuppressWarnings("all")
     @Override
     public WebSearchResultDTO searchWithDiagnostics(String query) {
         List<WebSearchItemDTO> results = new ArrayList<>();
@@ -105,6 +103,7 @@ public class TavilySearchService implements WebSearchProvider {
             for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
                 try {
                     root = requestTavily(body, headers);
+                    break;
                 } catch (Exception e) {
                     log.warn("Tavily search failed '{}' (attempt {}/{}): {}",
                             query, attempt, MAX_ATTEMPTS, e.getMessage());
