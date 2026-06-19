@@ -195,14 +195,18 @@ export interface AiProviderSettingDTO {
   baseUrl: string;
   model: string;
   temperature: number;
+  thinkingMode: ThinkingMode;
   apiKeySet: boolean;
   apiKey: string;
 }
+
+export type ThinkingMode = 'enabled' | 'disabled';
 
 export interface AiProviderSettingRequest {
   baseUrl: string;
   model: string;
   temperature: number;
+  thinkingMode?: ThinkingMode;
   apiKey?: string;
 }
 

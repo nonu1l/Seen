@@ -14,6 +14,7 @@ import type {
   AiProviderSettingRequest,
   SettingsDTO,
   SettingsTestResult,
+  ThinkingMode,
 } from '../api/types';
 
 type TestKey = 'ai' | 'search' | 'bangumi';
@@ -26,6 +27,7 @@ interface EditableAiConfig {
   baseUrl: string;
   model: string;
   temperature: number;
+  thinkingMode: ThinkingMode;
   apiKey: string;
 }
 
@@ -52,6 +54,7 @@ const EMPTY_AI_CONFIG: EditableAiConfig = {
   baseUrl: '',
   model: '',
   temperature: 0,
+  thinkingMode: 'enabled',
   apiKey: '',
 };
 
@@ -78,6 +81,7 @@ function toAiConfigDraft(settings: SettingsDTO | null): EditableAiConfig {
     baseUrl: profile.baseUrl,
     model: profile.model ?? '',
     temperature: Number.isFinite(profile.temperature) ? profile.temperature : 0,
+    thinkingMode: profile.thinkingMode ?? 'enabled',
     apiKey: profile.apiKey ?? '',
   };
 }
@@ -101,6 +105,7 @@ function sameAiConfig(a: EditableAiConfig, b: EditableAiConfig) {
     && a.baseUrl === b.baseUrl
     && a.model === b.model
     && String(a.temperature) === String(b.temperature)
+    && a.thinkingMode === b.thinkingMode
     && isSecretUnchanged(a.apiKey, b.apiKey);
 }
 
@@ -304,6 +309,7 @@ export default function SettingsPage() {
       baseUrl: aiDraft.baseUrl.trim(),
       model: aiDraft.model.trim(),
       temperature: Number.isFinite(aiDraft.temperature) ? aiDraft.temperature : 0,
+      thinkingMode: aiDraft.thinkingMode,
     };
     if (shouldSubmitAiSecret(aiDraft.apiKey, aiInitial.apiKey)) req.apiKey = aiDraft.apiKey.trim();
     return req;
@@ -604,6 +610,13 @@ export default function SettingsPage() {
                 value={String(aiDraft.temperature)}
                 onChange={event => setAiConfig('temperature', Number(event.target.value))}
               />
+            </div>
+          </SettingsRow>
+
+          <SettingsRow title="思考模式" description="按当前 provider 策略控制模型推理能力；不支持该能力的模型会自动忽略。">
+            <div className="settings-segmented settings-segmented--two">
+              <button type="button" className={aiDraft.thinkingMode === 'enabled' ? 'is-active' : ''} onClick={() => setAiConfig('thinkingMode', 'enabled')}>开启</button>
+              <button type="button" className={aiDraft.thinkingMode === 'disabled' ? 'is-active' : ''} onClick={() => setAiConfig('thinkingMode', 'disabled')}>关闭</button>
             </div>
           </SettingsRow>
         </div>

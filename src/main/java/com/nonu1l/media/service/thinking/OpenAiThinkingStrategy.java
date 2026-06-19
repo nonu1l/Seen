@@ -13,7 +13,7 @@ public class OpenAiThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "openai");
+        return baseUrlContains(setting, "openai");
     }
 
     @Override
@@ -22,7 +22,7 @@ public class OpenAiThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 0;
+    public String providerName() {
+        return "openai";
     }
 }

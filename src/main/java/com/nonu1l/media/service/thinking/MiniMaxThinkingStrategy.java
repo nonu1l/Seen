@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * MiniMax OpenAI-compatible 策略，关闭使用 disabled，开启或自动使用 adaptive。
+ * MiniMax OpenAI-compatible 策略，关闭使用 disabled，开启使用 adaptive。
  */
 @Component
 public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
@@ -16,7 +16,7 @@ public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "minimax") || modelContains(setting, "minimax");
+        return baseUrlContains(setting, "minimax");
     }
 
     @Override
@@ -25,7 +25,7 @@ public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
         if (resolved == ThinkingMode.DISABLED) {
             return thinkingType("disabled");
         }
-        if (resolved == ThinkingMode.ENABLED || resolved == ThinkingMode.AUTO) {
+        if (resolved == ThinkingMode.ENABLED) {
             return thinkingType("adaptive");
         }
         return Map.of();
@@ -37,7 +37,7 @@ public class MiniMaxThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 40;
+    public String providerName() {
+        return "minimax";
     }
 }

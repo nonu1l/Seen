@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Provider 级思考模式策略，负责把应用内部的 {@link ThinkingMode} 翻译成请求扩展参数。
+ * Provider 级思考模式策略，负责按 AI Base URL 识别 provider，并把 {@link ThinkingMode} 翻译成请求扩展参数。
  */
 public interface ThinkingStrategy {
 
@@ -17,6 +17,24 @@ public interface ThinkingStrategy {
      * @return 适用时返回 true
      */
     boolean supports(SettingsService.AiRuntimeSetting setting);
+
+    /**
+     * 当前策略对应的 provider 名称，用于 token 记录和设置页诊断展示。
+     *
+     * @return provider 标识名称
+     */
+    default String providerName() {
+        return "custom";
+    }
+
+    /**
+     * 标记兜底策略。兜底策略只在没有具体 provider 命中时使用。
+     *
+     * @return 是否为兜底策略
+     */
+    default boolean fallback() {
+        return false;
+    }
 
     /**
      * 构建 OpenAI-compatible 请求的额外 body 字段。
@@ -57,12 +75,4 @@ public interface ThinkingStrategy {
         return content;
     }
 
-    /**
-     * 策略优先级，数值越小越优先。
-     *
-     * @return 优先级数值
-     */
-    default int order() {
-        return 100;
-    }
 }

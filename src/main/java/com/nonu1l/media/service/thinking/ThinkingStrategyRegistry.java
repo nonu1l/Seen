@@ -3,7 +3,6 @@ package com.nonu1l.media.service.thinking;
 import com.nonu1l.media.service.SettingsService;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -33,14 +32,12 @@ public class ThinkingStrategyRegistry {
     }
 
     /**
-     * 注入所有策略并按优先级排序。
+     * 注入所有策略。解析时会先匹配具体 provider，再使用兜底策略。
      *
      * @param strategies Spring 管理的思考策略列表
      */
     public ThinkingStrategyRegistry(List<ThinkingStrategy> strategies) {
-        this.strategies = strategies.stream()
-                .sorted(Comparator.comparingInt(ThinkingStrategy::order))
-                .toList();
+        this.strategies = List.copyOf(strategies);
     }
 
     /**
@@ -51,9 +48,21 @@ public class ThinkingStrategyRegistry {
      */
     public ThinkingStrategy resolve(SettingsService.AiRuntimeSetting setting) {
         return strategies.stream()
+                .filter(strategy -> !strategy.fallback())
                 .filter(strategy -> strategy.supports(setting))
                 .findFirst()
+                .or(() -> strategies.stream().filter(ThinkingStrategy::fallback).findFirst())
                 .orElseThrow(() -> new IllegalStateException("No thinking strategy registered"));
+    }
+
+    /**
+     * 解析当前配置对应的 provider 展示名。
+     *
+     * @param setting 当前 AI 运行配置
+     * @return 命中策略的 provider 名称
+     */
+    public String providerName(SettingsService.AiRuntimeSetting setting) {
+        return resolve(setting).providerName();
     }
 
     /**

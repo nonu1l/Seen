@@ -13,7 +13,7 @@ public class MiMoThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "mimo", "momi") || modelContains(setting, "mimo", "momi");
+        return baseUrlContains(setting, "mimo", "momi", "xiaomi");
     }
 
     @Override
@@ -26,7 +26,7 @@ public class MiMoThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 50;
+    public String providerName() {
+        return "mimo";
     }
 }

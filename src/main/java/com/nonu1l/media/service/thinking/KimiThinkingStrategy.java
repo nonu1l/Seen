@@ -13,7 +13,7 @@ public class KimiThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "kimi") || modelContains(setting, "kimi", "moonshot");
+        return baseUrlContains(setting, "kimi", "moonshot");
     }
 
     @Override
@@ -29,7 +29,7 @@ public class KimiThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 30;
+    public String providerName() {
+        return "kimi";
     }
 }

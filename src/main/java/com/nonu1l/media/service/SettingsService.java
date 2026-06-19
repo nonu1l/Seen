@@ -6,6 +6,7 @@ import com.nonu1l.media.model.dto.AiProviderSettingDTO;
 import com.nonu1l.media.model.dto.SettingsDTO;
 import com.nonu1l.media.model.entity.AppSetting;
 import com.nonu1l.media.repository.AppSettingRepository;
+import com.nonu1l.media.service.thinking.ThinkingMode;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class SettingsService {
     public static final String AI_API_KEY = "ai.api-key";
     public static final String AI_MODEL = "ai.model";
     public static final String AI_TEMPERATURE = "ai.temperature";
+    public static final String AI_THINKING_SETTING = "ai.thinking-mode";
     public static final String SEARCH_PROVIDER = "search.provider";
     public static final String SEARCH_PROVIDER_DISABLED = "disabled";
     public static final String SERPER_API_KEY = "search.serper-api-key";
@@ -99,6 +101,7 @@ public class SettingsService {
                 getString(AI_BASE_URL),
                 getString(AI_MODEL),
                 getDouble(AI_TEMPERATURE),
+                getString(AI_THINKING_SETTING),
                 hasText(AI_API_KEY),
                 getString(AI_API_KEY)
         );
@@ -110,9 +113,12 @@ public class SettingsService {
             throw new IllegalArgumentException("请求不能为空");
         }
 
-        saveSetting(definitions.get(AI_BASE_URL), AiProviderSupport.trimTrailingSlash(request.baseUrl() != null ? request.baseUrl().trim() : ""));
+        saveSetting(definitions.get(AI_BASE_URL), trimTrailingSlash(request.baseUrl() != null ? request.baseUrl().trim() : ""));
         saveSetting(definitions.get(AI_MODEL), request.model() != null ? request.model().trim() : "");
         saveSetting(definitions.get(AI_TEMPERATURE), String.valueOf(clampTemperature(request.temperature())));
+        if (request.thinkingMode() != null) {
+            saveSetting(definitions.get(AI_THINKING_SETTING), normalizeThinkingMode(request.thinkingMode()));
+        }
 
         if (request.apiKey() != null) {
             saveSetting(definitions.get(AI_API_KEY), request.apiKey().trim());
@@ -123,10 +129,9 @@ public class SettingsService {
     }
 
     public AiRuntimeSetting currentRuntimeSetting() {
-        String baseUrl = AiProviderSupport.trimTrailingSlash(getString(AI_BASE_URL));
+        String baseUrl = trimTrailingSlash(getString(AI_BASE_URL));
         return new AiRuntimeSetting(
                 null,
-                AiProviderSupport.inferProviderKind(baseUrl),
                 baseUrl,
                 getString(AI_API_KEY),
                 getString(AI_MODEL),
@@ -135,9 +140,9 @@ public class SettingsService {
     }
 
     public AiRuntimeSetting runtimeFromDraft(AiProviderSettingRequest request) {
-        String currentBaseUrl = AiProviderSupport.trimTrailingSlash(getString(AI_BASE_URL));
+        String currentBaseUrl = trimTrailingSlash(getString(AI_BASE_URL));
         String baseUrl = request != null && request.baseUrl() != null
-                ? AiProviderSupport.trimTrailingSlash(request.baseUrl().trim())
+                ? trimTrailingSlash(request.baseUrl().trim())
                 : currentBaseUrl;
         String model = request != null && request.model() != null
                 ? request.model().trim()
@@ -146,7 +151,14 @@ public class SettingsService {
         double temperature = request != null && request.temperature() != null
                 ? clampTemperature(request.temperature())
                 : getDouble(AI_TEMPERATURE);
-        return new AiRuntimeSetting(null, AiProviderSupport.inferProviderKind(baseUrl), baseUrl, apiKey, model, temperature);
+        return new AiRuntimeSetting(null, baseUrl, apiKey, model, temperature);
+    }
+
+    /**
+     * @return 设置页保存的默认思考模式，非法值回退为 enabled。
+     */
+    public ThinkingMode currentThinkingMode() {
+        return parseThinkingMode(getString(AI_THINKING_SETTING));
     }
 
     public boolean getBoolean(String key) {
@@ -195,10 +207,18 @@ public class SettingsService {
     private static String bangumiApiBase(String proxy, String defaultApiBase) {
         String value = proxy == null ? "" : proxy.trim();
         if (value.isBlank()) {
-            return AiProviderSupport.trimTrailingSlash(defaultApiBase);
+            return trimTrailingSlash(defaultApiBase);
         }
-        value = AiProviderSupport.trimTrailingSlash(value);
+        value = trimTrailingSlash(value);
         return value.endsWith("/api") || value.endsWith("/v0") ? value : value + "/api";
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private Object effectiveValue(String key) {
@@ -250,6 +270,7 @@ public class SettingsService {
         return switch (definition.type()) {
             case "boolean" -> String.valueOf(Boolean.parseBoolean(value));
             case "select" -> normalizeProvider(value);
+            case "thinking-mode" -> normalizeThinkingMode(value);
             default -> value;
         };
     }
@@ -261,6 +282,7 @@ public class SettingsService {
                 case "boolean" -> Boolean.parseBoolean(value);
                 case "number" -> Double.parseDouble(value);
                 case "select" -> normalizeProvider(value);
+                case "thinking-mode" -> normalizeThinkingMode(value);
                 default -> value;
             };
         } catch (Exception ignored) {
@@ -276,6 +298,17 @@ public class SettingsService {
         }
         if ("tavily".equalsIgnoreCase(value)) return "tavily";
         return "serper";
+    }
+
+    private static String normalizeThinkingMode(String value) {
+        return parseThinkingMode(value).name().toLowerCase(Locale.ROOT);
+    }
+
+    private static ThinkingMode parseThinkingMode(String value) {
+        if (value != null && "disabled".equalsIgnoreCase(value.trim())) {
+            return ThinkingMode.DISABLED;
+        }
+        return ThinkingMode.ENABLED;
     }
 
     private String resolveAiApiKey(AiProviderSettingRequest request) {
@@ -305,6 +338,7 @@ public class SettingsService {
         map.put(AI_API_KEY, new SettingDefinition(AI_API_KEY, "AI API Key", "string", true, ""));
         map.put(AI_MODEL, new SettingDefinition(AI_MODEL, "AI 模型", "string", false, ""));
         map.put(AI_TEMPERATURE, new SettingDefinition(AI_TEMPERATURE, "AI Temperature", "number", false, 0.0d));
+        map.put(AI_THINKING_SETTING, new SettingDefinition(AI_THINKING_SETTING, "AI 思考模式", "thinking-mode", false, "enabled"));
         map.put(SEARCH_PROVIDER, new SettingDefinition(SEARCH_PROVIDER, "搜索源", "select", false, "serper"));
         map.put(SERPER_API_KEY, new SettingDefinition(SERPER_API_KEY, "Serper API Key", "string", true, ""));
         map.put(TAVILY_API_KEY, new SettingDefinition(TAVILY_API_KEY, "Tavily API Key", "string", true, ""));
@@ -321,7 +355,6 @@ public class SettingsService {
 
     public record AiRuntimeSetting(
             Long id,
-            String providerKind,
             String baseUrl,
             String apiKey,
             String model,

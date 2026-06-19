@@ -57,7 +57,7 @@ public class SettingsTestService {
         SettingsService.AiRuntimeSetting setting = resolveTestSetting(request);
         if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
             return response(false, "baseUrl、apiKey、model 不能为空", start,
-                    Map.of("provider", setting.providerKind(), "model", setting.model()));
+                    Map.of("provider", thinkingStrategyRegistry().providerName(setting), "model", setting.model()));
         }
 
         try {
@@ -73,19 +73,19 @@ public class SettingsTestService {
             body.putAll(thinkingStrategyRegistry().extraBody(setting, ThinkingMode.DISABLED));
 
             ResponseEntity<String> resp = restTemplate.exchange(
-                    AiProviderSupport.chatCompletionsUrl(setting.baseUrl()),
+                    chatCompletionsUrl(setting.baseUrl()),
                     HttpMethod.POST,
                     new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
                     String.class
             );
             boolean ok = resp.getStatusCode().is2xxSuccessful();
             return response(ok, ok ? "连接正常" : "连接失败", start, Map.of(
-                    "provider", setting.providerKind(),
+                    "provider", thinkingStrategyRegistry().providerName(setting),
                     "model", setting.model()
             ));
         } catch (Exception e) {
             return response(false, sanitize(e.getMessage(), setting.apiKey()), start, Map.of(
-                    "provider", setting.providerKind(),
+                    "provider", thinkingStrategyRegistry().providerName(setting),
                     "model", setting.model()
             ));
         }
@@ -128,6 +128,7 @@ public class SettingsTestService {
                 request != null ? request.baseUrl() : null,
                 request != null ? request.model() : null,
                 request != null ? request.temperature() : null,
+                null,
                 request != null ? request.apiKey() : null
         ));
     }
@@ -136,6 +137,18 @@ public class SettingsTestService {
         return thinkingStrategyRegistry != null
                 ? thinkingStrategyRegistry
                 : ThinkingStrategyRegistry.defaultRegistry();
+    }
+
+    private static String chatCompletionsUrl(String baseUrl) {
+        return trimTrailingSlash(baseUrl) + "/chat/completions";
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private List<String> testSerperSearch(String query, String apiKey) throws Exception {

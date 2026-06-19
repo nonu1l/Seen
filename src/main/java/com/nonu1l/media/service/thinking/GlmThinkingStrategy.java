@@ -13,7 +13,7 @@ public class GlmThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "glm") || modelContains(setting, "glm");
+        return baseUrlContains(setting, "bigmodel", "zhipu");
     }
 
     @Override
@@ -29,7 +29,7 @@ public class GlmThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 20;
+    public String providerName() {
+        return "glm";
     }
 }

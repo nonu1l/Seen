@@ -22,7 +22,7 @@ public class CustomThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 1000;
+    public boolean fallback() {
+        return true;
     }
 }

@@ -7,6 +7,7 @@ public record AiProviderSettingDTO(
         String baseUrl,
         String model,
         Double temperature,
+        String thinkingMode,
         boolean apiKeySet,
         String apiKey
 ) {

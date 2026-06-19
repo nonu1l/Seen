@@ -3,6 +3,7 @@ package com.nonu1l.media.config;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
+import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.ai.chat.client.ChatClientMessageAggregator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
 
     private final TokenUsageRepository repo;
     private final SettingsService settingsService;
+    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final Supplier<SettingsService.AiRuntimeSetting> settingSupplier;
 
     /**
@@ -40,19 +42,24 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      *
      * @param repo token 用量仓储。
      * @param settingsService 设置读取服务。
+     * @param thinkingStrategyRegistry provider 思考策略注册器。
      */
     public TokenUsageAdvisor(TokenUsageRepository repo,
-                             SettingsService settingsService) {
+                             SettingsService settingsService,
+                             ThinkingStrategyRegistry thinkingStrategyRegistry) {
         this.repo = repo;
         this.settingsService = settingsService;
+        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingsService::currentRuntimeSetting;
     }
 
     private TokenUsageAdvisor(TokenUsageRepository repo,
                               SettingsService settingsService,
+                              ThinkingStrategyRegistry thinkingStrategyRegistry,
                               Supplier<SettingsService.AiRuntimeSetting> settingSupplier) {
         this.repo = repo;
         this.settingsService = settingsService;
+        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingSupplier;
     }
 
@@ -63,7 +70,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      * @return 绑定指定配置的 Advisor。
      */
     public TokenUsageAdvisor withSetting(SettingsService.AiRuntimeSetting setting) {
-        return new TokenUsageAdvisor(repo, settingsService, () -> setting);
+        return new TokenUsageAdvisor(repo, settingsService, thinkingStrategyRegistry, () -> setting);
     }
 
     /**
@@ -177,7 +184,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                     tu.setNodeName(context.nodeName());
                     tu.setTurn(context.turn());
                     tu.setProfileId(context.setting().id());
-                    tu.setProfileName(context.setting().providerKind());
+                    tu.setProfileName(thinkingStrategyRegistry.providerName(context.setting()));
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);

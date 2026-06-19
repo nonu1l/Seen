@@ -6,7 +6,6 @@ import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -26,8 +25,6 @@ public class AiChatClientFactory {
     private final TokenUsageAdvisor tokenUsageAdvisor;
     private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final ConcurrentHashMap<String, ChatClient> cache = new ConcurrentHashMap<>();
-    @Value("${app.ai.thinking-mode:enabled}")
-    private String defaultThinkingMode;
 
     public AiChatClientFactory(SettingsService settingsService,
                                TokenUsageAdvisor tokenUsageAdvisor,
@@ -38,12 +35,12 @@ public class AiChatClientFactory {
     }
 
     /**
-     * 使用配置的业务默认思考模式创建当前 AI 客户端。
+     * 使用设置页保存的默认思考模式创建当前 AI 客户端。
      *
      * @return 当前运行时配置对应的 ChatClient
      */
     public ChatClient currentClient() {
-        return currentClient(defaultThinkingMode());
+        return currentClient(settingsService.currentThinkingMode());
     }
 
     /**
@@ -81,20 +78,9 @@ public class AiChatClientFactory {
                 : ThinkingStrategyRegistry.defaultRegistry();
     }
 
-    private ThinkingMode defaultThinkingMode() {
-        if (defaultThinkingMode == null || defaultThinkingMode.isBlank()) {
-            return ThinkingMode.ENABLED;
-        }
-        try {
-            return ThinkingMode.valueOf(defaultThinkingMode.trim().toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            return ThinkingMode.ENABLED;
-        }
-    }
-
     private ChatClient buildClient(SettingsService.AiRuntimeSetting setting, Map<String, Object> extraBody) {
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
-                .baseUrl(AiProviderSupport.trimTrailingSlash(setting.baseUrl()))
+                .baseUrl(trimTrailingSlash(setting.baseUrl()))
                 .apiKey(setting.apiKey())
                 .model(setting.model())
                 .temperature(setting.temperature());
@@ -112,6 +98,14 @@ public class AiChatClientFactory {
                 .build();
     }
 
+    private static String trimTrailingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
     private void validate(SettingsService.AiRuntimeSetting setting) {
         if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
             throw new IllegalStateException("请先在设置页配置 AI 地址、API Key 和模型");
@@ -121,8 +115,7 @@ public class AiChatClientFactory {
     String cacheKey(SettingsService.AiRuntimeSetting setting, ThinkingMode mode, Map<String, Object> extraBody) {
         String raw = CACHE_VERSION + "\n"
                 + setting.id() + "\n"
-                + setting.providerKind() + "\n"
-                + AiProviderSupport.trimTrailingSlash(setting.baseUrl()) + "\n"
+                + trimTrailingSlash(setting.baseUrl()) + "\n"
                 + setting.apiKey() + "\n"
                 + setting.model() + "\n"
                 + setting.temperature() + "\n"

@@ -13,7 +13,7 @@ public class DeepSeekThinkingStrategy extends AbstractThinkingStrategy {
 
     @Override
     public boolean supports(SettingsService.AiRuntimeSetting setting) {
-        return matchesProvider(setting, "deepseek") || modelContains(setting, "deepseek");
+        return baseUrlContains(setting, "deepseek");
     }
 
     @Override
@@ -29,7 +29,7 @@ public class DeepSeekThinkingStrategy extends AbstractThinkingStrategy {
     }
 
     @Override
-    public int order() {
-        return 10;
+    public String providerName() {
+        return "deepseek";
     }
 }
