@@ -207,8 +207,8 @@ public class WorkService {
     /**
      * 标记/更新单条作品状态（覆盖式）。
      *
-     * <p>当最新记录状态与新状态不同会新增/更新一条记录；否则返回当前最新记录。
-     * 该方法不会新增历史记录快照（与 {@link #markNew} 行为不同）。</p>
+     * <p>当最新记录状态与新状态不同时更新最新记录；无记录时新增一条记录。
+     * 该方法不创建 AI 会话快照。</p>
      *
      * @param req 标记参数，需包含作品ID与目标状态
      * @return 标记后的 {@link WorkListItemResponse}
@@ -263,66 +263,6 @@ public class WorkService {
     }
 
     /**
-     * AI 模式新增标记：每次都创建新记录。
-     *
-     * <p>用于需要保留全部历史的场景；当 req 中可选字段为空时会从上条记录继承并保持原字段。</p>
-     *
-     * @param req 标记请求，需至少包含作品ID
-     * @param rating 可选评分，空时继承上一条评分
-     * @param review 可选影评，空时继承上一条影评
-     * @return 新建记录与旧记录的上下文结果
-     */
-    public MarkResult markNew(MarkRequest req, Double rating, String review) {
-        if (req.getId() == null)
-            throw new IllegalArgumentException("id required");
-        Long id = parseId(req.getId());
-        if (id == null) throw new IllegalArgumentException("invalid id");
-
-        BangumiSubjectSummaryDTO meta = resolveMetaForInsert(id, req.getMeta());
-        MarkResult result = Objects.requireNonNull(transactionTemplate.execute(tx -> markNewInTransaction(req, rating, review, id, meta)));
-        preferenceMemoryService.recordChanged(id);
-        return result;
-    }
-
-    private MarkResult markNewInTransaction(MarkRequest req, Double rating, String review, Long id, BangumiSubjectSummaryDTO meta) {
-        Work work = upsertWork(id, meta);
-        Record previous = recordRepo.findLatestByWorkId(id).orElse(null);
-
-        // null / 空串字段从旧记录沿用
-        String newStatus = (req.getStatus() != null && !req.getStatus().isBlank()) ? req.getStatus() : null;
-        String status = newStatus != null ? newStatus
-                : (previous != null ? previous.getStatus() : "collect");
-        Double r = rating != null ? rating
-                : (previous != null ? previous.getRating() : null);
-        String rv = review != null ? review
-                : (previous != null ? previous.getReview() : null);
-
-        Record rec = new Record();
-        rec.setWorkId(id);
-        rec.setCreatedBy("AI");
-        rec.setStatus(status);
-        if (r != null) rec.setRating(r);
-        if (rv != null && !rv.isEmpty()) rec.setReview(rv);
-        recordRepo.save(rec);
-
-        return new MarkResult(buildListItem(work, rec), previous);
-    }
-
-    /**
-     * 回退最新一条记录。
-     *
-     * <p>仅删除该作品的最新记录，用于撤销最近一次操作。</p>
-     *
-     * @param workId 作品ID
-     */
-    @Transactional
-    public void undoLastRecord(Long workId) {
-        recordRepo.findLatestIdByWorkId(workId)
-                .ifPresent(recordRepo::deleteRecordById);
-        preferenceMemoryService.recordChanged(workId);
-    }
-
-    /**
      * 更新当前最新记录的评分与影评（覆盖式）。
      *
      * <p>该方法直接改写最新记录，不保留历史副本。</p>
@@ -344,11 +284,6 @@ public class WorkService {
         preferenceMemoryService.recordChanged(workId);
         return item;
     }
-
-    /**
-     * 标记返回值：返回新记录对应列表项及其前序记录，用于前端展示变更对比。
-     */
-    public record MarkResult(WorkListItemResponse item, Record previousRecord) {}
 
     /**
      * 查询角色中文名（透传 Bangumi API）。

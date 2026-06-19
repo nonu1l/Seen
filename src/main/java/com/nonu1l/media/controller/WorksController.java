@@ -41,13 +41,13 @@ public class WorksController {
     /**
      * 根据关键词检索作品。
      *
-     * @param body 请求体，必须包含键 {@code q}，将对其做 trim 处理后检索。
+     * @param request 请求体，必须包含键 {@code q}，将对其做 trim 处理后检索。
      * @return 匹配结果；为空时返回空列表；异常时返回 500。
      */
     @PostMapping("/search")
-    public ResponseEntity<WorkSearchResponse> search(@RequestBody Map<String, String> body) {
+    public ResponseEntity<WorkSearchResponse> search(@RequestBody SearchRequest request) {
         try {
-            String q = body.get("q");
+            String q = request != null ? request.q() : null;
             if (q == null || q.isBlank()) return ResponseEntity.ok(new WorkSearchResponse(List.of(), List.of()));
             return ResponseEntity.ok(workService.search(q.trim()));
         } catch (Exception e) { log.error("search failed", e); return ResponseEntity.internalServerError().build(); }
@@ -56,13 +56,13 @@ public class WorksController {
     /**
      * 获取作品明细。
      *
-     * @param body 请求体，必须包含作品 {@code id}。
+     * @param request 请求体，必须包含作品 {@code id}。
      * @return 找到则返回明细；未找到返回 404；异常返回 500。
      */
     @PostMapping("/details")
-    public ResponseEntity<WorkDetailResponse> details(@RequestBody Map<String, String> body) {
+    public ResponseEntity<WorkDetailResponse> details(@RequestBody DetailRequest request) {
         try {
-            String id = body.get("id");
+            String id = request != null ? request.id() : null;
             if (id == null) return ResponseEntity.badRequest().build();
             WorkDetailResponse d = workService.getDetail(id);
             return d == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(d);
@@ -85,15 +85,15 @@ public class WorksController {
     /**
      * 取消作品标记。
      *
-     * @param body 请求体，必须包含 {@code workId}。
+     * @param request 请求体，必须包含 {@code workId}。
      * @return 成功返回确认对象 {@code {"ok": true}}；异常返回 500。
      */
     @PostMapping("/unmark")
-    public ResponseEntity<Map<String, Boolean>> unmark(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<String, Boolean>> unmark(@RequestBody WorkIdRequest request) {
         try {
-            Number workId = (Number) body.get("workId");
+            Long workId = request != null ? request.workId() : null;
             if (workId == null) return ResponseEntity.badRequest().build();
-            workService.unmark(workId.longValue());
+            workService.unmark(workId);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (Exception e) { log.error("unmark failed", e); return ResponseEntity.internalServerError().build(); }
     }
@@ -101,18 +101,15 @@ public class WorksController {
     /**
      * 更新作品评分与评价。
      *
-     * @param body 请求体，需包含 {@code workId}，可选包含 {@code rating}/{@code review}。
+     * @param request 请求体，需包含 {@code workId}，可选包含 {@code rating}/{@code review}。
      * @return 更新后的作品条目；冲突返回 409，异常返回 500。
      */
     @PostMapping("/update-review")
-    public ResponseEntity<WorkListItemResponse> updateReview(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<WorkListItemResponse> updateReview(@RequestBody UpdateReviewRequest request) {
         try {
-            Number workId = (Number) body.get("workId");
+            Long workId = request != null ? request.workId() : null;
             if (workId == null) return ResponseEntity.badRequest().build();
-            Object ratingObj = body.get("rating");
-            Double rating = ratingObj == null ? null : ((Number) ratingObj).doubleValue();
-            String review = (String) body.get("review");
-            return ResponseEntity.ok(workService.updateReview(workId.longValue(), rating, review));
+            return ResponseEntity.ok(workService.updateReview(workId, request.rating(), request.review()));
         } catch (IllegalStateException e) { return ResponseEntity.status(409).build(); }
         catch (Exception e) { log.error("updateReview failed", e); return ResponseEntity.internalServerError().build(); }
     }
@@ -120,17 +117,16 @@ public class WorksController {
     /**
      * 批量获取角色中文名。
      *
-     * @param body 请求体，必须包含整数 ID 列表 {@code ids}。
+     * @param request 请求体，必须包含整数 ID 列表 {@code ids}。
      * @return 角色 ID 与中文名映射；仅返回命中结果；异常返回 500。
      */
     @PostMapping("/character-names")
-    public ResponseEntity<Map<Long, String>> characterNames(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<Long, String>> characterNames(@RequestBody BatchIdsRequest request) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Integer> raw = (List<Integer>) body.get("ids");
+            List<Long> raw = request != null ? request.ids() : null;
             if (raw == null || raw.isEmpty()) return ResponseEntity.ok(Map.of());
             Map<Long, String> result = new java.util.concurrent.ConcurrentHashMap<>();
-            raw.stream().map(Number::longValue).parallel().forEach(id -> {
+            raw.parallelStream().forEach(id -> {
                 String cn = workService.getCharacterName(id);
                 if (cn != null && !cn.isEmpty()) result.put(id, cn);
             });
@@ -141,17 +137,16 @@ public class WorksController {
     /**
      * 批量获取演员中文名。
      *
-     * @param body 请求体，必须包含演员 ID 列表 {@code ids}。
+     * @param request 请求体，必须包含演员 ID 列表 {@code ids}。
      * @return 演员 ID 与中文名映射；仅返回命中结果；异常返回 500。
      */
     @PostMapping("/actor-names")
-    public ResponseEntity<Map<Long, String>> actorNames(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<Long, String>> actorNames(@RequestBody BatchIdsRequest request) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Integer> raw = (List<Integer>) body.get("ids");
+            List<Long> raw = request != null ? request.ids() : null;
             if (raw == null || raw.isEmpty()) return ResponseEntity.ok(Map.of());
             Map<Long, String> result = new java.util.concurrent.ConcurrentHashMap<>();
-            raw.stream().map(Number::longValue).parallel().forEach(id -> {
+            raw.parallelStream().forEach(id -> {
                 String cn = workService.getActorName(id);
                 if (cn != null && !cn.isEmpty()) result.put(id, cn);
             });
@@ -169,4 +164,42 @@ public class WorksController {
         try { return ResponseEntity.ok(workService.getDict()); }
         catch (Exception e) { log.error("dict failed", e); return ResponseEntity.internalServerError().build(); }
     }
+
+    /**
+     * 作品搜索请求体。
+     *
+     * @param q 搜索关键词
+     */
+    public record SearchRequest(String q) {}
+
+    /**
+     * 作品详情请求体。
+     *
+     * @param id Bangumi 条目 ID
+     * @param platform 前端兼容字段，当前后端不使用
+     */
+    public record DetailRequest(String id, String platform) {}
+
+    /**
+     * 单作品 ID 请求体。
+     *
+     * @param workId 作品 ID
+     */
+    public record WorkIdRequest(Long workId) {}
+
+    /**
+     * 评分与短评更新请求体。
+     *
+     * @param workId 作品 ID
+     * @param rating 评分，可为空
+     * @param review 短评，可为空
+     */
+    public record UpdateReviewRequest(Long workId, Double rating, String review) {}
+
+    /**
+     * 批量 ID 请求体。
+     *
+     * @param ids ID 列表
+     */
+    public record BatchIdsRequest(List<Long> ids) {}
 }

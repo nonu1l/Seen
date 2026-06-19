@@ -2,7 +2,6 @@ package com.nonu1l.media.repository;
 
 import com.nonu1l.media.model.entity.Record;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -79,23 +78,4 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
      */
     void deleteAllByWorkId(Long workId);
 
-    /**
-     * 查询作品最近一条记录的 ID。
-     *
-     * @param workId 作品 ID
-     * @return 最近一条记录的 ID；无记录则返回 {@link Optional#empty()}
-     */
-    @Query(value = "SELECT id FROM record WHERE work_id = :workId ORDER BY updated_at DESC, id DESC LIMIT 1", nativeQuery = true)
-    Optional<Long> findLatestIdByWorkId(@Param("workId") Long workId);
-
-    /**
-     * 按主键删除记录（直接执行删除语句）。
-     *
-     * <p>关键副作用：该方法执行的是直接 DML 删除，未走实体生命周期回调。</p>
-     *
-     * @param id 记录 ID
-     */
-    @Modifying
-    @Query("DELETE FROM Record r WHERE r.id = :id")
-    void deleteRecordById(@Param("id") Long id);
 }
