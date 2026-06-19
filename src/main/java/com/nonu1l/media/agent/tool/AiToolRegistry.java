@@ -17,6 +17,7 @@ public class AiToolRegistry {
 
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
+    private final AiWatchSourceTools watchSourceTools;
     private final AiLocalLibraryTools localLibraryTools;
     private final AiAutonomousTools autonomousTools;
     private final SettingsService settingsService;
@@ -24,17 +25,20 @@ public class AiToolRegistry {
     /**
      * @param bangumiTools Bangumi 查询工具
      * @param webSearchTools Web 搜索工具
+     * @param watchSourceTools 在线观看地址搜索工具
      * @param localLibraryTools 本地记录查询工具
      * @param autonomousTools 自主 Agent 工具门面
      * @param settingsService 运行时设置服务，用于按配置暴露可用工具
      */
     public AiToolRegistry(AiBangumiTools bangumiTools,
                           AiWebSearchTools webSearchTools,
+                          AiWatchSourceTools watchSourceTools,
                           AiLocalLibraryTools localLibraryTools,
                           AiAutonomousTools autonomousTools,
                           SettingsService settingsService) {
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
+        this.watchSourceTools = watchSourceTools;
         this.localLibraryTools = localLibraryTools;
         this.autonomousTools = autonomousTools;
         this.settingsService = settingsService;
@@ -86,6 +90,11 @@ public class AiToolRegistry {
                     (MemoryReq req) -> autonomousTools.readUserMemory(req.query()))
                 .description("按需读取用户长期偏好记忆；推荐时可参考但当前用户请求优先")
                 .inputType(MemoryReq.class).build());
+
+        callbacks.add(FunctionToolCallback.builder("searchWatchSources",
+                    (WatchSourceReq req) -> watchSourceTools.searchWatchSources(req.query()))
+                .description("当用户询问哪里可以看、在哪看、在线观看、播放地址或片源时，解析作品并搜索候选观看链接")
+                .inputType(WatchSourceReq.class).build());
 
         if (isWebSearchEnabled()) {
             callbacks.add(FunctionToolCallback.builder("searchWeb",
@@ -144,6 +153,7 @@ public class AiToolRegistry {
     public record MarkWorkReq(Long subjectId, String status, Double rating, String review, String reason) {}
     public record UnmarkWorkReq(Long subjectId, String reason) {}
     public record MemoryReq(String query) {}
+    public record WatchSourceReq(String query) {}
     public record FetchUrlReq(String url, String purpose, Integer maxChars) {}
 
     private Object searchLocal(String keyword) {
