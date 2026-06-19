@@ -95,6 +95,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
      ├─ presentWorks → 生成 PENDING 展示卡片
      ├─ markWork → 快照 → 写入 record → 生成 SAVED 卡片
      ├─ unmarkWork → 安全检查 → 快照 → 删除本地记录 → 生成 UNMARKED 卡片
+     ├─ searchWatchSources → 搜索候选片源 → 并发打开页面 → LLM 二次筛选
      └─ readUserMemory / searchWeb(可关闭) / fetchWeb(直访公开页面)
                          │
                          ▼
