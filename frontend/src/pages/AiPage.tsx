@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
 import { Masonry } from '@tuturuuu/masonry';
-import remarkGfm from 'remark-gfm';
 import { useAiMode } from '../hooks/useAiMode';
 import type { AppLayoutContext } from '../components/AppLayout';
 import { AiCard } from '../components/AiCard';
 import { AiInput } from '../components/AiInput';
+import { MarkdownMessage } from '../components/MarkdownMessage';
 
 export default function AiPage() {
   const { registerReset } = useOutletContext<AppLayoutContext>();
@@ -54,7 +53,7 @@ export default function AiPage() {
                   >
                     {isUser
                       ? msg.content
-                      : <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>}
+                      : <MarkdownMessage content={msg.content} />}
                   </span>
                 </div>
                 {msgCards.length > 0 && (
