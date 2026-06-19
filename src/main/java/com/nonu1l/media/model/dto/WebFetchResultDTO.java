@@ -2,6 +2,8 @@ package com.nonu1l.media.model.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 /**
  * AI 网页抓取工具的结构化返回，保留 HTTP 状态与失败原因。
  *
@@ -11,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param contentType 响应内容类型。
  * @param title HTML 标题。
  * @param text 清洗后的正文文本。
+ * @param links 页面内可继续访问的链接列表。
  * @param truncated 文本是否被截断。
  * @param error 失败原因。
  * @param hint 给 Agent 的下一步建议。
@@ -23,6 +26,7 @@ public record WebFetchResultDTO(
         String contentType,
         String title,
         String text,
+        List<WebFetchLinkDTO> links,
         boolean truncated,
         String error,
         String hint
