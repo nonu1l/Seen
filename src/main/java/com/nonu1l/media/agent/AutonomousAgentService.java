@@ -66,21 +66,16 @@ public class AutonomousAgentService {
                 .toolCallbacks(toolRegistry.callbacks())
                 .call()
                 .chatResponse();
-        String content = contentBlockService.textFrom(response);
-        String cleaned = cleanAssistantContent(content);
-        if (cleaned == null || cleaned.isBlank()) {
-            cleaned = "已处理。";
+        String replyText = contentBlockService.textFrom(response);
+        if (replyText == null || replyText.isBlank()) {
+            replyText = "已处理。";
         }
-        log.debug("Autonomous agent reply: {}", cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned);
-        return new AgentResponse(cleaned, contentBlockService.blocksJson(response, cleaned));
+        log.debug("Autonomous agent reply: {}", replyText.length() > 200 ? replyText.substring(0, 200) : replyText);
+        return new AgentResponse(replyText, contentBlockService.blocksJson(response, replyText));
     }
 
     private ChatClient chatClient() {
         return chatClientFactory.currentClient();
-    }
-
-    private String cleanAssistantContent(String content) {
-        return chatClientFactory.cleanAssistantContent(content);
     }
 
     private static String loadPrompt(String path) {

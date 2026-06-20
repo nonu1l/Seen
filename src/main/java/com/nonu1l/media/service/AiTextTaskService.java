@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * 封装不带工具调用的 LLM 文本任务，统一处理提示词、思考模式、重试和正文清理。
+ * 封装不带工具调用的 LLM 文本任务，统一处理提示词、思考模式和重试。
  *
  * <p>设置页思考模式为 default 时尊重单次任务的 thinking 参数；设置为 enabled/disabled 时会强制覆盖。</p>
  */
@@ -21,7 +21,7 @@ public class AiTextTaskService {
     /**
      * 创建文本型 LLM 任务服务。
      *
-     * @param chatClientFactory AI 客户端工厂，用于获取当前 ChatClient 并清理模型输出
+     * @param chatClientFactory AI 客户端工厂，用于获取当前 ChatClient
      * @param settingsService 设置服务，用于读取文本任务思考模式覆盖
      */
     public AiTextTaskService(AiChatClientFactory chatClientFactory,
@@ -49,7 +49,7 @@ public class AiTextTaskService {
         private String userPrompt;
         private AiThinkingMode thinkingMode;
         private int maxAttempts = 1;
-        private Consumer<String> cleanedContentListener;
+        private Consumer<String> contentListener;
 
         /**
          * 设置 Token 用量统计节点名。
@@ -118,31 +118,31 @@ public class AiTextTaskService {
         }
 
         /**
-         * 注册清理后正文监听器，适合记录调试日志或保存原始分析结果。
+         * 注册模型正文监听器，适合记录调试日志或保存原始分析结果。
          *
          * @param listener 监听器，可为空
          * @return 当前构建器
          */
-        public TaskBuilder onCleanedContent(Consumer<String> listener) {
-            this.cleanedContentListener = listener;
+        public TaskBuilder onContent(Consumer<String> listener) {
+            this.contentListener = listener;
             return this;
         }
 
         /**
-         * 执行文本任务并返回清理后的模型正文。
+         * 执行文本任务并返回模型正文。
          *
-         * @return 清理后的正文
+         * @return 模型正文
          */
         public String call() {
             return call(Function.identity());
         }
 
         /**
-         * 执行文本任务，并用回调把清理后的正文转换为调用方需要的结果。
+         * 执行文本任务，并用回调把模型正文转换为调用方需要的结果。
          *
          * <p>当模型调用或回调解析抛出异常时，会按 maxAttempts 重试；全部失败后抛出最后一次异常。</p>
          *
-         * @param resultHandler 清理后正文的处理回调
+         * @param resultHandler 模型正文的处理回调
          * @param <T> 返回结果类型
          * @return 回调处理后的结果
          */
@@ -162,11 +162,10 @@ public class AiTextTaskService {
                             .user(userPrompt)
                             .call()
                             .content();
-                    String cleaned = chatClientFactory.cleanAssistantContent(content);
-                    if (cleanedContentListener != null) {
-                        cleanedContentListener.accept(cleaned);
+                    if (contentListener != null) {
+                        contentListener.accept(content);
                     }
-                    return handler.apply(cleaned);
+                    return handler.apply(content);
                 } catch (RuntimeException e) {
                     lastError = e;
                 } catch (Exception e) {

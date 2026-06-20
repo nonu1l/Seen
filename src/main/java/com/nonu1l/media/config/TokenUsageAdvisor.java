@@ -177,7 +177,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                     tu.setNodeName(context.nodeName());
                     tu.setTurn(context.turn());
                     tu.setProfileId(context.setting().id());
-                    tu.setProfileName(profileName(context.setting()));
+                    tu.setProfileName(context.setting().profileName());
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
@@ -269,20 +269,6 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
             }
         }
         return null;
-    }
-
-    private String profileName(SettingsService.AiRuntimeSetting setting) {
-        String baseUrl = setting != null ? setting.baseUrl() : "";
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return "anthropic-compatible";
-        }
-        try {
-            java.net.URI uri = java.net.URI.create(baseUrl);
-            String host = uri.getHost();
-            return host == null || host.isBlank() ? "anthropic-compatible" : host;
-        } catch (Exception ignored) {
-            return "anthropic-compatible";
-        }
     }
 
     /**

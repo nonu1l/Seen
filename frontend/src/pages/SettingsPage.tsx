@@ -556,7 +556,7 @@ export default function SettingsPage() {
       <div className="settings-panel-head">
         <div>
           <h3>AI 接入配置</h3>
-          <p>填写 OpenAI-compatible API 前缀、模型名称和 API Key。保存后立即生效，无需重启。</p>
+          <p>填写 Anthropic-compatible API 前缀、模型名称和 API Key。保存后立即生效，无需重启。</p>
         </div>
         <div className="settings-panel-buttons">
           <button type="button" className="btn-ghost" disabled={testLoading !== null} onClick={() => runTest('ai')}>

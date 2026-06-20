@@ -55,7 +55,7 @@ public class SettingsTestService {
         SettingsService.AiRuntimeSetting setting = resolveTestSetting(request);
         if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
             return response(false, "baseUrl、apiKey、model 不能为空", start,
-                    Map.of("provider", profileName(setting), "model", setting.model()));
+                    Map.of("provider", setting.profileName(), "model", setting.model()));
         }
 
         try {
@@ -66,12 +66,12 @@ public class SettingsTestService {
                     .content();
             boolean ok = content != null;
             return response(ok, ok ? "连接正常" : "连接失败", start, Map.of(
-                    "provider", profileName(setting),
+                    "provider", setting.profileName(),
                     "model", setting.model()
             ));
         } catch (Exception e) {
             return response(false, sanitize(e.getMessage(), setting.apiKey()), start, Map.of(
-                    "provider", profileName(setting),
+                    "provider", setting.profileName(),
                     "model", setting.model()
             ));
         }
@@ -117,28 +117,6 @@ public class SettingsTestService {
                 null,
                 request != null ? request.apiKey() : null
         ));
-    }
-
-    private static String trimTrailingSlash(String value) {
-        String result = value == null ? "" : value.trim();
-        while (result.endsWith("/")) {
-            result = result.substring(0, result.length() - 1);
-        }
-        return result;
-    }
-
-    private static String profileName(SettingsService.AiRuntimeSetting setting) {
-        String baseUrl = setting != null ? setting.baseUrl() : "";
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return "anthropic-compatible";
-        }
-        try {
-            java.net.URI uri = java.net.URI.create(baseUrl);
-            String host = uri.getHost();
-            return host == null || host.isBlank() ? "anthropic-compatible" : host;
-        } catch (Exception ignored) {
-            return "anthropic-compatible";
-        }
     }
 
     private List<String> testSerperSearch(String query, String apiKey) throws Exception {

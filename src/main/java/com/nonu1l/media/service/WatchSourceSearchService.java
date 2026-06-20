@@ -100,17 +100,17 @@ public class WatchSourceSearchService {
      * 用一次轻量 LLM 调用从用户问题中抽取影视名称。
      *
      * <p>提示词放在 prompts/watch-source-title.st；这里禁用思考模式，避免结构化抽取任务产生额外
-     * reasoning 文本。</p>
+        * reasoning 文本。</p>
      */
     private TitleGuess resolveTitle(String query) {
         try {
-            String cleaned = aiTextTaskService.task()
+            String content = aiTextTaskService.task()
                     .node("watch-source-title")
                     .system(titlePrompt)
                     .user(query)
                     .thinking(AiThinkingMode.DISABLED)
                     .call();
-            TitleGuess parsed = parseGuess(cleaned);
+            TitleGuess parsed = parseGuess(content);
             if (hasText(parsed.title())) {
                 return parsed;
             }
@@ -240,8 +240,8 @@ public class WatchSourceSearchService {
                     .user(validationInput(title, fetched))
                     .thinking(AiThinkingMode.DISABLED)
                     .maxAttempts(3)
-                    .call(cleaned -> {
-                        Matcher keepMatcher = KEEP_PATTERN.matcher(cleaned);
+                    .call(content -> {
+                        Matcher keepMatcher = KEEP_PATTERN.matcher(content);
                         if (!keepMatcher.find()) {
                             return List.of();
                         }

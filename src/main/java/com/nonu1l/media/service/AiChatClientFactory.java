@@ -67,16 +67,6 @@ public class AiChatClientFactory {
         return cache.computeIfAbsent(cacheKey, ignored -> buildClient(setting, effectiveMode));
     }
 
-    /**
-     * Anthropic-compatible 主链路下正文由 text block 产生，不再清理 provider 私有 thinking 标签。
-     *
-     * @param content 模型原始正文
-     * @return 原样正文
-     */
-    public String cleanAssistantContent(String content) {
-        return content;
-    }
-
     private ChatClient buildClient(SettingsService.AiRuntimeSetting setting, AiThinkingMode mode) {
         AnthropicChatOptions.Builder options = AnthropicChatOptions.builder()
                 .baseUrl(trimTrailingSlash(setting.baseUrl()))

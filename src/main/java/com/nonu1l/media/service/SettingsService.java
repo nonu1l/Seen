@@ -384,5 +384,22 @@ public class SettingsService {
             String model,
             double temperature
     ) {
+        /**
+         * 返回用于设置测试和 Token 记录的接入端展示名。
+         *
+         * @return Base URL host；无法解析时返回通用 Anthropic 兼容名称
+         */
+        public String profileName() {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                return "anthropic-compatible";
+            }
+            try {
+                java.net.URI uri = java.net.URI.create(baseUrl);
+                String host = uri.getHost();
+                return host == null || host.isBlank() ? "anthropic-compatible" : host;
+            } catch (Exception ignored) {
+                return "anthropic-compatible";
+            }
+        }
     }
 }
