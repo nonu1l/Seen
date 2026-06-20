@@ -3,7 +3,6 @@ package com.nonu1l.media.config;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
-import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.ai.chat.client.ChatClientMessageAggregator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +33,6 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
 
     private final TokenUsageRepository repo;
     private final SettingsService settingsService;
-    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final Supplier<SettingsService.AiRuntimeSetting> settingSupplier;
 
     /**
@@ -42,24 +40,19 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      *
      * @param repo token 用量仓储。
      * @param settingsService 设置读取服务。
-     * @param thinkingStrategyRegistry provider 思考策略注册器。
      */
     public TokenUsageAdvisor(TokenUsageRepository repo,
-                             SettingsService settingsService,
-                             ThinkingStrategyRegistry thinkingStrategyRegistry) {
+                             SettingsService settingsService) {
         this.repo = repo;
         this.settingsService = settingsService;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingsService::currentRuntimeSetting;
     }
 
     private TokenUsageAdvisor(TokenUsageRepository repo,
                               SettingsService settingsService,
-                              ThinkingStrategyRegistry thinkingStrategyRegistry,
                               Supplier<SettingsService.AiRuntimeSetting> settingSupplier) {
         this.repo = repo;
         this.settingsService = settingsService;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingSupplier;
     }
 
@@ -70,7 +63,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      * @return 绑定指定配置的 Advisor。
      */
     public TokenUsageAdvisor withSetting(SettingsService.AiRuntimeSetting setting) {
-        return new TokenUsageAdvisor(repo, settingsService, thinkingStrategyRegistry, () -> setting);
+        return new TokenUsageAdvisor(repo, settingsService, () -> setting);
     }
 
     /**
@@ -184,12 +177,12 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                     tu.setNodeName(context.nodeName());
                     tu.setTurn(context.turn());
                     tu.setProfileId(context.setting().id());
-                    tu.setProfileName(thinkingStrategyRegistry.providerName(context.setting()));
+                    tu.setProfileName(context.setting().profileName());
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
                     tu.setTotalTokens(usage.getTotalTokens() > 0 ? (int) usage.getTotalTokens() : null);
-                    tu.setNativeCachedTokens(extractNativeCachedTokens(usage.getNativeUsage()));
+                    tu.setNativeCachedTokens(extractNativeCachedTokens(usage));
                     tu.setInputText(context.inputText());
                     tu.setOutputText(outputText);
                     repo.save(tu);
@@ -209,21 +202,40 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     /**
-     * 从 provider 原始 usage 中提取官方 prompt cache 命中数。
+     * 从 Spring AI 统一字段或 provider 原始 usage 中提取官方 prompt cache 命中数。
      *
-     * <p>不同 OpenAI 兼容 SDK 可能暴露为 Map、Optional 或 record 风格方法，因此这里只读
-     * prompt_tokens_details.cached_tokens，不做本地估算。</p>
+     * <p>Spring AI 2.0 已统一暴露 cache read/write token；优先读取 cache read。
+     * 若当前模型适配未提供统一字段，再兼容 OpenAI 形态的
+     * prompt_tokens_details.cached_tokens 和 Anthropic 形态的 cacheReadInputTokens。</p>
      *
-     * @param nativeUsage Spring AI 暴露的 provider 原始 usage 对象。
+     * @param usage Spring AI usage 对象。
      * @return 官方 cached tokens；没有返回时为 {@code null}。
      */
-    private Long extractNativeCachedTokens(Object nativeUsage) {
-        Object usage = unwrapOptional(nativeUsage);
+    private Long extractNativeCachedTokens(Usage usage) {
         if (usage == null) {
             return null;
         }
+        Long springAiCacheRead = asPositiveLong(usage.getCacheReadInputTokens());
+        if (springAiCacheRead != null) {
+            return springAiCacheRead;
+        }
 
-        Object details = readValue(usage, "prompt_tokens_details", "promptTokensDetails", "getPromptTokensDetails");
+        Object nativeUsage = unwrapOptional(usage.getNativeUsage());
+        if (nativeUsage == null) {
+            return null;
+        }
+
+        Long anthropicCacheRead = asPositiveLong(unwrapOptional(readValue(
+                nativeUsage,
+                "cache_read_input_tokens",
+                "cacheReadInputTokens",
+                "getCacheReadInputTokens"
+        )));
+        if (anthropicCacheRead != null) {
+            return anthropicCacheRead;
+        }
+
+        Object details = readValue(nativeUsage, "prompt_tokens_details", "promptTokensDetails", "getPromptTokensDetails");
         Object cachedTokens = readValue(unwrapOptional(details), "cached_tokens", "cachedTokens", "getCachedTokens");
         Long value = asPositiveLong(unwrapOptional(cachedTokens));
         return value != null && value > 0 ? value : null;

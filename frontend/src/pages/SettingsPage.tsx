@@ -556,7 +556,7 @@ export default function SettingsPage() {
       <div className="settings-panel-head">
         <div>
           <h3>AI 接入配置</h3>
-          <p>填写 OpenAI-compatible API 前缀、模型名称和 API Key。保存后立即生效，无需重启。</p>
+          <p>填写 Anthropic-compatible API 前缀、模型名称和 API Key。保存后立即生效，无需重启。</p>
         </div>
         <div className="settings-panel-buttons">
           <button type="button" className="btn-ghost" disabled={testLoading !== null} onClick={() => runTest('ai')}>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
         <div className="settings-form">
           <ToggleRow title="AI 助手" checked={aiDraft.aiEnabled} onChange={value => setAiConfig('aiEnabled', value)} />
 
-          <SettingsRow title="API Base URL" description="填写完整 API 前缀，例如 https://api.deepseek.com/v1 或 https://open.bigmodel.cn/api/paas/v4。">
+          <SettingsRow title="API Base URL" description="填写 Anthropic-compatible API 前缀，例如 https://api.deepseek.com/anthropic ">
             <input className="settings-input" value={aiDraft.baseUrl} onChange={event => setAiConfig('baseUrl', event.target.value)} />
           </SettingsRow>
 

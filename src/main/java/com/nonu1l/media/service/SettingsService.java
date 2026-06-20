@@ -6,7 +6,6 @@ import com.nonu1l.media.model.dto.AiProviderSettingDTO;
 import com.nonu1l.media.model.dto.SettingsDTO;
 import com.nonu1l.media.model.entity.AppSetting;
 import com.nonu1l.media.repository.AppSettingRepository;
-import com.nonu1l.media.service.thinking.ThinkingMode;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -160,19 +159,19 @@ public class SettingsService {
     /**
      * @return 设置页保存的默认思考模式，非法值回退为 enabled。
      */
-    public ThinkingMode currentThinkingMode() {
+    public AiThinkingMode currentThinkingMode() {
         return parseThinkingMode(getString(AI_THINKING_SETTING));
     }
 
     /**
      * 返回文本型 LLM 任务的全局思考模式覆盖。
      *
-     * <p>default 表示尊重 {@link AiTextTaskService} 单次调用传入的 thinking 参数；
+     * <p>default 表示尊重 {@link AiChatCallService} 单次调用传入的 thinking 参数；
      * enabled/disabled 会强制覆盖文本任务的单次参数。工具调用型 Agent 暂不使用该覆盖。</p>
      *
      * @return 空表示不覆盖；非空表示文本任务必须使用的思考模式
      */
-    public Optional<ThinkingMode> currentAiTextTaskThinkingOverride() {
+    public Optional<AiThinkingMode> currentAiTextTaskThinkingOverride() {
         String value = getString(AI_THINKING_SETTING);
         if (AI_THINKING_DEFAULT.equalsIgnoreCase(value)) {
             return Optional.empty();
@@ -326,11 +325,14 @@ public class SettingsService {
         return parseThinkingMode(value).name().toLowerCase(Locale.ROOT);
     }
 
-    private static ThinkingMode parseThinkingMode(String value) {
-        if (value != null && AI_THINKING_DISABLED.equalsIgnoreCase(value.trim())) {
-            return ThinkingMode.DISABLED;
+    private static AiThinkingMode parseThinkingMode(String value) {
+        if (value != null && AI_THINKING_DEFAULT.equalsIgnoreCase(value.trim())) {
+            return AiThinkingMode.DEFAULT;
         }
-        return ThinkingMode.ENABLED;
+        if (value != null && AI_THINKING_DISABLED.equalsIgnoreCase(value.trim())) {
+            return AiThinkingMode.DISABLED;
+        }
+        return AiThinkingMode.ENABLED;
     }
 
     private String resolveAiApiKey(AiProviderSettingRequest request) {
@@ -382,5 +384,22 @@ public class SettingsService {
             String model,
             double temperature
     ) {
+        /**
+         * 返回用于设置测试和 Token 记录的接入端展示名。
+         *
+         * @return Base URL host；无法解析时返回通用 Anthropic 兼容名称
+         */
+        public String profileName() {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                return "anthropic-compatible";
+            }
+            try {
+                java.net.URI uri = java.net.URI.create(baseUrl);
+                String host = uri.getHost();
+                return host == null || host.isBlank() ? "anthropic-compatible" : host;
+            } catch (Exception ignored) {
+                return "anthropic-compatible";
+            }
+        }
     }
 }

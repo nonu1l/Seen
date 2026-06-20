@@ -7,6 +7,7 @@ import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -16,11 +17,11 @@ import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 /**
  * Tavily 搜索 API provider，负责把 Tavily 响应映射为统一 Web 搜索结果。
@@ -29,13 +30,13 @@ import java.util.Map;
 public class TavilySearchService implements WebSearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(TavilySearchService.class);
-    private static final int MAX_RESULTS = 10;
-    private static final int MAX_ATTEMPTS = 3;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final SettingsService settingsService;
     private final ExternalEndpointProperties endpointProperties;
+    private final int maxResults;
+    private final int maxAttempts;
 
     /**
      * 构造 Tavily 搜索服务。
@@ -44,18 +45,26 @@ public class TavilySearchService implements WebSearchProvider {
      * @param objectMapper JSON 映射工具
      * @param settingsService 设置读取服务
      * @param endpointProperties 外部 endpoint 配置
+     * @param maxResults 单次返回给 Agent 的最大搜索结果数量
+     * @param maxAttempts Tavily 请求失败时的最大尝试次数
      */
     public TavilySearchService(RestTemplateBuilder builder,
                                ObjectMapper objectMapper,
                                SettingsService settingsService,
-                               ExternalEndpointProperties endpointProperties) {
+                               ExternalEndpointProperties endpointProperties,
+                               @Value("${app.runtime.web-search.max-results:10}") int maxResults,
+                               @Value("${app.runtime.web-search.tavily-max-attempts:3}") int maxAttempts,
+                               @Value("${app.runtime.web-search.tavily-connect-timeout:10s}") Duration connectTimeout,
+                               @Value("${app.runtime.web-search.tavily-read-timeout:20s}") Duration readTimeout) {
         this.restTemplate = builder
-                .connectTimeout(Duration.ofSeconds(10))
-                .readTimeout(Duration.ofSeconds(20))
+                .connectTimeout(connectTimeout)
+                .readTimeout(readTimeout)
                 .build();
         this.objectMapper = objectMapper;
         this.settingsService = settingsService;
         this.endpointProperties = endpointProperties;
+        this.maxResults = Math.max(1, maxResults);
+        this.maxAttempts = Math.max(1, maxAttempts);
     }
 
     @Override
@@ -94,19 +103,19 @@ public class TavilySearchService implements WebSearchProvider {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("query", query);
             body.put("search_depth", "basic");
-            body.put("max_results", MAX_RESULTS);
+            body.put("max_results", maxResults);
             body.put("include_answer", false);
             body.put("include_raw_content", false);
             body.put("include_images", false);
 
             JsonNode root = null;
-            for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+            for (int attempt = 1; attempt < maxAttempts; attempt++) {
                 try {
                     root = requestTavily(body, headers);
                     break;
                 } catch (Exception e) {
                     log.warn("Tavily search failed '{}' (attempt {}/{}): {}",
-                            query, attempt, MAX_ATTEMPTS, e.getMessage());
+                            query, attempt, maxAttempts, e.getMessage());
                 }
             }
             if (root == null) {
@@ -114,7 +123,7 @@ public class TavilySearchService implements WebSearchProvider {
                     root = requestTavily(body, headers);
                 } catch (Exception e) {
                     log.warn("Tavily search failed '{}' (attempt {}/{}): {}",
-                            query, MAX_ATTEMPTS, MAX_ATTEMPTS, e.getMessage());
+                            query, maxAttempts, maxAttempts, e.getMessage());
                     return new WebSearchResultDTO(false, query, providerKey(), 0, results,
                             "Tavily search failed: " + e.getMessage(), null);
                 }
@@ -132,7 +141,7 @@ public class TavilySearchService implements WebSearchProvider {
                 String content = item.has("content") ? item.get("content").asString() : "";
                 if (title != null && !title.isBlank() && url != null && !url.isBlank()) {
                     results.add(new WebSearchItemDTO(title, content, url));
-                    if (results.size() >= MAX_RESULTS) break;
+                    if (results.size() >= maxResults) break;
                 }
             }
 

@@ -7,6 +7,8 @@ import com.nonu1l.media.service.SearchResultPreprocessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.util.List;
 
@@ -36,7 +38,9 @@ public class AiBangumiTools {
      * @param keyword 关键词
      * @return 紧凑条目列表
      */
-    public List<BangumiCompactSubjectDTO> searchBangumi(String keyword) {
+    @Tool(name = "searchBangumi", description = "搜索 Bangumi 影视数据库，返回候选作品列表")
+    public List<BangumiCompactSubjectDTO> searchBangumi(
+            @ToolParam(description = "搜索关键词") String keyword) {
         log.debug("Tool: searchBangumi keyword='{}'", keyword);
         List<BangumiSubjectSummaryDTO> raw = bangumiService.search(keyword);
 

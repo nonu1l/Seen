@@ -7,15 +7,16 @@ import com.nonu1l.media.service.SettingsService;
 import com.nonu1l.media.service.WebSearchProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -66,12 +67,12 @@ import tools.jackson.databind.ObjectMapper;
 public class SerperSearchService implements WebSearchProvider {
 
     private static final Logger log = LoggerFactory.getLogger(SerperSearchService.class);
-    private static final int MAX_RESULTS = 10;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final SettingsService settingsService;
     private final ExternalEndpointProperties endpointProperties;
+    private final int maxResults;
 
     /**
      * 构造 Serper 搜索服务。
@@ -79,18 +80,24 @@ public class SerperSearchService implements WebSearchProvider {
      * @param builder RestTemplate 构造器
      * @param objectMapper JSON 映射工具
      * @param settingsService 设置读取服务
+     * @param endpointProperties 外部 endpoint 配置
+     * @param maxResults 单次返回给 Agent 的最大搜索结果数量
      */
     public SerperSearchService(RestTemplateBuilder builder,
                                 ObjectMapper objectMapper,
                                 SettingsService settingsService,
-                                ExternalEndpointProperties endpointProperties) {
+                                ExternalEndpointProperties endpointProperties,
+                                @Value("${app.runtime.web-search.max-results:10}") int maxResults,
+                                @Value("${app.runtime.web-search.serper-connect-timeout:10s}") Duration connectTimeout,
+                                @Value("${app.runtime.web-search.serper-read-timeout:10s}") Duration readTimeout) {
         this.restTemplate = builder
-                .connectTimeout(Duration.ofSeconds(10))
-                .readTimeout(Duration.ofSeconds(10))
+                .connectTimeout(connectTimeout)
+                .readTimeout(readTimeout)
                 .build();
         this.objectMapper = objectMapper;
         this.settingsService = settingsService;
         this.endpointProperties = endpointProperties;
+        this.maxResults = Math.max(1, maxResults);
     }
 
     @Override
@@ -148,7 +155,7 @@ public class SerperSearchService implements WebSearchProvider {
                 String link = r.has("link") ? r.get("link").asText() : null;
                 if (title != null && link != null) {
                     results.add(new WebSearchItemDTO(title, snippet, link));
-                    if (results.size() >= MAX_RESULTS) break;
+                    if (results.size() >= maxResults) break;
                 }
             }
             log.info("Serper '{}' returned {} results", query, results.size());

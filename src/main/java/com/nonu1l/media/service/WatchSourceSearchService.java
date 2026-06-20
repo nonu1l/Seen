@@ -4,9 +4,9 @@ import com.nonu1l.media.model.dto.WatchSourceItemDTO;
 import com.nonu1l.media.model.dto.WatchSourceResultDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.model.dto.WebSearchResultDTO;
-import com.nonu1l.media.service.thinking.ThinkingMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -32,28 +32,40 @@ public class WatchSourceSearchService {
     private static final Pattern CONFIDENCE_PATTERN = Pattern.compile("\"confidence\"\\s*:\\s*([0-9.]+)");
     private static final Pattern KEEP_PATTERN = Pattern.compile("\"keep\"\\s*:\\s*\\[([^]]*)]");
     private static final Pattern INTEGER_PATTERN = Pattern.compile("\\d+");
-    private static final int FETCH_CONTENT_MAX_CHARS = 3000;
-    private static final int VALIDATION_CONTENT_MAX_CHARS = 2000;
 
-    private final AiTextTaskService aiTextTaskService;
+    private final AiChatCallService AiChatCallService;
     private final WebSearchService webSearchService;
     private final WebFetchService webFetchService;
+    private final int fetchContentMaxChars;
+    private final int validationContentMaxChars;
+    private final int candidateLimit;
+    private final int resultLimit;
     private final String titlePrompt;
     private final String validatePrompt;
 
     /**
      * 创建片源搜索服务。
      *
-     * @param aiTextTaskService 文本型 LLM 任务服务，用于校验候选页面内容
+     * @param AiChatCallService LLM 调用服务，用于校验候选页面内容
      * @param webSearchService Web 搜索服务，用于搜索候选观看链接
      * @param webFetchService Web 抓取服务，用于并发读取候选页面内容
+     * @param fetchContentMaxChars 每个候选页面最多抓取的正文字符数
+     * @param validationContentMaxChars 进入 LLM 校验的单页正文字符数
      */
-    public WatchSourceSearchService(AiTextTaskService aiTextTaskService,
+    public WatchSourceSearchService(AiChatCallService AiChatCallService,
                                     WebSearchService webSearchService,
-                                    WebFetchService webFetchService) {
-        this.aiTextTaskService = aiTextTaskService;
+                                    WebFetchService webFetchService,
+                                    @Value("${app.runtime.watch-source.fetch-content-max-chars:3000}") int fetchContentMaxChars,
+                                    @Value("${app.runtime.watch-source.validation-content-max-chars:2000}") int validationContentMaxChars,
+                                    @Value("${app.runtime.watch-source.candidate-limit:12}") int candidateLimit,
+                                    @Value("${app.runtime.watch-source.result-limit:8}") int resultLimit) {
+        this.AiChatCallService = AiChatCallService;
         this.webSearchService = webSearchService;
         this.webFetchService = webFetchService;
+        this.fetchContentMaxChars = fetchContentMaxChars;
+        this.validationContentMaxChars = validationContentMaxChars;
+        this.candidateLimit = candidateLimit;
+        this.resultLimit = resultLimit;
         this.titlePrompt = loadPrompt("prompts/watch-source-title.st");
         this.validatePrompt = loadPrompt("prompts/watch-source-validate.st");
     }
@@ -101,17 +113,17 @@ public class WatchSourceSearchService {
      * 用一次轻量 LLM 调用从用户问题中抽取影视名称。
      *
      * <p>提示词放在 prompts/watch-source-title.st；这里禁用思考模式，避免结构化抽取任务产生额外
-     * reasoning 文本。</p>
+        * reasoning 文本。</p>
      */
     private TitleGuess resolveTitle(String query) {
         try {
-            String cleaned = aiTextTaskService.task()
+            String content = AiChatCallService.task()
                     .node("watch-source-title")
                     .system(titlePrompt)
                     .user(query)
-                    .thinking(ThinkingMode.DISABLED)
+                    .thinking(AiThinkingMode.DISABLED)
                     .call();
-            TitleGuess parsed = parseGuess(cleaned);
+            TitleGuess parsed = parseGuess(content);
             if (hasText(parsed.title())) {
                 return parsed;
             }
@@ -155,7 +167,7 @@ public class WatchSourceSearchService {
                 .map(byIndex::get)
                 .filter(Objects::nonNull)
                 .map(item -> toItem(item, confidence))
-                .limit(8)
+                .limit(Math.max(1, resultLimit))
                 .toList();
     }
 
@@ -176,7 +188,7 @@ public class WatchSourceSearchService {
                 continue;
             }
             deduped.put(url, new WatchSourceCandidate(item.title(), url, sourceHost(url)));
-            if (deduped.size() >= 12) {
+            if (deduped.size() >= Math.max(1, candidateLimit)) {
                 break;
             }
         }
@@ -205,7 +217,7 @@ public class WatchSourceSearchService {
      */
     private FetchedWatchSource fetchCandidate(int index, WatchSourceCandidate candidate) {
         try {
-            var fetched = webFetchService.fetch(candidate.url(), FETCH_CONTENT_MAX_CHARS);
+            var fetched = webFetchService.fetch(candidate.url(), fetchContentMaxChars);
             if (fetched == null || !fetched.ok() || !hasText(fetched.text())) {
                 return null;
             }
@@ -235,14 +247,14 @@ public class WatchSourceSearchService {
      */
     private List<Integer> validateFetchedContent(String title, List<FetchedWatchSource> fetched) {
         try {
-            return aiTextTaskService.task()
+            return AiChatCallService.task()
                     .node("watch-source-validate")
                     .system(validatePrompt)
                     .user(validationInput(title, fetched))
-                    .thinking(ThinkingMode.DISABLED)
+                    .thinking(AiThinkingMode.DISABLED)
                     .maxAttempts(3)
-                    .call(cleaned -> {
-                        Matcher keepMatcher = KEEP_PATTERN.matcher(cleaned);
+                    .call(content -> {
+                        Matcher keepMatcher = KEEP_PATTERN.matcher(content);
                         if (!keepMatcher.find()) {
                             return List.of();
                         }
@@ -270,7 +282,8 @@ public class WatchSourceSearchService {
                     .append("页面标题：").append(item.pageTitle()).append('\n')
                     .append("   搜索标题：").append(firstText(item.searchTitle(), "")).append('\n')
                     .append("   URL：").append(item.url()).append('\n')
-                    .append("   页面内容：").append(compactContent(item.pageContent(), VALIDATION_CONTENT_MAX_CHARS)).append('\n');
+                    .append("   页面内容：").append(compactContent(item.pageContent(),
+                            validationContentMaxChars)).append('\n');
         }
         return sb.toString();
     }

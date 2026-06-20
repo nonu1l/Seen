@@ -1,6 +1,7 @@
 package com.nonu1l.media.agent.tool;
 
 import com.nonu1l.media.repository.ConversationCardRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,7 +14,6 @@ import java.util.regex.Pattern;
 @Service
 public class AiToolSafetyService {
 
-    private static final int MAX_UNMARKS_PER_REQUEST = 5;
     private static final String UNMARK_ACTION = "UNMARK";
 
     private static final List<Pattern> WHOLE_LIBRARY_UNMARK_PATTERNS = List.of(
@@ -29,14 +29,18 @@ public class AiToolSafetyService {
     );
 
     private final ConversationCardRepository cardRepo;
+    private final int unmarkLimitPerRequest;
 
     /**
      * 创建 AI 工具安全策略服务。
      *
      * @param cardRepo 会话卡片仓储，用于统计本轮请求已执行的动作数量
+     * @param unmarkLimitPerRequest 单轮请求内允许 AI 自动取消标记的最大数量
      */
-    public AiToolSafetyService(ConversationCardRepository cardRepo) {
+    public AiToolSafetyService(ConversationCardRepository cardRepo,
+                               @Value("${app.runtime.agent.unmark-limit-per-request:5}") int unmarkLimitPerRequest) {
         this.cardRepo = cardRepo;
+        this.unmarkLimitPerRequest = unmarkLimitPerRequest;
     }
 
     /**
@@ -60,9 +64,10 @@ public class AiToolSafetyService {
 
         long existingUnmarks = cardRepo.countBySessionIdAndRequestIdAndActionType(
                 context.sessionId(), context.requestId(), UNMARK_ACTION);
-        if (existingUnmarks >= MAX_UNMARKS_PER_REQUEST) {
+        int maxUnmarks = Math.max(1, unmarkLimitPerRequest);
+        if (existingUnmarks >= maxUnmarks) {
             return SafetyDecision.block(
-                    "本轮取消标记数量已达到安全上限 5 个",
+                    "本轮取消标记数量已达到安全上限 " + maxUnmarks + " 个",
                     "停止继续取消标记，请让用户缩小范围或明确确认下一批作品。");
         }
         return SafetyDecision.allow();

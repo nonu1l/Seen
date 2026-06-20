@@ -1,6 +1,7 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.model.dto.ConversationRunStateDTO;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -18,11 +19,17 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class ConversationRunStore {
 
-    private static final int MAX_STATUSES = 6;
-
+    private final int activeStatusLimit;
     private final AtomicReference<ActiveRun> activeRun = new AtomicReference<>();
     private final Set<Long> stoppedUserMessages = ConcurrentHashMap.newKeySet();
     private final Set<Long> stoppedAssistantSavedMessages = ConcurrentHashMap.newKeySet();
+
+    /**
+     * @param activeStatusLimit 页面恢复时保留的最近状态数量
+     */
+    public ConversationRunStore(@Value("${app.runtime.conversation.active-status-limit:6}") int activeStatusLimit) {
+        this.activeStatusLimit = activeStatusLimit;
+    }
 
     /**
      * 尝试占用全局 AI 运行槽位。
@@ -36,7 +43,8 @@ public class ConversationRunStore {
         if (sessionId == null || requestId == null || requestId.isBlank()) {
             return false;
         }
-        ActiveRun next = new ActiveRun(sessionId, requestId, startedAt != null ? startedAt : Instant.now());
+        ActiveRun next = new ActiveRun(sessionId, requestId, startedAt != null ? startedAt : Instant.now(),
+                Math.max(1, activeStatusLimit));
         while (true) {
             ActiveRun current = activeRun.get();
             if (current != null && !current.isStopped()) {
@@ -243,6 +251,7 @@ public class ConversationRunStore {
         private final Long sessionId;
         private final String requestId;
         private final Instant startedAt;
+        private final int maxStatuses;
         private final List<String> statuses = new ArrayList<>();
         private Long userMessageId;
         private Long assistantMessageId;
@@ -253,10 +262,11 @@ public class ConversationRunStore {
         private SseEmitter emitter;
         private boolean stopped;
 
-        private ActiveRun(Long sessionId, String requestId, Instant startedAt) {
+        private ActiveRun(Long sessionId, String requestId, Instant startedAt, int maxStatuses) {
             this.sessionId = sessionId;
             this.requestId = requestId;
             this.startedAt = startedAt;
+            this.maxStatuses = maxStatuses;
             this.updatedAt = startedAt;
         }
 
@@ -288,7 +298,7 @@ public class ConversationRunStore {
             }
             if (statuses.isEmpty() || !statuses.get(statuses.size() - 1).equals(status)) {
                 statuses.add(status);
-                while (statuses.size() > MAX_STATUSES) {
+                while (statuses.size() > maxStatuses) {
                     statuses.remove(0);
                 }
             }

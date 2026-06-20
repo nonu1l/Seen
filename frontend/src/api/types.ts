@@ -100,6 +100,7 @@ export interface ConversationMessageDTO {
   id: number;
   role: 'user' | 'assistant';
   content: string;
+  contentBlocks?: string | null;
   createdAt: string;
 }
 
@@ -137,6 +138,7 @@ export interface AiStreamEventDTO {
   type: AiStreamEventType;
   messageId: number | null;
   content: string | null;
+  contentBlocks?: string | null;
   createdAt: string | null;
   cards: ConversationCardDTO[] | null;
 }

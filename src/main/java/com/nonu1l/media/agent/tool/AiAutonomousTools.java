@@ -1,7 +1,6 @@
 package com.nonu1l.media.agent.tool;
 
 import com.nonu1l.media.agent.SearchPipeline;
-import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.ConversationCardDTO;
 import com.nonu1l.media.model.dto.AgentFindWorksResultDTO;
 import com.nonu1l.media.model.dto.AgentWorkActionResultDTO;
@@ -11,6 +10,9 @@ import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import com.nonu1l.media.service.AiPreferenceMemoryService;
 import com.nonu1l.media.service.AiWorkOperationService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,6 +29,7 @@ public class AiAutonomousTools {
     private final WorkRepository workRepo;
     private final SearchPipeline searchPipeline;
     private final AiToolSafetyService safetyService;
+    private final int presentCardLimit;
 
     /**
      * 创建自主 Agent 工具集合。
@@ -37,19 +40,22 @@ public class AiAutonomousTools {
      * @param workRepo 作品仓储
      * @param searchPipeline 推荐/搜索流水线
      * @param safetyService AI 工具安全策略
+     * @param presentCardLimit presentWorks 单次最多生成的展示卡片数量
      */
     public AiAutonomousTools(AiPreferenceMemoryService memoryService,
                              AiWorkOperationService operationService,
                              RecordRepository recordRepo,
                              WorkRepository workRepo,
                              SearchPipeline searchPipeline,
-                             AiToolSafetyService safetyService) {
+                             AiToolSafetyService safetyService,
+                             @Value("${app.runtime.agent.present-card-limit:8}") int presentCardLimit) {
         this.memoryService = memoryService;
         this.operationService = operationService;
         this.recordRepo = recordRepo;
         this.workRepo = workRepo;
         this.searchPipeline = searchPipeline;
         this.safetyService = safetyService;
+        this.presentCardLimit = presentCardLimit;
     }
 
     /**
@@ -59,14 +65,16 @@ public class AiAutonomousTools {
      * @param mode search / recommend / description
      * @return 带成功状态和失败说明的找片结果
      */
-    public AgentFindWorksResultDTO findWorks(String query, String mode) {
+    @Tool(name = "findWorks", description = "根据推荐、搜索或描述找片需求查找影视作品候选")
+    public AgentFindWorksResultDTO findWorks(
+            @ToolParam(description = "查询、推荐或描述找片需求") String query,
+            @ToolParam(description = "工具模式：search / recommend / description", required = false) String mode) {
         AiToolExecutionContext context = AiToolContextHolder.require();
         if (query == null || query.isBlank()) {
             return new AgentFindWorksResultDTO(false, query, normalizeMode(mode), List.of(),
                     "query is blank", "请先从用户请求中提取明确的作品搜索或推荐需求。");
         }
         context.listener().status("正在寻找作品");
-        TokenUsageAdvisor.setCurrentNode("tool-findWorks");
         String normalizedMode = normalizeMode(mode);
         String input = query + "\n\n模式：" + normalizedMode;
         try {
@@ -81,8 +89,6 @@ public class AiAutonomousTools {
         } catch (Exception e) {
             return new AgentFindWorksResultDTO(false, query, normalizedMode, List.of(),
                     "findWorks failed: " + e.getMessage(), "可以换一种搜索表达，或告知用户当前搜索流程失败。");
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
     }
 
@@ -93,17 +99,19 @@ public class AiAutonomousTools {
      * @param reason 展示理由
      * @return 展示操作结构化结果
      */
-    public AgentWorkActionResultDTO presentWorks(List<Long> subjectIds, String reason) {
+    @Tool(name = "presentWorks", description = "把候选作品保存为 AI 页面 PENDING 展示卡片，不写入用户观看记录")
+    public AgentWorkActionResultDTO presentWorks(
+            @ToolParam(description = "要展示的 Bangumi subjectId 列表") List<Long> subjectIds,
+            @ToolParam(description = "展示理由", required = false) String reason) {
         AiToolContextHolder.require();
         if (subjectIds == null || subjectIds.isEmpty()) {
             return new AgentWorkActionResultDTO(false, "present", null, null, List.of(),
                     "subjectIds is empty", "请先通过 searchBangumi 或 findWorks 获得 subjectId。");
         }
-        TokenUsageAdvisor.setCurrentNode("tool-presentWorks");
         try {
             List<ConversationCardDTO> cards = subjectIds.stream()
                     .distinct()
-                    .limit(8)
+                    .limit(Math.max(1, presentCardLimit))
                     .map(id -> operationService.presentWork(id, reason))
                     .toList();
             if (cards.isEmpty()) {
@@ -114,8 +122,6 @@ public class AiAutonomousTools {
         } catch (Exception e) {
             return new AgentWorkActionResultDTO(false, "present", null, null, List.of(),
                     "presentWorks failed: " + e.getMessage(), "请重新确认 subjectId，或改为只用自然语言说明候选。");
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
     }
 
@@ -129,20 +135,24 @@ public class AiAutonomousTools {
      * @param reason 操作原因
      * @return 标记操作结构化结果
      */
-    public AgentWorkActionResultDTO markWork(Long subjectId, String status, Double rating, String review, String reason) {
+    @Tool(name = "markWork", description = "直接标记、评分或修改影评；会保存记录并生成可撤销 SAVED 卡片")
+    public AgentWorkActionResultDTO markWork(
+            @ToolParam(description = "Bangumi subjectId") Long subjectId,
+            @ToolParam(description = "目标状态，如 wish / doing / done / on_hold / dropped", required = false) String status,
+            @ToolParam(description = "0 到 10 的评分，可带 0.5", required = false) Double rating,
+            @ToolParam(description = "用户影评或短评", required = false) String review,
+            @ToolParam(description = "操作原因", required = false) String reason)
+    {
         if (subjectId == null) {
             return new AgentWorkActionResultDTO(false, "mark", null, null, null,
                     "subjectId required", "请先调用 searchBangumi、findWorks 或 searchLocal 获取准确 subjectId。");
         }
-        TokenUsageAdvisor.setCurrentNode("tool-markWork");
         try {
             ConversationCardDTO card = operationService.markWork(subjectId, status, rating, review, reason);
             return new AgentWorkActionResultDTO(true, "mark", subjectId, card, null, null, null);
         } catch (Exception e) {
             return new AgentWorkActionResultDTO(false, "mark", subjectId, null, null,
                     "markWork failed: " + e.getMessage(), "请重新确认 subjectId、状态和评分，必要时先查询作品当前状态。");
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
     }
 
@@ -153,7 +163,10 @@ public class AiAutonomousTools {
      * @param reason 操作原因
      * @return 取消标记操作结构化结果
      */
-    public AgentWorkActionResultDTO unmarkWork(Long subjectId, String reason) {
+    @Tool(name = "unmarkWork", description = "取消本地已有作品标记；会删除作品记录并生成可撤回 UNMARKED 卡片")
+    public AgentWorkActionResultDTO unmarkWork(
+            @ToolParam(description = "要取消标记的 Bangumi subjectId") Long subjectId,
+            @ToolParam(description = "操作原因", required = false) String reason) {
         if (subjectId == null) {
             return new AgentWorkActionResultDTO(false, "unmark", null, null, null,
                     "subjectId required", "取消标记前必须先调用 searchLocal 找到本地已有记录。");
@@ -164,7 +177,6 @@ public class AiAutonomousTools {
             return new AgentWorkActionResultDTO(false, "unmark", subjectId, null, null,
                     safety.error(), safety.hint());
         }
-        TokenUsageAdvisor.setCurrentNode("tool-unmarkWork");
         try {
             ConversationCardDTO card = operationService.unmarkWork(subjectId, reason);
             if (card == null) {
@@ -175,8 +187,6 @@ public class AiAutonomousTools {
         } catch (Exception e) {
             return new AgentWorkActionResultDTO(false, "unmark", subjectId, null, null,
                     "unmarkWork failed: " + e.getMessage(), "请先调用 searchLocal 确认本地记录是否存在。");
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         }
     }
 
@@ -186,25 +196,22 @@ public class AiAutonomousTools {
      * @param subjectId 作品 ID
      * @return 当前状态摘要；不存在时返回空摘要
      */
-    public WorkState getWorkState(Long subjectId) {
-        TokenUsageAdvisor.setCurrentNode("tool-getWorkState");
+    @Tool(name = "getWorkState", description = "按 Bangumi subjectId 查询单个本地作品当前状态")
+    public WorkState getWorkState(
+            @ToolParam(description = "Bangumi subjectId") Long subjectId) {
         if (subjectId == null) {
             return new WorkState(null, null, null, null, null, false);
         }
         Work work = workRepo.findById(subjectId).orElse(null);
         Record record = recordRepo.findLatestByWorkId(subjectId).orElse(null);
-        try {
-            return new WorkState(
-                    subjectId,
-                    work != null ? displayName(work) : null,
-                    record != null ? record.getStatus() : null,
-                    record != null ? record.getRating() : null,
-                    record != null ? record.getReview() : null,
-                    record != null
-            );
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
-        }
+        return new WorkState(
+                subjectId,
+                work != null ? displayName(work) : null,
+                record != null ? record.getStatus() : null,
+                record != null ? record.getRating() : null,
+                record != null ? record.getReview() : null,
+                record != null
+        );
     }
 
     /**
@@ -213,15 +220,12 @@ public class AiAutonomousTools {
      * @param query 当前用户需求
      * @return 可注入 Agent 的记忆摘要
      */
-    public String readUserMemory(String query) {
+    @Tool(name = "readUserMemory", description = "按需读取用户长期偏好记忆；推荐时可参考但当前用户请求优先")
+    public String readUserMemory(
+            @ToolParam(description = "当前用户需求", required = false) String query) {
         AiToolContextHolder.require();
-        TokenUsageAdvisor.setCurrentNode("tool-readUserMemory");
-        try {
-            String memory = memoryService.getMemoryContext();
-            return memory == null || memory.isBlank() ? "当前没有可用长期记忆。" : memory;
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
-        }
+        String memory = memoryService.getMemoryContext();
+        return memory == null || memory.isBlank() ? "当前没有可用长期记忆。" : memory;
     }
 
     private static String displayName(Work work) {

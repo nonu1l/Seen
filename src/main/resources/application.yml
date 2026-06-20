@@ -6,10 +6,85 @@ app:
   endpoints:
 #    bangumi 默认 api  / https://bangumi.github.io
     bangumi-api-base: "${BANGUMI_API_BASE:https://api.bgm.tv/v0}"
-#   serper搜索，免费，需要api key / https://serper.dev/
+#   serper搜索，需要api key / https://serper.dev/
     serper-search-url: "${SERPER_SEARCH_URL:https://google.serper.dev/search}"
 #   tavily搜索，需要api key / https://docs.tavily.com
     tavily-search-url: "${TAVILY_SEARCH_URL:https://api.tavily.com/search}"
+  runtime:
+    # AI 模型单次回复 token 上限；thinking 开启时使用 thinking-max-tokens，并预留 thinking-budget-tokens 给思考内容。
+    ai:
+      default-max-tokens: 4096
+      thinking-max-tokens: 8192
+      thinking-budget-tokens: 2048
+    # AI 对话运行参数：SSE 连接超时、进入 Agent 的最近消息数、页面恢复时保留的最近状态数。
+    conversation:
+      stream-timeout: 10m
+      history-message-limit: 20
+      active-status-limit: 6
+    # Agent 工具安全与展示上限：presentWorks 最多生成卡片数，单轮自动取消标记的安全上限。
+    agent:
+      present-card-limit: 8
+      unmark-limit-per-request: 5
+    # 推荐/搜索管道参数：控制搜索关键词、抓取页面、Bangumi 重试和进入 LLM 的文本长度。
+    search-pipeline:
+      # 最多返回给 Agent 的候选作品卡片数。
+      max-cards: 5
+      # 每个搜索关键词最多抓取的搜索结果页面数。
+      max-pages: 10
+      # 搜索源无结果时，LLM 最多直接给出的公开资料 URL 数。
+      max-direct-urls: 3
+      # LLM 生成搜索关键词的最大数量。
+      keyword-limit: 3
+      # Bangumi 单条匹配失败时的最大重试次数。
+      bangumi-retry-limit: 3
+      # 直访公开资料 URL 时，fetchWeb 返回给管道的最大字符数。
+      direct-fetch-max-chars: 6000
+      # 从网页内容提取片名前，传入 LLM 的最大聚合文本字符数。
+      extract-text-max-chars: 8000
+    # Web 搜索 provider 参数：控制 Serper/Tavily 的结果数量、HTTP 超时和 Tavily 重试。
+    web-search:
+      max-results: 10
+      tavily-max-attempts: 3
+      serper-connect-timeout: 10s
+      serper-read-timeout: 10s
+      tavily-connect-timeout: 10s
+      tavily-read-timeout: 20s
+    # fetchWeb 抓取边界：限制 URL 抓取大小、跳转次数、超时、User-Agent 和可继续访问的链接数量。
+    web-fetch:
+      # 调用方未指定 maxChars 时的默认正文字符数。
+      default-max-chars: 6000
+      # 允许调用方请求的最大正文字符数。
+      max-chars: 12000
+      # 单个 HTTP 响应最多读取的字节数，防止大页面占用过多内存。
+      max-bytes: 1048576
+      # 手动跟随重定向的最大次数。
+      max-redirects: 3
+      timeout: 10s
+      user-agent: seen-app-agentic-fetch/1.0
+      # 页面正文中最多提取多少个链接给 LLM 引用。
+      max-links: 40
+    # 在线观看地址搜索参数：控制候选页面抓取、LLM 校验内容长度和最终返回数量。
+    watch-source:
+      fetch-content-max-chars: 3000
+      validation-content-max-chars: 2000
+      candidate-limit: 12
+      result-limit: 8
+    # 长期记忆参数：控制进入画像生成的上下文长度和证据数量，影响 token 消耗。
+    memory:
+      max-context-length: 1200
+      max-evidence-for-llm: 80
+    # 请求缓存和 Bangumi 预缓存参数：控制进程内缓存容量，以及角色/人物/详情预取 TTL。
+    cache:
+      request-maximum-size: 5000
+      bangumi-character-ttl-seconds: 1209600
+      pre-cache-subject-ttl-seconds: 600
+      pre-cache-characters-ttl-seconds: 600
+    # 设置页连接测试参数：默认测试关键词、测试请求超时和返回给前端预览的标题数量。
+    settings-test:
+      query: 孤独摇滚
+      connect-timeout: 10s
+      read-timeout: 20s
+      preview-title-limit: 5
 
 spring:
   datasource:
@@ -49,7 +124,6 @@ logging:
     com.nonu1l.media.service.search.TavilySearchService: DEBUG
     com.nonu1l.media.agent.AgentService: DEBUG
     com.nonu1l.media.config.TokenUsageAdvisor: DEBUG
-    com.nonu1l.media.config.DeepSeekThinkingDisableInterceptor: DEBUG
 #    org.hibernate.orm.jdbc.bind: TRACE
 #    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG

@@ -4,9 +4,10 @@ import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.model.dto.FindWorksCandidateDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
-import com.nonu1l.media.service.AiTextTaskService;
+import com.nonu1l.media.service.AiChatCallService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -30,28 +31,49 @@ public class SearchPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
 
-    private final AiTextTaskService aiTextTaskService;
+    private final AiChatCallService AiChatCallService;
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
-    private final static int maxCards = 5;
-    private final static int maxPages = 10;
-    private final static int maxDirectUrls = 3;
+    private final int maxCards;
+    private final int maxPages;
+    private final int maxDirectUrls;
+    private final int keywordLimit;
+    private final int bangumiRetryLimit;
+    private final int directFetchMaxChars;
+    private final int extractTextMaxChars;
     private final String promptKeywords;
     private final String promptTitles;
     private final String promptValidate;
     private final String promptFail;
 
     /**
-     * @param aiTextTaskService 文本型 LLM 任务服务
+     * @param AiChatCallService LLM 调用服务
      * @param bangumiTools AI Bangumi 查询工具
      * @param webSearchTools AI Web 搜索工具
+     * @param maxCards 最多聚合的候选卡片数量
+     * @param maxPages 每轮关键词最多抓取的搜索结果页面数量
+     * @param maxDirectUrls 搜索无结果时最多直访的公开 URL 数量
      */
-    public SearchPipeline(AiTextTaskService aiTextTaskService,
+    public SearchPipeline(AiChatCallService AiChatCallService,
                           AiBangumiTools bangumiTools,
-                          AiWebSearchTools webSearchTools) {
-        this.aiTextTaskService = aiTextTaskService;
+                          AiWebSearchTools webSearchTools,
+                          @Value("${app.runtime.search-pipeline.max-cards:5}") int maxCards,
+                          @Value("${app.runtime.search-pipeline.max-pages:10}") int maxPages,
+                          @Value("${app.runtime.search-pipeline.max-direct-urls:3}") int maxDirectUrls,
+                          @Value("${app.runtime.search-pipeline.keyword-limit:3}") int keywordLimit,
+                          @Value("${app.runtime.search-pipeline.bangumi-retry-limit:3}") int bangumiRetryLimit,
+                          @Value("${app.runtime.search-pipeline.direct-fetch-max-chars:6000}") int directFetchMaxChars,
+                          @Value("${app.runtime.search-pipeline.extract-text-max-chars:8000}") int extractTextMaxChars) {
+        this.AiChatCallService = AiChatCallService;
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
+        this.maxCards = maxCards;
+        this.maxPages = maxPages;
+        this.maxDirectUrls = maxDirectUrls;
+        this.keywordLimit = keywordLimit;
+        this.bangumiRetryLimit = bangumiRetryLimit;
+        this.directFetchMaxChars = directFetchMaxChars;
+        this.extractTextMaxChars = extractTextMaxChars;
         this.promptKeywords = load("prompts/pipeline-keywords.st");
         this.promptTitles = load("prompts/pipeline-titles.st");
         this.promptValidate = load("prompts/pipeline-validate.st");
@@ -131,7 +153,7 @@ public class SearchPipeline {
             runListener.status("正在读取搜索结果");
             List<String> pageTexts = webResults.isEmpty()
                     ? fetchDirectUrls(context, kw)
-                    : webResults.stream().limit(maxPages).parallel()
+                    : webResults.stream().limit(Math.max(1, maxPages)).parallel()
                             .map(r -> webSearchTools.fetchWebText(r.url()))
                             .filter(t -> t != null && !t.isBlank())
                             .toList();
@@ -149,7 +171,7 @@ public class SearchPipeline {
             var futures = titles.stream().distinct()
                     .collect(Collectors.toMap(
                             t -> t, t -> CompletableFuture.supplyAsync(() ->
-                                    searchBangumiWithRetry(t, 3))));
+                                    searchBangumiWithRetry(t, Math.max(1, bangumiRetryLimit)))));
 
             runListener.status("正在查询 Bangumi");
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
@@ -171,7 +193,7 @@ public class SearchPipeline {
             allCards.addAll(cardMap.values());
             log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
 
-            if (allCards.size() >= maxCards) break;
+            if (allCards.size() >= Math.max(1, maxCards)) break;
         }
 
         if (allCards.isEmpty()) {
@@ -223,7 +245,7 @@ public class SearchPipeline {
             .append(")\n"));
         String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", context);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-validateMatch")
                 .system(prompt)
                 .user(sb.toString())
@@ -245,13 +267,14 @@ public class SearchPipeline {
      */
     List<String> generateKeywords(String userInput) {
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-generateKeywords")
                 .system(prompt)
                 .user(userInput)
                 .call();
         if (result == null || result.isBlank()) return List.of(userInput);
-        return result.lines().map(String::trim).filter(l -> !l.isEmpty()).limit(3).toList();
+        return result.lines().map(String::trim).filter(l -> !l.isEmpty())
+                .limit(Math.max(1, keywordLimit)).toList();
     }
 
     /**
@@ -270,7 +293,7 @@ public class SearchPipeline {
                 今日日期: %s
                 """.formatted(LocalDate.now());
         String user = "用户上下文：\n" + context + "\n\n失败关键词：\n" + keyword;
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-directFetchUrls")
                 .system(system)
                 .user(user)
@@ -280,12 +303,13 @@ public class SearchPipeline {
                 .map(String::trim)
                 .filter(line -> line.startsWith("http://") || line.startsWith("https://"))
                 .distinct()
-                .limit(maxDirectUrls)
+                .limit(Math.max(1, maxDirectUrls))
                 .toList();
         if (urls.isEmpty()) return List.of();
         log.info("Pipeline: direct fetch fallback urls={}", urls);
         return urls.stream()
-                .map(url -> webSearchTools.fetchWeb(url, "search-source-fallback", 6000))
+                .map(url -> webSearchTools.fetchWeb(url, "search-source-fallback",
+                        directFetchMaxChars))
                 .filter(resultItem -> resultItem != null && resultItem.ok())
                 .map(resultItem -> resultItem.text())
                 .filter(text -> text != null && !text.isBlank())
@@ -300,10 +324,11 @@ public class SearchPipeline {
      * @return 过滤后的标题列表
      */
     List<String> extractTitles(String text, String userInput) {
-        if (text.length() > 8000) text = text.substring(0, 8000);
+        int maxChars = Math.max(1, extractTextMaxChars);
+        if (text.length() > maxChars) text = text.substring(0, maxChars);
         String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", userInput);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-extractTitles")
                 .system(prompt)
                 .user(text)
@@ -321,7 +346,7 @@ public class SearchPipeline {
      */
     String failMessage(String userInput, String reason) {
         String prompt = promptFail.replace("{reason}", reason);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-failMessage")
                 .system(prompt)
                 .user(userInput)

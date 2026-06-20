@@ -4,6 +4,7 @@ import com.nonu1l.media.util.CachedHttpClient;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,22 +22,28 @@ import java.util.concurrent.atomic.AtomicLong;
 public class PreCacheService {
 
     private static final Logger log = LoggerFactory.getLogger(PreCacheService.class);
-    private static final long TTL_SUBJECT = 600;
-    private static final long TTL_CHARS = 600;
 
     private final CachedHttpClient httpClient;
     private final SettingsService settingsService;
+    private final long subjectTtlSeconds;
+    private final long charactersTtlSeconds;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final AtomicLong batchCounter = new AtomicLong(0);
 
     /**
      * @param httpClient 带缓存的 HTTP 客户端
      * @param settingsService 设置读取服务
+     * @param subjectTtlSeconds 作品详情预缓存 TTL
+     * @param charactersTtlSeconds 角色页预缓存 TTL
      */
     public PreCacheService(CachedHttpClient httpClient,
-                           SettingsService settingsService) {
+                           SettingsService settingsService,
+                           @Value("${app.runtime.cache.pre-cache-subject-ttl-seconds:600}") long subjectTtlSeconds,
+                           @Value("${app.runtime.cache.pre-cache-characters-ttl-seconds:600}") long charactersTtlSeconds) {
         this.httpClient = httpClient;
         this.settingsService = settingsService;
+        this.subjectTtlSeconds = subjectTtlSeconds;
+        this.charactersTtlSeconds = charactersTtlSeconds;
     }
 
     /**
@@ -54,9 +61,11 @@ public class PreCacheService {
         List<CompletableFuture<Void>> futures = ids.stream()
             .map(id -> CompletableFuture.runAsync(() -> {
                 if (batchId != batchCounter.get()) return;
-                httpClient.get(base + "/subjects/" + id, TTL_SUBJECT);
+                httpClient.get(base + "/subjects/" + id,
+                        Math.max(1, subjectTtlSeconds));
                 if (castEnabled) {
-                    httpClient.get(base + "/subjects/" + id + "/characters", TTL_CHARS);
+                    httpClient.get(base + "/subjects/" + id + "/characters",
+                            Math.max(1, charactersTtlSeconds));
                 }
             }, executor))
             .toList();

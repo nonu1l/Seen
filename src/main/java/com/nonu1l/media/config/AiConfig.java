@@ -2,7 +2,6 @@ package com.nonu1l.media.config;
 
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
-import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,13 +16,11 @@ public class AiConfig {
      *
      * @param repo token 持久化仓库。
      * @param settingsService 设置读取服务。
-     * @param thinkingStrategyRegistry provider 思考策略注册器。
      * @return token 用量 Advisor 实例。
      */
     @Bean
     public TokenUsageAdvisor tokenUsageAdvisor(TokenUsageRepository repo,
-                                               SettingsService settingsService,
-                                               ThinkingStrategyRegistry thinkingStrategyRegistry) {
-        return new TokenUsageAdvisor(repo, settingsService, thinkingStrategyRegistry);
+                                               SettingsService settingsService) {
+        return new TokenUsageAdvisor(repo, settingsService);
     }
 }

@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Expiry;
 import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -19,29 +20,34 @@ import java.util.stream.Collectors;
 @Component
 public class RequestCacheStore {
 
-    private static final long MAXIMUM_SIZE = 5000;
+    private final Cache<String, CachedResponse> cache;
 
-    private final Cache<String, CachedResponse> cache = Caffeine.newBuilder()
-            .maximumSize(MAXIMUM_SIZE)
-            .expireAfter(new Expiry<String, CachedResponse>() {
-                @Override
-                public long expireAfterCreate(@NonNull String key, @NonNull CachedResponse value, long currentTime) {
-                    return remainingNanos(value, currentTime);
-                }
+    /**
+     * @param maximumSize 进程内请求缓存最大条目数
+     */
+    public RequestCacheStore(@Value("${app.runtime.cache.request-maximum-size:5000}") long maximumSize) {
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(Math.max(1, maximumSize))
+                .expireAfter(new Expiry<String, CachedResponse>() {
+                    @Override
+                    public long expireAfterCreate(@NonNull String key, @NonNull CachedResponse value, long currentTime) {
+                        return remainingNanos(value, currentTime);
+                    }
 
-                @Override
-                public long expireAfterUpdate(@NonNull String key, @NonNull CachedResponse value,
-                                              long currentTime, long currentDuration) {
-                    return remainingNanos(value, currentTime);
-                }
+                    @Override
+                    public long expireAfterUpdate(@NonNull String key, @NonNull CachedResponse value,
+                                                  long currentTime, long currentDuration) {
+                        return remainingNanos(value, currentTime);
+                    }
 
-                @Override
-                public long expireAfterRead(@NonNull String key, @NonNull CachedResponse value,
-                                            long currentTime, long currentDuration) {
-                    return currentDuration;
-                }
-            })
-            .build();
+                    @Override
+                    public long expireAfterRead(@NonNull String key, @NonNull CachedResponse value,
+                                                long currentTime, long currentDuration) {
+                        return currentDuration;
+                    }
+                })
+                .build();
+    }
 
     /**
      * 按 key 读取未过期响应正文。

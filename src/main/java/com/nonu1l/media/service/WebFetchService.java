@@ -9,6 +9,7 @@ import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -19,9 +20,9 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -36,17 +37,39 @@ import java.util.regex.Pattern;
 public class WebFetchService {
 
     private static final Logger log = LoggerFactory.getLogger(WebFetchService.class);
-    private static final int DEFAULT_MAX_CHARS = 6000;
-    private static final int MAX_CHARS = 12000;
-    private static final int MAX_BYTES = 1024 * 1024;
-    private static final int MAX_REDIRECTS = 3;
-    private static final int TIMEOUT_MS = (int) Duration.ofSeconds(10).toMillis();
-    private static final String USER_AGENT = "seen-app-agentic-fetch/1.0";
-    private static final int MAX_LINKS = 40;
     private static final Pattern BLOCK_TAG_PATTERN = Pattern.compile(
             "^(p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section|article|main|blockquote)$");
     private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
             "(?i)Bearer\\s+[A-Za-z0-9._~+/=-]+");
+
+    private final int defaultMaxChars;
+    private final int maxChars;
+    private final int maxBytes;
+    private final int maxRedirects;
+    private final Duration timeout;
+    private final String userAgent;
+    private final int maxLinks;
+
+    /**
+     * @param defaultMaxChars 默认返回给模型的正文字符数
+     * @param maxChars 允许调用方请求的最大正文字符数
+     * @param maxBytes 单个响应最多读取的字节数
+     */
+    public WebFetchService(@Value("${app.runtime.web-fetch.default-max-chars:6000}") int defaultMaxChars,
+                           @Value("${app.runtime.web-fetch.max-chars:12000}") int maxChars,
+                           @Value("${app.runtime.web-fetch.max-bytes:1048576}") int maxBytes,
+                           @Value("${app.runtime.web-fetch.max-redirects:3}") int maxRedirects,
+                           @Value("${app.runtime.web-fetch.timeout:10s}") Duration timeout,
+                           @Value("${app.runtime.web-fetch.user-agent:seen-app-agentic-fetch/1.0}") String userAgent,
+                           @Value("${app.runtime.web-fetch.max-links:40}") int maxLinks) {
+        this.defaultMaxChars = defaultMaxChars;
+        this.maxChars = maxChars;
+        this.maxBytes = maxBytes;
+        this.maxRedirects = maxRedirects;
+        this.timeout = timeout;
+        this.userAgent = userAgent;
+        this.maxLinks = maxLinks;
+    }
 
     /**
      * 抓取 URL 并返回结构化结果。
@@ -73,7 +96,7 @@ public class WebFetchService {
      * @return 清洗后的文本，失败时为空字符串
      */
     public String fetchText(String url) {
-        WebFetchResultDTO result = fetch(url, DEFAULT_MAX_CHARS);
+        WebFetchResultDTO result = fetch(url, defaultMaxChars);
         return result.error() == null ? result.text() : "";
     }
 
@@ -90,15 +113,16 @@ public class WebFetchService {
         validateResolvedAddress(uri);
         HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
         conn.setInstanceFollowRedirects(false);
-        conn.setConnectTimeout(TIMEOUT_MS);
-        conn.setReadTimeout(TIMEOUT_MS);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
+        int timeoutMs = (int) timeout.toMillis();
+        conn.setConnectTimeout(timeoutMs);
+        conn.setReadTimeout(timeoutMs);
+        conn.setRequestProperty("User-Agent", userAgent);
         conn.setRequestProperty("Accept", "text/html,application/json,text/plain;q=0.9,*/*;q=0.5");
 
         int status = conn.getResponseCode();
         String contentType = Optional.ofNullable(conn.getContentType()).orElse("");
         if (isRedirect(status)) {
-            if (redirects >= MAX_REDIRECTS) {
+            if (redirects >= Math.max(0, maxRedirects)) {
                 return failure(uri.toString(), status, contentType, "redirect limit exceeded");
             }
             String location = conn.getHeaderField("Location");
@@ -110,9 +134,10 @@ public class WebFetchService {
         }
 
         byte[] bytes = readLimited(status >= 400 ? conn.getErrorStream() : conn.getInputStream());
-        boolean byteTruncated = bytes.length > MAX_BYTES;
+        int byteLimit = Math.max(1, maxBytes);
+        boolean byteTruncated = bytes.length > byteLimit;
         if (byteTruncated) {
-            bytes = java.util.Arrays.copyOf(bytes, MAX_BYTES);
+            bytes = java.util.Arrays.copyOf(bytes, byteLimit);
         }
         Charset charset = charsetFrom(contentType);
         String raw = new String(bytes, charset);
@@ -233,13 +258,13 @@ public class WebFetchService {
      * 按上限读取响应体，额外多读 1 字节用于判断是否发生字节截断。
      *
      * @param stream 响应体输入流
-     * @return 最多 MAX_BYTES + 1 字节的响应体
+     * @return 最多配置字节上限 + 1 字节的响应体
      * @throws Exception 读取失败时抛出
      */
     private byte[] readLimited(InputStream stream) throws Exception {
         if (stream == null) return new byte[0];
         try (stream) {
-            return stream.readNBytes(MAX_BYTES + 1);
+            return stream.readNBytes(Math.max(1, maxBytes) + 1);
         }
     }
 
@@ -323,8 +348,8 @@ public class WebFetchService {
      * @return 应用默认值和上限后的字符数
      */
     private int clampMaxChars(Integer value) {
-        if (value == null || value <= 0) return DEFAULT_MAX_CHARS;
-        return Math.min(value, MAX_CHARS);
+        if (value == null || value <= 0) return defaultMaxChars;
+        return Math.min(value, Math.max(1, maxChars));
     }
 
     /**
@@ -345,17 +370,18 @@ public class WebFetchService {
      * 提取并编号页面链接，同时把正文中的链接文本替换为 [id] 前缀，便于模型引用。
      *
      * @param doc 已经移除脚本和导航噪音的 HTML 文档
-     * @return 最多 MAX_LINKS 条可继续抓取的链接
+     * @return 最多配置数量条可继续抓取的链接
      */
     private List<WebFetchLinkDTO> annotateLinks(Document doc) {
         List<WebFetchLinkDTO> links = new ArrayList<>();
+        int linkLimit = Math.max(0, maxLinks);
         for (Element anchor : doc.select("a[href]")) {
             String text = normalizeInlineText(anchor.text());
             String href = anchor.absUrl("href");
             if (href == null || href.isBlank()) {
                 href = anchor.attr("href");
             }
-            if (text.isBlank() || href == null || href.isBlank() || links.size() >= MAX_LINKS) {
+            if (text.isBlank() || href == null || href.isBlank() || links.size() >= linkLimit) {
                 continue;
             }
             String normalizedHref = normalizeLink(href);
