@@ -7,6 +7,8 @@ import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -41,7 +43,9 @@ public class AiLocalLibraryTools {
      * @param keyword 关键词，空白时返回全部
      * @return 紧凑本地记录列表
      */
-    public List<LocalWorkRecordDTO> searchLocal(String keyword) {
+    @Tool(name = "searchLocal", description = "查询本地已标记的作品记录")
+    public List<LocalWorkRecordDTO> searchLocal(
+            @ToolParam(description = "本地作品搜索关键词") String keyword) {
         log.debug("Tool: searchLocal keyword='{}'", keyword);
         List<Work> works = (keyword == null || keyword.isBlank())
                 ? workRepo.findAll()

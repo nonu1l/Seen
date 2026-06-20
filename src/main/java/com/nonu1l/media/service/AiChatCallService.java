@@ -3,9 +3,9 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -57,7 +57,9 @@ public class AiChatCallService {
 
         private String node;
         private String systemPrompt;
+        private Map<String, Object> systemParams = Map.of();
         private String userPrompt;
+        private Map<String, Object> userParams = Map.of();
         private AiThinkingMode thinkingMode;
         private int maxAttempts = 1;
         private Consumer<String> contentListener;
@@ -81,6 +83,20 @@ public class AiChatCallService {
          */
         public TaskBuilder system(String systemPrompt) {
             this.systemPrompt = systemPrompt;
+            this.systemParams = Map.of();
+            return this;
+        }
+
+        /**
+         * 设置带模板参数的系统提示词。
+         *
+         * @param systemPrompt 系统提示词模板，可为空
+         * @param params 模板参数，可为空
+         * @return 当前构建器
+         */
+        public TaskBuilder system(String systemPrompt, Map<String, Object> params) {
+            this.systemPrompt = systemPrompt;
+            this.systemParams = params != null ? params : Map.of();
             return this;
         }
 
@@ -92,6 +108,20 @@ public class AiChatCallService {
          */
         public TaskBuilder user(String userPrompt) {
             this.userPrompt = userPrompt;
+            this.userParams = Map.of();
+            return this;
+        }
+
+        /**
+         * 设置带模板参数的用户提示词。
+         *
+         * @param userPrompt 用户提示词模板
+         * @param params 模板参数，可为空
+         * @return 当前构建器
+         */
+        public TaskBuilder user(String userPrompt, Map<String, Object> params) {
+            this.userPrompt = userPrompt;
+            this.userParams = params != null ? params : Map.of();
             return this;
         }
 
@@ -170,8 +200,8 @@ public class AiChatCallService {
                         TokenUsageAdvisor.setCurrentNode(node);
                     }
                     String content = currentClient().prompt()
-                            .system(systemPrompt != null ? systemPrompt : "")
-                            .user(userPrompt)
+                            .system(s -> s.text(systemPrompt != null ? systemPrompt : "").params(systemParams))
+                            .user(u -> u.text(userPrompt).params(userParams))
                             .call()
                             .content();
                     if (contentListener != null) {
@@ -201,9 +231,11 @@ public class AiChatCallService {
 
         private String node;
         private String systemPrompt;
+        private Map<String, Object> systemParams = Map.of();
         private String userPrompt;
+        private Map<String, Object> userParams = Map.of();
         private AiThinkingMode thinkingMode;
-        private ToolCallback[] toolCallbacks = new ToolCallback[0];
+        private Object[] tools = new Object[0];
 
         /**
          * 设置 Token 用量统计节点名。
@@ -224,6 +256,20 @@ public class AiChatCallService {
          */
         public AgentBuilder system(String systemPrompt) {
             this.systemPrompt = systemPrompt;
+            this.systemParams = Map.of();
+            return this;
+        }
+
+        /**
+         * 设置带模板参数的系统提示词。
+         *
+         * @param systemPrompt 系统提示词模板，可为空
+         * @param params 模板参数，可为空
+         * @return 当前构建器
+         */
+        public AgentBuilder system(String systemPrompt, Map<String, Object> params) {
+            this.systemPrompt = systemPrompt;
+            this.systemParams = params != null ? params : Map.of();
             return this;
         }
 
@@ -235,6 +281,20 @@ public class AiChatCallService {
          */
         public AgentBuilder user(String userPrompt) {
             this.userPrompt = userPrompt;
+            this.userParams = Map.of();
+            return this;
+        }
+
+        /**
+         * 设置带模板参数的用户提示词。
+         *
+         * @param userPrompt 用户提示词模板
+         * @param params 模板参数，可为空
+         * @return 当前构建器
+         */
+        public AgentBuilder user(String userPrompt, Map<String, Object> params) {
+            this.userPrompt = userPrompt;
+            this.userParams = params != null ? params : Map.of();
             return this;
         }
 
@@ -250,13 +310,13 @@ public class AiChatCallService {
         }
 
         /**
-         * 设置本次 Agent 可调用的工具。
+         * 设置本次 Agent 可调用的 Spring AI 工具对象或 ToolCallback。
          *
-         * @param toolCallbacks Spring AI 工具回调
+         * @param tools 工具对象列表
          * @return 当前构建器
          */
-        public AgentBuilder toolCallbacks(ToolCallback[] toolCallbacks) {
-            this.toolCallbacks = toolCallbacks != null ? toolCallbacks : new ToolCallback[0];
+        public AgentBuilder tools(Object... tools) {
+            this.tools = tools != null ? tools : new Object[0];
             return this;
         }
 
@@ -273,9 +333,9 @@ public class AiChatCallService {
                 TokenUsageAdvisor.setCurrentNode(node);
             }
             return currentAgentClient().prompt()
-                    .system(systemPrompt != null ? systemPrompt : "")
-                    .user(userPrompt)
-                    .toolCallbacks(toolCallbacks)
+                    .system(s -> s.text(systemPrompt != null ? systemPrompt : "").params(systemParams))
+                    .user(u -> u.text(userPrompt).params(userParams))
+                    .tools(tools)
                     .call()
                     .chatResponse();
         }

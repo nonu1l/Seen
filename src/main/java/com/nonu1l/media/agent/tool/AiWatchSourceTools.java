@@ -1,10 +1,11 @@
 package com.nonu1l.media.agent.tool;
 
-import com.nonu1l.media.config.TokenUsageAdvisor;
 import com.nonu1l.media.model.dto.WatchSourceResultDTO;
 import com.nonu1l.media.service.WatchSourceSearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,13 +33,10 @@ public class AiWatchSourceTools {
      * @param query 用户原始问题或片名
      * @return 候选观看地址结果
      */
-    public WatchSourceResultDTO searchWatchSources(String query) {
+    @Tool(name = "searchWatchSources", description = "当用户询问哪里可以看、在哪看、在线观看、播放地址或片源时，解析作品并搜索候选观看链接")
+    public WatchSourceResultDTO searchWatchSources(
+            @ToolParam(description = "用户片源问题或作品名") String query) {
         log.debug("Tool: searchWatchSources query='{}'", query);
-        TokenUsageAdvisor.setCurrentNode("tool-searchWatchSources");
-        try {
-            return watchSourceSearchService.search(query);
-        } finally {
-            TokenUsageAdvisor.setCurrentNode("autonomous-agent");
-        }
+        return watchSourceSearchService.search(query);
     }
 }
