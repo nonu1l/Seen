@@ -118,6 +118,7 @@ export function useAiMode() {
                   ...msg,
                   id: nextAssistantId,
                   content: event.content ?? msg.content,
+                  contentBlocks: event.contentBlocks ?? msg.contentBlocks,
                   createdAt: event.createdAt ?? msg.createdAt,
                 }
                 : msg);
@@ -126,6 +127,7 @@ export function useAiMode() {
                 id: nextAssistantId,
                 role: 'assistant',
                 content: event.content ?? '',
+                contentBlocks: event.contentBlocks ?? null,
                 createdAt: event.createdAt ?? new Date().toISOString(),
               }];
             });
@@ -143,6 +145,7 @@ export function useAiMode() {
                 id: assistantMessageId!,
                 role: 'assistant',
                 content: event.content!,
+                contentBlocks: null,
                 createdAt: new Date().toISOString(),
               }]);
             }
@@ -173,7 +176,7 @@ export function useAiMode() {
           : msg));
       } else {
         setMessages(prev => [...prev, {
-          id: tempUserId - 1, role: 'assistant', content: errorText, createdAt: now,
+          id: tempUserId - 1, role: 'assistant', content: errorText, contentBlocks: null, createdAt: now,
         }]);
       }
     } finally {

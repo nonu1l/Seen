@@ -1,7 +1,6 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.TokenUsageAdvisor;
-import com.nonu1l.media.service.thinking.ThinkingMode;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -48,7 +47,7 @@ public class AiTextTaskService {
         private String node;
         private String systemPrompt;
         private String userPrompt;
-        private ThinkingMode thinkingMode;
+        private AiThinkingMode thinkingMode;
         private int maxAttempts = 1;
         private Consumer<String> cleanedContentListener;
 
@@ -91,7 +90,7 @@ public class AiTextTaskService {
          * @param thinkingMode 思考模式
          * @return 当前构建器
          */
-        public TaskBuilder thinking(ThinkingMode thinkingMode) {
+        public TaskBuilder thinking(AiThinkingMode thinkingMode) {
             this.thinkingMode = thinkingMode;
             return this;
         }
@@ -103,7 +102,7 @@ public class AiTextTaskService {
          * @return 当前构建器
          */
         public TaskBuilder thinkingEnabled(boolean enabled) {
-            this.thinkingMode = enabled ? ThinkingMode.ENABLED : ThinkingMode.DISABLED;
+            this.thinkingMode = enabled ? AiThinkingMode.ENABLED : AiThinkingMode.DISABLED;
             return this;
         }
 
@@ -178,7 +177,7 @@ public class AiTextTaskService {
         }
 
         private ChatClient currentClient() {
-            ThinkingMode effectiveMode = settingsService.currentAiTextTaskThinkingOverride()
+            AiThinkingMode effectiveMode = settingsService.currentAiTextTaskThinkingOverride()
                     .orElse(thinkingMode);
             return chatClientFactory.currentClient(effectiveMode);
         }

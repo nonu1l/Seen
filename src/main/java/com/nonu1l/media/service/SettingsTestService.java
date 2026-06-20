@@ -4,8 +4,6 @@ import com.nonu1l.media.config.ExternalEndpointProperties;
 import com.nonu1l.media.model.dto.AiProviderSettingRequest;
 import com.nonu1l.media.model.dto.test.SettingsTestRequests;
 import com.nonu1l.media.model.dto.test.SettingsTestResponse;
-import com.nonu1l.media.service.thinking.ThinkingMode;
-import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -35,13 +33,13 @@ public class SettingsTestService {
     private final ExternalEndpointProperties endpointProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
+    private final AiChatClientFactory chatClientFactory;
 
     public SettingsTestService(SettingsService settingsService,
                                ExternalEndpointProperties endpointProperties,
                                RestTemplateBuilder builder,
                                ObjectMapper objectMapper,
-                               ThinkingStrategyRegistry thinkingStrategyRegistry) {
+                               AiChatClientFactory chatClientFactory) {
         this.settingsService = settingsService;
         this.endpointProperties = endpointProperties;
         this.restTemplate = builder
@@ -49,7 +47,7 @@ public class SettingsTestService {
                 .readTimeout(Duration.ofSeconds(20))
                 .build();
         this.objectMapper = objectMapper;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
+        this.chatClientFactory = chatClientFactory;
     }
 
     public SettingsTestResponse testAiProfile(SettingsTestRequests.AiTestRequest request) {
@@ -57,35 +55,23 @@ public class SettingsTestService {
         SettingsService.AiRuntimeSetting setting = resolveTestSetting(request);
         if (setting.baseUrl().isBlank() || setting.apiKey().isBlank() || setting.model().isBlank()) {
             return response(false, "baseUrl、apiKey、model 不能为空", start,
-                    Map.of("provider", thinkingStrategyRegistry().providerName(setting), "model", setting.model()));
+                    Map.of("provider", profileName(setting), "model", setting.model()));
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(setting.apiKey());
-
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", setting.model());
-            body.put("temperature", Math.max(0.0d, Math.min(2.0d, setting.temperature())));
-            body.put("max_tokens", 8);
-            body.put("messages", List.of(Map.of("role", "user", "content", "ping")));
-            body.putAll(thinkingStrategyRegistry().extraBody(setting, ThinkingMode.DISABLED));
-
-            ResponseEntity<String> resp = restTemplate.exchange(
-                    chatCompletionsUrl(setting.baseUrl()),
-                    HttpMethod.POST,
-                    new HttpEntity<>(objectMapper.writeValueAsString(body), headers),
-                    String.class
-            );
-            boolean ok = resp.getStatusCode().is2xxSuccessful();
+            String content = chatClientFactory.clientFor(setting, AiThinkingMode.DISABLED)
+                    .prompt()
+                    .user("ping")
+                    .call()
+                    .content();
+            boolean ok = content != null;
             return response(ok, ok ? "连接正常" : "连接失败", start, Map.of(
-                    "provider", thinkingStrategyRegistry().providerName(setting),
+                    "provider", profileName(setting),
                     "model", setting.model()
             ));
         } catch (Exception e) {
             return response(false, sanitize(e.getMessage(), setting.apiKey()), start, Map.of(
-                    "provider", thinkingStrategyRegistry().providerName(setting),
+                    "provider", profileName(setting),
                     "model", setting.model()
             ));
         }
@@ -133,22 +119,26 @@ public class SettingsTestService {
         ));
     }
 
-    private ThinkingStrategyRegistry thinkingStrategyRegistry() {
-        return thinkingStrategyRegistry != null
-                ? thinkingStrategyRegistry
-                : ThinkingStrategyRegistry.defaultRegistry();
-    }
-
-    private static String chatCompletionsUrl(String baseUrl) {
-        return trimTrailingSlash(baseUrl) + "/chat/completions";
-    }
-
     private static String trimTrailingSlash(String value) {
         String result = value == null ? "" : value.trim();
         while (result.endsWith("/")) {
             result = result.substring(0, result.length() - 1);
         }
         return result;
+    }
+
+    private static String profileName(SettingsService.AiRuntimeSetting setting) {
+        String baseUrl = setting != null ? setting.baseUrl() : "";
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "anthropic-compatible";
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(baseUrl);
+            String host = uri.getHost();
+            return host == null || host.isBlank() ? "anthropic-compatible" : host;
+        } catch (Exception ignored) {
+            return "anthropic-compatible";
+        }
     }
 
     private List<String> testSerperSearch(String query, String apiKey) throws Exception {

@@ -34,6 +34,10 @@ public class ConversationMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    /** Anthropic-compatible content blocks JSON；用于保留 text/thinking/tool 调试信息。 */
+    @Column(name = "content_blocks", columnDefinition = "TEXT")
+    private String contentBlocks;
+
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 }

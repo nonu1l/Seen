@@ -4,7 +4,6 @@ import com.nonu1l.media.model.dto.WatchSourceItemDTO;
 import com.nonu1l.media.model.dto.WatchSourceResultDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.model.dto.WebSearchResultDTO;
-import com.nonu1l.media.service.thinking.ThinkingMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
@@ -109,7 +108,7 @@ public class WatchSourceSearchService {
                     .node("watch-source-title")
                     .system(titlePrompt)
                     .user(query)
-                    .thinking(ThinkingMode.DISABLED)
+                    .thinking(AiThinkingMode.DISABLED)
                     .call();
             TitleGuess parsed = parseGuess(cleaned);
             if (hasText(parsed.title())) {
@@ -239,7 +238,7 @@ public class WatchSourceSearchService {
                     .node("watch-source-validate")
                     .system(validatePrompt)
                     .user(validationInput(title, fetched))
-                    .thinking(ThinkingMode.DISABLED)
+                    .thinking(AiThinkingMode.DISABLED)
                     .maxAttempts(3)
                     .call(cleaned -> {
                         Matcher keepMatcher = KEEP_PATTERN.matcher(cleaned);

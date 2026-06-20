@@ -3,7 +3,6 @@ package com.nonu1l.media.config;
 import com.nonu1l.media.model.entity.TokenUsage;
 import com.nonu1l.media.repository.TokenUsageRepository;
 import com.nonu1l.media.service.SettingsService;
-import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
 import org.springframework.ai.chat.client.ChatClientMessageAggregator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +33,6 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
 
     private final TokenUsageRepository repo;
     private final SettingsService settingsService;
-    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final Supplier<SettingsService.AiRuntimeSetting> settingSupplier;
 
     /**
@@ -42,24 +40,19 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      *
      * @param repo token 用量仓储。
      * @param settingsService 设置读取服务。
-     * @param thinkingStrategyRegistry provider 思考策略注册器。
      */
     public TokenUsageAdvisor(TokenUsageRepository repo,
-                             SettingsService settingsService,
-                             ThinkingStrategyRegistry thinkingStrategyRegistry) {
+                             SettingsService settingsService) {
         this.repo = repo;
         this.settingsService = settingsService;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingsService::currentRuntimeSetting;
     }
 
     private TokenUsageAdvisor(TokenUsageRepository repo,
                               SettingsService settingsService,
-                              ThinkingStrategyRegistry thinkingStrategyRegistry,
                               Supplier<SettingsService.AiRuntimeSetting> settingSupplier) {
         this.repo = repo;
         this.settingsService = settingsService;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
         this.settingSupplier = settingSupplier;
     }
 
@@ -70,7 +63,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
      * @return 绑定指定配置的 Advisor。
      */
     public TokenUsageAdvisor withSetting(SettingsService.AiRuntimeSetting setting) {
-        return new TokenUsageAdvisor(repo, settingsService, thinkingStrategyRegistry, () -> setting);
+        return new TokenUsageAdvisor(repo, settingsService, () -> setting);
     }
 
     /**
@@ -184,7 +177,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
                     tu.setNodeName(context.nodeName());
                     tu.setTurn(context.turn());
                     tu.setProfileId(context.setting().id());
-                    tu.setProfileName(thinkingStrategyRegistry.providerName(context.setting()));
+                    tu.setProfileName(profileName(context.setting()));
                     tu.setModelName(model != null ? model : "unknown");
                     tu.setPromptTokens(usage.getPromptTokens() > 0 ? (int) usage.getPromptTokens() : null);
                     tu.setCompletionTokens(usage.getCompletionTokens() > 0 ? (int) usage.getCompletionTokens() : null);
@@ -211,7 +204,7 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
     /**
      * 从 provider 原始 usage 中提取官方 prompt cache 命中数。
      *
-     * <p>不同 OpenAI 兼容 SDK 可能暴露为 Map、Optional 或 record 风格方法，因此这里只读
+     * <p>不同 provider SDK 可能暴露为 Map、Optional 或 record 风格方法，因此这里只读
      * prompt_tokens_details.cached_tokens，不做本地估算。</p>
      *
      * @param nativeUsage Spring AI 暴露的 provider 原始 usage 对象。
@@ -276,6 +269,20 @@ public class TokenUsageAdvisor implements CallAdvisor, StreamAdvisor {
             }
         }
         return null;
+    }
+
+    private String profileName(SettingsService.AiRuntimeSetting setting) {
+        String baseUrl = setting != null ? setting.baseUrl() : "";
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "anthropic-compatible";
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(baseUrl);
+            String host = uri.getHost();
+            return host == null || host.isBlank() ? "anthropic-compatible" : host;
+        } catch (Exception ignored) {
+            return "anthropic-compatible";
+        }
     }
 
     /**

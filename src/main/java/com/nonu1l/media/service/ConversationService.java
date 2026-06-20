@@ -2,6 +2,7 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.agent.AgentRunEvents;
 import com.nonu1l.media.agent.AgentRunListener;
+import com.nonu1l.media.agent.AgentResponse;
 import com.nonu1l.media.agent.AutonomousAgentService;
 import com.nonu1l.media.agent.tool.AiToolContextHolder;
 import com.nonu1l.media.agent.tool.AiToolExecutionContext;
@@ -108,7 +109,7 @@ public class ConversationService {
         List<ConversationMessageDTO> messageDTOs = messageRepo.findAllBySessionIdOrderByIdAsc(session.getId())
                 .stream()
                 .filter(m -> "user".equals(m.getRole()) || (m.getContent() != null && !m.getContent().isBlank()))
-                .map(m -> new ConversationMessageDTO(m.getId(), m.getRole(), m.getContent(), m.getCreatedAt()))
+                .map(m -> new ConversationMessageDTO(m.getId(), m.getRole(), m.getContent(), m.getContentBlocks(), m.getCreatedAt()))
                 .toList();
 
         List<ConversationCardDTO> cardDTOs = cardRepo.findAllBySessionIdAndCardStateInOrderByIdAsc(
@@ -260,9 +261,9 @@ public class ConversationService {
             AiToolContextHolder.set(new AiToolExecutionContext(
                     sessionId, requestId, userMessageId, assistantMessageId, userInput, listener));
 
-            String replyText;
+            AgentResponse agentResponse;
             try {
-                replyText = autonomousAgentService.invoke(userInput, history, listener);
+                agentResponse = autonomousAgentService.invoke(userInput, history, listener);
             } finally {
                 AiToolContextHolder.clear();
                 TokenUsageAdvisor.clearSession();
@@ -274,14 +275,16 @@ public class ConversationService {
 
             Instant completedAt = Instant.now();
             Long finalAssistantMessageId = assistantMessageId;
+            String replyText = agentResponse.content();
+            String contentBlocks = agentResponse.contentBlocks();
             transactionTemplate.execute(tx -> {
-                updateAssistantMessage(finalAssistantMessageId, replyText, completedAt);
+                updateAssistantMessage(finalAssistantMessageId, replyText, contentBlocks, completedAt);
                 touchSession(sessionId, completedAt);
                 return null;
             });
 
             List<ConversationCardDTO> cards = operationService.cardsForRequest(sessionId, requestId);
-            publishRunEvent(sessionId, AiStreamEventDTO.assistantSaved(assistantMessageId, replyText, completedAt), sender);
+            publishRunEvent(sessionId, AiStreamEventDTO.assistantSaved(assistantMessageId, replyText, contentBlocks, completedAt), sender);
             if (!cards.isEmpty()) {
                 publishRunEvent(sessionId, AiStreamEventDTO.cards(cards), sender);
             }
@@ -293,7 +296,7 @@ public class ConversationService {
                 Long finalAssistantMessageId = assistantMessageId;
                 if (finalAssistantMessageId != null) {
                     transactionTemplate.execute(tx -> {
-                        updateAssistantMessage(finalAssistantMessageId, ERROR_REPLY, Instant.now());
+                        updateAssistantMessage(finalAssistantMessageId, ERROR_REPLY, null, Instant.now());
                         return null;
                     });
                 }
@@ -317,6 +320,7 @@ public class ConversationService {
         userMsg.setRequestId(requestId);
         userMsg.setRole("user");
         userMsg.setContent(userInput);
+        userMsg.setContentBlocks(null);
         userMsg.setCreatedAt(now);
         session.setUpdatedAt(now);
         sessionRepo.save(session);
@@ -329,27 +333,30 @@ public class ConversationService {
         assistantMsg.setRequestId(requestId);
         assistantMsg.setRole("assistant");
         assistantMsg.setContent("");
+        assistantMsg.setContentBlocks("[]");
         assistantMsg.setCreatedAt(now);
         return messageRepo.save(assistantMsg);
     }
 
-    private void updateAssistantMessage(Long assistantMessageId, String content, Instant now) {
+    private void updateAssistantMessage(Long assistantMessageId, String content, String contentBlocks, Instant now) {
         ConversationMessage assistantMsg = messageRepo.findById(assistantMessageId)
                 .orElseThrow(() -> new IllegalArgumentException("Assistant message not found: " + assistantMessageId));
         assistantMsg.setContent(content != null ? content : "");
+        assistantMsg.setContentBlocks(contentBlocks);
         messageRepo.save(assistantMsg);
     }
 
     private void saveStoppedAssistantResponse(Long sessionId, String requestId, Long assistantMessageId) {
         Instant now = Instant.now();
         if (assistantMessageId != null) {
-            updateAssistantMessage(assistantMessageId, STOPPED_REPLY, now);
+            updateAssistantMessage(assistantMessageId, STOPPED_REPLY, null, now);
         } else {
             ConversationMessage assistantMsg = new ConversationMessage();
             assistantMsg.setSessionId(sessionId);
             assistantMsg.setRequestId(requestId);
             assistantMsg.setRole("assistant");
             assistantMsg.setContent(STOPPED_REPLY);
+            assistantMsg.setContentBlocks(null);
             assistantMsg.setCreatedAt(now);
             messageRepo.save(assistantMsg);
         }

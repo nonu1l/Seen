@@ -6,7 +6,6 @@ import com.nonu1l.media.model.dto.AiProviderSettingDTO;
 import com.nonu1l.media.model.dto.SettingsDTO;
 import com.nonu1l.media.model.entity.AppSetting;
 import com.nonu1l.media.repository.AppSettingRepository;
-import com.nonu1l.media.service.thinking.ThinkingMode;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -160,7 +159,7 @@ public class SettingsService {
     /**
      * @return 设置页保存的默认思考模式，非法值回退为 enabled。
      */
-    public ThinkingMode currentThinkingMode() {
+    public AiThinkingMode currentThinkingMode() {
         return parseThinkingMode(getString(AI_THINKING_SETTING));
     }
 
@@ -172,7 +171,7 @@ public class SettingsService {
      *
      * @return 空表示不覆盖；非空表示文本任务必须使用的思考模式
      */
-    public Optional<ThinkingMode> currentAiTextTaskThinkingOverride() {
+    public Optional<AiThinkingMode> currentAiTextTaskThinkingOverride() {
         String value = getString(AI_THINKING_SETTING);
         if (AI_THINKING_DEFAULT.equalsIgnoreCase(value)) {
             return Optional.empty();
@@ -326,11 +325,14 @@ public class SettingsService {
         return parseThinkingMode(value).name().toLowerCase(Locale.ROOT);
     }
 
-    private static ThinkingMode parseThinkingMode(String value) {
-        if (value != null && AI_THINKING_DISABLED.equalsIgnoreCase(value.trim())) {
-            return ThinkingMode.DISABLED;
+    private static AiThinkingMode parseThinkingMode(String value) {
+        if (value != null && AI_THINKING_DEFAULT.equalsIgnoreCase(value.trim())) {
+            return AiThinkingMode.DEFAULT;
         }
-        return ThinkingMode.ENABLED;
+        if (value != null && AI_THINKING_DISABLED.equalsIgnoreCase(value.trim())) {
+            return AiThinkingMode.DISABLED;
+        }
+        return AiThinkingMode.ENABLED;
     }
 
     private String resolveAiApiKey(AiProviderSettingRequest request) {

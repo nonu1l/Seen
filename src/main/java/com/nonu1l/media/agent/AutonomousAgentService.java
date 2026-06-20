@@ -6,6 +6,7 @@ import com.nonu1l.media.service.AiChatClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ public class AutonomousAgentService {
 
     private final AiChatClientFactory chatClientFactory;
     private final AiToolRegistry toolRegistry;
+    private final AnthropicContentBlockService contentBlockService;
     private final String prompt;
 
     /**
@@ -31,9 +33,12 @@ public class AutonomousAgentService {
      * @param chatClientFactory AI 客户端工厂
      * @param toolRegistry 工具注册器
      */
-    public AutonomousAgentService(AiChatClientFactory chatClientFactory, AiToolRegistry toolRegistry) {
+    public AutonomousAgentService(AiChatClientFactory chatClientFactory,
+                                  AiToolRegistry toolRegistry,
+                                  AnthropicContentBlockService contentBlockService) {
         this.chatClientFactory = chatClientFactory;
         this.toolRegistry = toolRegistry;
+        this.contentBlockService = contentBlockService;
         this.prompt = loadPrompt("prompts/agent-autonomous.st");
     }
 
@@ -43,9 +48,9 @@ public class AutonomousAgentService {
      * @param userInput 用户输入
      * @param history 最近会话历史
      * @param listener 运行状态监听器
-     * @return 最终助手回复文本
+     * @return 最终助手回复和 content blocks
      */
-    public String invoke(String userInput, String history, AgentRunListener listener) {
+    public AgentResponse invoke(String userInput, String history, AgentRunListener listener) {
         AgentRunListener runListener = listener != null ? listener : AgentRunEvents.noop();
         runListener.status("正在理解需求");
         TokenUsageAdvisor.setCurrentNode("autonomous-agent");
@@ -55,18 +60,19 @@ public class AutonomousAgentService {
                 .replace("{webToolGuidance}", toolRegistry.webToolGuidance())
                 .replace("{analysisToolList}", toolRegistry.analysisToolList())
                 .replace("{webFailureGuidance}", toolRegistry.webFailureGuidance());
-        String content = chatClient().prompt()
+        ChatResponse response = chatClient().prompt()
                 .system(system)
                 .user(userInput)
                 .toolCallbacks(toolRegistry.callbacks())
                 .call()
-                .content();
+                .chatResponse();
+        String content = contentBlockService.textFrom(response);
         String cleaned = cleanAssistantContent(content);
         if (cleaned == null || cleaned.isBlank()) {
-            return "已处理。";
+            cleaned = "已处理。";
         }
         log.debug("Autonomous agent reply: {}", cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned);
-        return cleaned;
+        return new AgentResponse(cleaned, contentBlockService.blocksJson(response, cleaned));
     }
 
     private ChatClient chatClient() {

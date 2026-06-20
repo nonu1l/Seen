@@ -53,7 +53,7 @@ export default function AiPage() {
                   >
                     {isUser
                       ? msg.content
-                      : <MarkdownMessage content={msg.content} />}
+                      : <MarkdownMessage content={msg.content} contentBlocks={msg.contentBlocks} />}
                   </span>
                 </div>
                 {msgCards.length > 0 && (

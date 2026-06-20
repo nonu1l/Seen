@@ -1,37 +1,34 @@
 package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.TokenUsageAdvisor;
-import com.nonu1l.media.service.thinking.ThinkingMode;
-import com.nonu1l.media.service.thinking.ThinkingStrategyRegistry;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 根据当前 AI 接入配置动态创建和复用 ChatClient。
+ * 根据设置页保存的 Anthropic-compatible AI 接入配置动态创建和复用 ChatClient。
  */
 @Service
 public class AiChatClientFactory {
 
-    private static final String CACHE_VERSION = "thinking-strategy-v2";
+    private static final String CACHE_VERSION = "anthropic-client-v1";
+    private static final int DEFAULT_MAX_TOKENS = 4096;
+    private static final int THINKING_MAX_TOKENS = 8192;
+    private static final int THINKING_BUDGET_TOKENS = 2048;
 
     private final SettingsService settingsService;
     private final TokenUsageAdvisor tokenUsageAdvisor;
-    private final ThinkingStrategyRegistry thinkingStrategyRegistry;
     private final ConcurrentHashMap<String, ChatClient> cache = new ConcurrentHashMap<>();
 
     public AiChatClientFactory(SettingsService settingsService,
-                               TokenUsageAdvisor tokenUsageAdvisor,
-                               ThinkingStrategyRegistry thinkingStrategyRegistry) {
+                               TokenUsageAdvisor tokenUsageAdvisor) {
         this.settingsService = settingsService;
         this.tokenUsageAdvisor = tokenUsageAdvisor;
-        this.thinkingStrategyRegistry = thinkingStrategyRegistry;
     }
 
     /**
@@ -49,47 +46,50 @@ public class AiChatClientFactory {
      * @param mode 本次调用希望使用的思考模式
      * @return 当前运行时配置和思考模式对应的 ChatClient
      */
-    public ChatClient currentClient(ThinkingMode mode) {
+    public ChatClient currentClient(AiThinkingMode mode) {
         SettingsService.AiRuntimeSetting setting = settingsService.currentRuntimeSetting();
-        validate(setting);
-        Map<String, Object> extraBody = thinkingStrategyRegistry().extraBody(setting, mode);
-        String cacheKey = cacheKey(setting, mode, extraBody);
-        return cache.computeIfAbsent(cacheKey, ignored -> buildClient(setting, extraBody));
+        return clientFor(setting, mode);
     }
 
     /**
-     * 按当前 provider 策略清理模型正文，处理部分模型把思考标签混入 content 的情况。
+     * 使用指定运行时配置创建或复用 Anthropic ChatClient，供设置页草稿测试使用。
+     *
+     * @param setting AI 运行时配置
+     * @param mode 思考模式
+     * @return 对应的 ChatClient
+     */
+    public ChatClient clientFor(SettingsService.AiRuntimeSetting setting, AiThinkingMode mode) {
+        validate(setting);
+        AiThinkingMode effectiveMode = mode != null && mode != AiThinkingMode.DEFAULT
+                ? mode
+                : AiThinkingMode.DISABLED;
+        String cacheKey = cacheKey(setting, effectiveMode);
+        return cache.computeIfAbsent(cacheKey, ignored -> buildClient(setting, effectiveMode));
+    }
+
+    /**
+     * Anthropic-compatible 主链路下正文由 text block 产生，不再清理 provider 私有 thinking 标签。
      *
      * @param content 模型原始正文
-     * @return 清理后的正文
+     * @return 原样正文
      */
     public String cleanAssistantContent(String content) {
-        if (content == null) {
-            return null;
-        }
-        SettingsService.AiRuntimeSetting setting = settingsService.currentRuntimeSetting();
-        validate(setting);
-        return thinkingStrategyRegistry().cleanAssistantContent(setting, content);
+        return content;
     }
 
-    private ThinkingStrategyRegistry thinkingStrategyRegistry() {
-        return thinkingStrategyRegistry != null
-                ? thinkingStrategyRegistry
-                : ThinkingStrategyRegistry.defaultRegistry();
-    }
-
-    private ChatClient buildClient(SettingsService.AiRuntimeSetting setting, Map<String, Object> extraBody) {
-        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
+    private ChatClient buildClient(SettingsService.AiRuntimeSetting setting, AiThinkingMode mode) {
+        AnthropicChatOptions.Builder options = AnthropicChatOptions.builder()
                 .baseUrl(trimTrailingSlash(setting.baseUrl()))
                 .apiKey(setting.apiKey())
                 .model(setting.model())
-                .temperature(setting.temperature());
+                .temperature(mode == AiThinkingMode.ENABLED ? 1.0 : setting.temperature())
+                .maxTokens(mode == AiThinkingMode.ENABLED ? THINKING_MAX_TOKENS : DEFAULT_MAX_TOKENS);
 
-        if (extraBody != null && !extraBody.isEmpty()) {
-            options.extraBody(extraBody);
+        if (mode == AiThinkingMode.ENABLED) {
+            options.thinkingEnabled(THINKING_BUDGET_TOKENS);
         }
 
-        OpenAiChatModel model = OpenAiChatModel.builder()
+        AnthropicChatModel model = AnthropicChatModel.builder()
                 .options(options.build())
                 .build();
 
@@ -112,15 +112,14 @@ public class AiChatClientFactory {
         }
     }
 
-    String cacheKey(SettingsService.AiRuntimeSetting setting, ThinkingMode mode, Map<String, Object> extraBody) {
+    String cacheKey(SettingsService.AiRuntimeSetting setting, AiThinkingMode mode) {
         String raw = CACHE_VERSION + "\n"
                 + setting.id() + "\n"
                 + trimTrailingSlash(setting.baseUrl()) + "\n"
                 + setting.apiKey() + "\n"
                 + setting.model() + "\n"
                 + setting.temperature() + "\n"
-                + mode + "\n"
-                + (extraBody != null ? extraBody.toString() : "");
+                + mode;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] bytes = digest.digest(raw.getBytes(StandardCharsets.UTF_8));

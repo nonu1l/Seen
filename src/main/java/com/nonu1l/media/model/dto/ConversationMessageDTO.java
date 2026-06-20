@@ -8,11 +8,13 @@ import java.time.Instant;
  * @param id 消息 ID。
  * @param role 角色（user/assistant/system）。
  * @param content 消息正文。
+ * @param contentBlocks Anthropic-compatible 内容块 JSON。
  * @param createdAt 创建时间戳。
  */
 public record ConversationMessageDTO(
         Long id,
         String role,
         String content,
+        String contentBlocks,
         Instant createdAt
 ) {}

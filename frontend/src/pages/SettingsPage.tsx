@@ -572,7 +572,7 @@ export default function SettingsPage() {
         <div className="settings-form">
           <ToggleRow title="AI 助手" checked={aiDraft.aiEnabled} onChange={value => setAiConfig('aiEnabled', value)} />
 
-          <SettingsRow title="API Base URL" description="填写完整 API 前缀，例如 https://api.deepseek.com/v1 或 https://open.bigmodel.cn/api/paas/v4。">
+          <SettingsRow title="API Base URL" description="填写 Anthropic-compatible API 前缀，例如 https://api.deepseek.com/anthropic 或 https://api.minimaxi.com/anthropic。">
             <input className="settings-input" value={aiDraft.baseUrl} onChange={event => setAiConfig('baseUrl', event.target.value)} />
           </SettingsRow>
 

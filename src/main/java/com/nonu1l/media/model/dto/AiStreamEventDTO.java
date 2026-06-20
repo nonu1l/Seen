@@ -9,6 +9,7 @@ import java.util.List;
  * @param type 事件类型
  * @param messageId 关联消息 ID；user_saved 为用户消息，assistant_saved 为助手消息
  * @param content 状态文案或最终回复正文
+ * @param contentBlocks Anthropic-compatible 内容块 JSON
  * @param createdAt 消息创建时间
  * @param cards 本轮生成的卡片列表
  */
@@ -16,6 +17,7 @@ public record AiStreamEventDTO(
         String type,
         Long messageId,
         String content,
+        String contentBlocks,
         Instant createdAt,
         List<ConversationCardDTO> cards
 ) {
@@ -28,7 +30,7 @@ public record AiStreamEventDTO(
      * @return SSE 事件
      */
     public static AiStreamEventDTO userSaved(Long messageId, Instant createdAt) {
-        return new AiStreamEventDTO("user_saved", messageId, null, createdAt, null);
+        return new AiStreamEventDTO("user_saved", messageId, null, null, createdAt, null);
     }
 
     /**
@@ -38,7 +40,7 @@ public record AiStreamEventDTO(
      * @return SSE 事件
      */
     public static AiStreamEventDTO status(String content) {
-        return new AiStreamEventDTO("status", null, content, null, null);
+        return new AiStreamEventDTO("status", null, content, null, null, null);
     }
 
     /**
@@ -49,8 +51,8 @@ public record AiStreamEventDTO(
      * @param createdAt 创建时间
      * @return SSE 事件
      */
-    public static AiStreamEventDTO assistantSaved(Long messageId, String content, Instant createdAt) {
-        return new AiStreamEventDTO("assistant_saved", messageId, content, createdAt, null);
+    public static AiStreamEventDTO assistantSaved(Long messageId, String content, String contentBlocks, Instant createdAt) {
+        return new AiStreamEventDTO("assistant_saved", messageId, content, contentBlocks, createdAt, null);
     }
 
     /**
@@ -60,7 +62,7 @@ public record AiStreamEventDTO(
      * @return SSE 事件
      */
     public static AiStreamEventDTO cards(List<ConversationCardDTO> cards) {
-        return new AiStreamEventDTO("cards", null, null, null, cards);
+        return new AiStreamEventDTO("cards", null, null, null, null, cards);
     }
 
     /**
@@ -69,7 +71,7 @@ public record AiStreamEventDTO(
      * @return SSE 事件
      */
     public static AiStreamEventDTO done() {
-        return new AiStreamEventDTO("done", null, null, null, null);
+        return new AiStreamEventDTO("done", null, null, null, null, null);
     }
 
     /**
@@ -79,6 +81,6 @@ public record AiStreamEventDTO(
      * @return SSE 事件
      */
     public static AiStreamEventDTO error(String content) {
-        return new AiStreamEventDTO("error", null, content, null, null);
+        return new AiStreamEventDTO("error", null, content, null, null, null);
     }
 }
