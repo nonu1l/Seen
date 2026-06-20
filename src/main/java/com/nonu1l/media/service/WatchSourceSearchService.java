@@ -33,7 +33,7 @@ public class WatchSourceSearchService {
     private static final Pattern KEEP_PATTERN = Pattern.compile("\"keep\"\\s*:\\s*\\[([^]]*)]");
     private static final Pattern INTEGER_PATTERN = Pattern.compile("\\d+");
 
-    private final AiTextTaskService aiTextTaskService;
+    private final AiChatCallService AiChatCallService;
     private final WebSearchService webSearchService;
     private final WebFetchService webFetchService;
     private final int fetchContentMaxChars;
@@ -46,20 +46,20 @@ public class WatchSourceSearchService {
     /**
      * 创建片源搜索服务。
      *
-     * @param aiTextTaskService 文本型 LLM 任务服务，用于校验候选页面内容
+     * @param AiChatCallService LLM 调用服务，用于校验候选页面内容
      * @param webSearchService Web 搜索服务，用于搜索候选观看链接
      * @param webFetchService Web 抓取服务，用于并发读取候选页面内容
      * @param fetchContentMaxChars 每个候选页面最多抓取的正文字符数
      * @param validationContentMaxChars 进入 LLM 校验的单页正文字符数
      */
-    public WatchSourceSearchService(AiTextTaskService aiTextTaskService,
+    public WatchSourceSearchService(AiChatCallService AiChatCallService,
                                     WebSearchService webSearchService,
                                     WebFetchService webFetchService,
                                     @Value("${app.runtime.watch-source.fetch-content-max-chars:3000}") int fetchContentMaxChars,
                                     @Value("${app.runtime.watch-source.validation-content-max-chars:2000}") int validationContentMaxChars,
                                     @Value("${app.runtime.watch-source.candidate-limit:12}") int candidateLimit,
                                     @Value("${app.runtime.watch-source.result-limit:8}") int resultLimit) {
-        this.aiTextTaskService = aiTextTaskService;
+        this.AiChatCallService = AiChatCallService;
         this.webSearchService = webSearchService;
         this.webFetchService = webFetchService;
         this.fetchContentMaxChars = fetchContentMaxChars;
@@ -117,7 +117,7 @@ public class WatchSourceSearchService {
      */
     private TitleGuess resolveTitle(String query) {
         try {
-            String content = aiTextTaskService.task()
+            String content = AiChatCallService.task()
                     .node("watch-source-title")
                     .system(titlePrompt)
                     .user(query)
@@ -247,7 +247,7 @@ public class WatchSourceSearchService {
      */
     private List<Integer> validateFetchedContent(String title, List<FetchedWatchSource> fetched) {
         try {
-            return aiTextTaskService.task()
+            return AiChatCallService.task()
                     .node("watch-source-validate")
                     .system(validatePrompt)
                     .user(validationInput(title, fetched))

@@ -1,11 +1,9 @@
 package com.nonu1l.media.agent;
 
 import com.nonu1l.media.agent.tool.AiToolRegistry;
-import com.nonu1l.media.config.TokenUsageAdvisor;
-import com.nonu1l.media.service.AiChatClientFactory;
+import com.nonu1l.media.service.AiChatCallService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -22,7 +20,7 @@ public class AutonomousAgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AutonomousAgentService.class);
 
-    private final AiChatClientFactory chatClientFactory;
+    private final AiChatCallService aiChatCallService;
     private final AiToolRegistry toolRegistry;
     private final AnthropicContentBlockService contentBlockService;
     private final String prompt;
@@ -30,13 +28,13 @@ public class AutonomousAgentService {
     /**
      * 创建自主 Agent 服务。
      *
-     * @param chatClientFactory AI 客户端工厂
+     * @param aiChatCallService LLM 调用服务
      * @param toolRegistry 工具注册器
      */
-    public AutonomousAgentService(AiChatClientFactory chatClientFactory,
+    public AutonomousAgentService(AiChatCallService aiChatCallService,
                                   AiToolRegistry toolRegistry,
                                   AnthropicContentBlockService contentBlockService) {
-        this.chatClientFactory = chatClientFactory;
+        this.aiChatCallService = aiChatCallService;
         this.toolRegistry = toolRegistry;
         this.contentBlockService = contentBlockService;
         this.prompt = loadPrompt("prompts/agent-autonomous.st");
@@ -53,29 +51,24 @@ public class AutonomousAgentService {
     public AgentResponse invoke(String userInput, String history, AgentRunListener listener) {
         AgentRunListener runListener = listener != null ? listener : AgentRunEvents.noop();
         runListener.status("正在理解需求");
-        TokenUsageAdvisor.setCurrentNode("autonomous-agent");
         String system = prompt
                 .replace("{today}", LocalDate.now().toString())
                 .replace("{history}", history != null ? history : "")
                 .replace("{webToolGuidance}", toolRegistry.webToolGuidance())
                 .replace("{analysisToolList}", toolRegistry.analysisToolList())
                 .replace("{webFailureGuidance}", toolRegistry.webFailureGuidance());
-        ChatResponse response = chatClient().prompt()
+        ChatResponse response = aiChatCallService.agent()
+                .node("autonomous-agent")
                 .system(system)
                 .user(userInput)
                 .toolCallbacks(toolRegistry.callbacks())
-                .call()
-                .chatResponse();
+                .callOnceResponse();
         String replyText = contentBlockService.textFrom(response);
         if (replyText == null || replyText.isBlank()) {
             replyText = "已处理。";
         }
         log.debug("Autonomous agent reply: {}", replyText.length() > 200 ? replyText.substring(0, 200) : replyText);
         return new AgentResponse(replyText, contentBlockService.blocksJson(response, replyText));
-    }
-
-    private ChatClient chatClient() {
-        return chatClientFactory.currentClient();
     }
 
     private static String loadPrompt(String path) {

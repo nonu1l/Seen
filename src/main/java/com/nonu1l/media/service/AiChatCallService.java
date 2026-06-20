@@ -2,29 +2,31 @@ package com.nonu1l.media.service;
 
 import com.nonu1l.media.config.TokenUsageAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * 封装不带工具调用的 LLM 文本任务，统一处理提示词、思考模式和重试。
+ * 统一封装 LLM 调用链路，区分无工具文本任务和带工具副作用的 Agent 单次调用。
  *
  * <p>设置页思考模式为 default 时尊重单次任务的 thinking 参数；设置为 enabled/disabled 时会强制覆盖。</p>
  */
 @Service
-public class AiTextTaskService {
+public class AiChatCallService {
 
     private final AiChatClientFactory chatClientFactory;
     private final SettingsService settingsService;
 
     /**
-     * 创建文本型 LLM 任务服务。
+     * 创建 LLM 调用服务。
      *
      * @param chatClientFactory AI 客户端工厂，用于获取当前 ChatClient
      * @param settingsService 设置服务，用于读取文本任务思考模式覆盖
      */
-    public AiTextTaskService(AiChatClientFactory chatClientFactory,
+    public AiChatCallService(AiChatClientFactory chatClientFactory,
                              SettingsService settingsService) {
         this.chatClientFactory = chatClientFactory;
         this.settingsService = settingsService;
@@ -37,6 +39,15 @@ public class AiTextTaskService {
      */
     public TaskBuilder task() {
         return new TaskBuilder();
+    }
+
+    /**
+     * 创建一次带工具调用的 Agent 调用构建器。
+     *
+     * @return Agent 调用构建器
+     */
+    public AgentBuilder agent() {
+        return new AgentBuilder();
     }
 
     /**
@@ -141,6 +152,7 @@ public class AiTextTaskService {
          * 执行文本任务，并用回调把模型正文转换为调用方需要的结果。
          *
          * <p>当模型调用或回调解析抛出异常时，会按 maxAttempts 重试；全部失败后抛出最后一次异常。</p>
+         * <p>允许回调函数传入，如果回调函数失败也会进行重试</p>
          *
          * @param resultHandler 模型正文的处理回调
          * @param <T> 返回结果类型
@@ -179,6 +191,97 @@ public class AiTextTaskService {
             AiThinkingMode effectiveMode = settingsService.currentAiTextTaskThinkingOverride()
                     .orElse(thinkingMode);
             return chatClientFactory.currentClient(effectiveMode);
+        }
+    }
+
+    /**
+     * 带工具调用的 Agent 构建器；工具可能产生副作用，因此只提供单次调用，不做任务级重试。
+     */
+    public class AgentBuilder {
+
+        private String node;
+        private String systemPrompt;
+        private String userPrompt;
+        private AiThinkingMode thinkingMode;
+        private ToolCallback[] toolCallbacks = new ToolCallback[0];
+
+        /**
+         * 设置 Token 用量统计节点名。
+         *
+         * @param node 节点名，可为空
+         * @return 当前构建器
+         */
+        public AgentBuilder node(String node) {
+            this.node = node;
+            return this;
+        }
+
+        /**
+         * 设置系统提示词。
+         *
+         * @param systemPrompt 系统提示词，可为空
+         * @return 当前构建器
+         */
+        public AgentBuilder system(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
+            return this;
+        }
+
+        /**
+         * 设置用户提示词；调用 callOnceResponse 前必须设置。
+         *
+         * @param userPrompt 用户提示词
+         * @return 当前构建器
+         */
+        public AgentBuilder user(String userPrompt) {
+            this.userPrompt = userPrompt;
+            return this;
+        }
+
+        /**
+         * 设置本次 Agent 调用的思考模式；为空时使用设置页当前默认模式。
+         *
+         * @param thinkingMode 思考模式
+         * @return 当前构建器
+         */
+        public AgentBuilder thinking(AiThinkingMode thinkingMode) {
+            this.thinkingMode = thinkingMode;
+            return this;
+        }
+
+        /**
+         * 设置本次 Agent 可调用的工具。
+         *
+         * @param toolCallbacks Spring AI 工具回调
+         * @return 当前构建器
+         */
+        public AgentBuilder toolCallbacks(ToolCallback[] toolCallbacks) {
+            this.toolCallbacks = toolCallbacks != null ? toolCallbacks : new ToolCallback[0];
+            return this;
+        }
+
+        /**
+         * 执行一次带工具的 Agent 调用并返回完整响应；不会因解析失败重试整轮工具链路。
+         *
+         * @return 完整 ChatResponse，包含文本、thinking、tool 内容块等元数据
+         */
+        public ChatResponse callOnceResponse() {
+            if (userPrompt == null || userPrompt.isBlank()) {
+                throw new IllegalArgumentException("user prompt is required");
+            }
+            if (node != null && !node.isBlank()) {
+                TokenUsageAdvisor.setCurrentNode(node);
+            }
+            return currentAgentClient().prompt()
+                    .system(systemPrompt != null ? systemPrompt : "")
+                    .user(userPrompt)
+                    .toolCallbacks(toolCallbacks)
+                    .call()
+                    .chatResponse();
+        }
+
+        private ChatClient currentAgentClient() {
+            return thinkingMode != null ? chatClientFactory.currentClient(thinkingMode) : chatClientFactory.currentClient();
         }
     }
 }

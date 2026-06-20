@@ -6,7 +6,7 @@ app:
   endpoints:
 #    bangumi 默认 api  / https://bangumi.github.io
     bangumi-api-base: "${BANGUMI_API_BASE:https://api.bgm.tv/v0}"
-#   serper搜索，免费，需要api key / https://serper.dev/
+#   serper搜索，需要api key / https://serper.dev/
     serper-search-url: "${SERPER_SEARCH_URL:https://google.serper.dev/search}"
 #   tavily搜索，需要api key / https://docs.tavily.com
     tavily-search-url: "${TAVILY_SEARCH_URL:https://api.tavily.com/search}"

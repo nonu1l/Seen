@@ -50,7 +50,7 @@ public class AiPreferenceMemoryService {
     private final UserPreferenceEvidenceRepository evidenceRepo;
     private final WorkRepository workRepo;
     private final RecordRepository recordRepo;
-    private final AiTextTaskService aiTextTaskService;
+    private final AiChatCallService AiChatCallService;
     private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
     private final int maxContextLength;
@@ -67,7 +67,7 @@ public class AiPreferenceMemoryService {
      * @param evidenceRepo 画像证据仓储
      * @param workRepo 作品仓储
      * @param recordRepo 记录仓储
-     * @param aiTextTaskService 文本型 LLM 任务服务
+     * @param AiChatCallService LLM 调用服务
      * @param settingsService 运行时设置服务
      * @param objectMapper JSON 映射工具
      * @param maxContextLength 进入记忆生成提示词的最大上下文字符数
@@ -77,7 +77,7 @@ public class AiPreferenceMemoryService {
                                      UserPreferenceEvidenceRepository evidenceRepo,
                                      WorkRepository workRepo,
                                      RecordRepository recordRepo,
-                                     AiTextTaskService aiTextTaskService,
+                                     AiChatCallService AiChatCallService,
                                      SettingsService settingsService,
                                      ObjectMapper objectMapper,
                                      @Value("${app.runtime.memory.max-context-length:1200}") int maxContextLength,
@@ -86,7 +86,7 @@ public class AiPreferenceMemoryService {
         this.evidenceRepo = evidenceRepo;
         this.workRepo = workRepo;
         this.recordRepo = recordRepo;
-        this.aiTextTaskService = aiTextTaskService;
+        this.AiChatCallService = AiChatCallService;
         this.settingsService = settingsService;
         this.objectMapper = objectMapper;
         this.maxContextLength = maxContextLength;
@@ -338,7 +338,7 @@ public class AiPreferenceMemoryService {
     }
 
     private GeneratedMemory generateMemory(List<UserPreferenceEvidence> evidences) throws Exception {
-        return aiTextTaskService.task()
+        return AiChatCallService.task()
                 .node("preference-memory")
                 .system(memoryPrompt)
                 .user(buildEvidencePrompt(evidences))

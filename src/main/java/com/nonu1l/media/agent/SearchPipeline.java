@@ -4,7 +4,7 @@ import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.model.dto.FindWorksCandidateDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
-import com.nonu1l.media.service.AiTextTaskService;
+import com.nonu1l.media.service.AiChatCallService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +31,7 @@ public class SearchPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
 
-    private final AiTextTaskService aiTextTaskService;
+    private final AiChatCallService AiChatCallService;
     private final AiBangumiTools bangumiTools;
     private final AiWebSearchTools webSearchTools;
     private final int maxCards;
@@ -47,14 +47,14 @@ public class SearchPipeline {
     private final String promptFail;
 
     /**
-     * @param aiTextTaskService 文本型 LLM 任务服务
+     * @param AiChatCallService LLM 调用服务
      * @param bangumiTools AI Bangumi 查询工具
      * @param webSearchTools AI Web 搜索工具
      * @param maxCards 最多聚合的候选卡片数量
      * @param maxPages 每轮关键词最多抓取的搜索结果页面数量
      * @param maxDirectUrls 搜索无结果时最多直访的公开 URL 数量
      */
-    public SearchPipeline(AiTextTaskService aiTextTaskService,
+    public SearchPipeline(AiChatCallService AiChatCallService,
                           AiBangumiTools bangumiTools,
                           AiWebSearchTools webSearchTools,
                           @Value("${app.runtime.search-pipeline.max-cards:5}") int maxCards,
@@ -64,7 +64,7 @@ public class SearchPipeline {
                           @Value("${app.runtime.search-pipeline.bangumi-retry-limit:3}") int bangumiRetryLimit,
                           @Value("${app.runtime.search-pipeline.direct-fetch-max-chars:6000}") int directFetchMaxChars,
                           @Value("${app.runtime.search-pipeline.extract-text-max-chars:8000}") int extractTextMaxChars) {
-        this.aiTextTaskService = aiTextTaskService;
+        this.AiChatCallService = AiChatCallService;
         this.bangumiTools = bangumiTools;
         this.webSearchTools = webSearchTools;
         this.maxCards = maxCards;
@@ -245,7 +245,7 @@ public class SearchPipeline {
             .append(")\n"));
         String prompt = promptValidate.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", context);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-validateMatch")
                 .system(prompt)
                 .user(sb.toString())
@@ -267,7 +267,7 @@ public class SearchPipeline {
      */
     List<String> generateKeywords(String userInput) {
         String prompt = promptKeywords.replace("{today}", LocalDate.now().toString());
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-generateKeywords")
                 .system(prompt)
                 .user(userInput)
@@ -293,7 +293,7 @@ public class SearchPipeline {
                 今日日期: %s
                 """.formatted(LocalDate.now());
         String user = "用户上下文：\n" + context + "\n\n失败关键词：\n" + keyword;
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-directFetchUrls")
                 .system(system)
                 .user(user)
@@ -328,7 +328,7 @@ public class SearchPipeline {
         if (text.length() > maxChars) text = text.substring(0, maxChars);
         String prompt = promptTitles.replace("{today}", LocalDate.now().toString())
                 .replace("{context}", userInput);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-extractTitles")
                 .system(prompt)
                 .user(text)
@@ -346,7 +346,7 @@ public class SearchPipeline {
      */
     String failMessage(String userInput, String reason) {
         String prompt = promptFail.replace("{reason}", reason);
-        String result = aiTextTaskService.task()
+        String result = AiChatCallService.task()
                 .node("pipeline-failMessage")
                 .system(prompt)
                 .user(userInput)

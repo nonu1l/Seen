@@ -166,7 +166,7 @@ public class SettingsService {
     /**
      * 返回文本型 LLM 任务的全局思考模式覆盖。
      *
-     * <p>default 表示尊重 {@link AiTextTaskService} 单次调用传入的 thinking 参数；
+     * <p>default 表示尊重 {@link AiChatCallService} 单次调用传入的 thinking 参数；
      * enabled/disabled 会强制覆盖文本任务的单次参数。工具调用型 Agent 暂不使用该覆盖。</p>
      *
      * @return 空表示不覆盖；非空表示文本任务必须使用的思考模式
