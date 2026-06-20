@@ -10,6 +10,59 @@ app:
     serper-search-url: "${SERPER_SEARCH_URL:https://google.serper.dev/search}"
 #   tavily搜索，需要api key / https://docs.tavily.com
     tavily-search-url: "${TAVILY_SEARCH_URL:https://api.tavily.com/search}"
+  runtime:
+    ai:
+      default-max-tokens: 4096
+      thinking-max-tokens: 8192
+      thinking-budget-tokens: 2048
+    conversation:
+      stream-timeout: 10m
+      history-message-limit: 8
+      active-status-limit: 6
+    agent:
+      present-card-limit: 8
+      unmark-limit-per-request: 5
+    search-pipeline:
+      max-cards: 5
+      max-pages: 10
+      max-direct-urls: 3
+      keyword-limit: 3
+      bangumi-retry-limit: 3
+      direct-fetch-max-chars: 6000
+      extract-text-max-chars: 8000
+    web-search:
+      max-results: 10
+      tavily-max-attempts: 3
+      serper-connect-timeout: 10s
+      serper-read-timeout: 10s
+      tavily-connect-timeout: 10s
+      tavily-read-timeout: 20s
+    web-fetch:
+      default-max-chars: 6000
+      max-chars: 12000
+      max-bytes: 1048576
+      max-redirects: 3
+      timeout: 10s
+      user-agent: seen-app-agentic-fetch/1.0
+      max-links: 40
+    watch-source:
+      fetch-content-max-chars: 3000
+      validation-content-max-chars: 2000
+      candidate-limit: 12
+      result-limit: 8
+    memory:
+      max-context-length: 1200
+      max-evidence-for-llm: 80
+    cache:
+      request-maximum-size: 5000
+      bangumi-character-ttl-seconds: 1209600
+      pre-cache-subject-ttl-seconds: 600
+      pre-cache-characters-ttl-seconds: 600
+    settings-test:
+      query: 孤独摇滚
+      connect-timeout: 10s
+      read-timeout: 20s
+      preview-title-limit: 5
 
 spring:
   datasource:
@@ -49,7 +102,6 @@ logging:
     com.nonu1l.media.service.search.TavilySearchService: DEBUG
     com.nonu1l.media.agent.AgentService: DEBUG
     com.nonu1l.media.config.TokenUsageAdvisor: DEBUG
-    com.nonu1l.media.config.DeepSeekThinkingDisableInterceptor: DEBUG
 #    org.hibernate.orm.jdbc.bind: TRACE
 #    org.hibernate.SQL_SLOW: INFO
 #    com.nonu1l.media.service.PreCacheService: DEBUG

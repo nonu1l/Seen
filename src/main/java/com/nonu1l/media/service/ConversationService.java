@@ -18,12 +18,14 @@ import com.nonu1l.media.repository.ConversationSessionRepository;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -38,7 +40,6 @@ import java.util.concurrent.ThreadFactory;
 public class ConversationService {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
-    private static final long STREAM_TIMEOUT_MILLIS = 10 * 60 * 1000L;
     private static final String STOPPED_REPLY = "已停止本次生成。";
     private static final String ERROR_REPLY = "抱歉，处理出错了，请重试。";
 
@@ -50,6 +51,8 @@ public class ConversationService {
     private final AiWorkOperationService operationService;
     private final TransactionTemplate transactionTemplate;
     private final ConversationRunStore runStore;
+    private final Duration streamTimeout;
+    private final int historyMessageLimit;
     private volatile ExecutorService streamExecutor;
 
     /**
@@ -63,6 +66,8 @@ public class ConversationService {
      * @param operationService AI 作品操作服务
      * @param transactionTemplate 事务模板
      * @param runStore 活动运行状态存储
+     * @param streamTimeout SSE 连接超时时间
+     * @param historyMessageLimit 进入 Agent 上下文的最近消息数量
      */
     public ConversationService(ConversationSessionRepository sessionRepo,
                                ConversationMessageRepository messageRepo,
@@ -71,7 +76,9 @@ public class ConversationService {
                                AutonomousAgentService autonomousAgentService,
                                AiWorkOperationService operationService,
                                TransactionTemplate transactionTemplate,
-                               ConversationRunStore runStore) {
+                               ConversationRunStore runStore,
+                               @Value("${app.runtime.conversation.stream-timeout:10m}") Duration streamTimeout,
+                               @Value("${app.runtime.conversation.history-message-limit:8}") int historyMessageLimit) {
         this.sessionRepo = sessionRepo;
         this.messageRepo = messageRepo;
         this.cardRepo = cardRepo;
@@ -80,6 +87,8 @@ public class ConversationService {
         this.operationService = operationService;
         this.transactionTemplate = transactionTemplate;
         this.runStore = runStore;
+        this.streamTimeout = streamTimeout;
+        this.historyMessageLimit = historyMessageLimit;
     }
 
     /**
@@ -135,7 +144,7 @@ public class ConversationService {
             throw new ActiveConversationRunException("已有 AI 任务正在运行");
         }
 
-        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
+        SseEmitter emitter = new SseEmitter(streamTimeout.toMillis());
         try {
             Future<?> future = streamExecutor().submit(() -> doSendMessageStream(session, requestId, userInput, emitter));
             runStore.attachExecution(sessionId, future, emitter);
@@ -410,7 +419,8 @@ public class ConversationService {
         }
 
         StringBuilder sb = new StringBuilder();
-        int start = Math.max(0, msgs.size() - 8);
+        int historyLimit = Math.max(0, historyMessageLimit);
+        int start = Math.max(0, msgs.size() - historyLimit);
         for (int i = start; i < msgs.size(); i++) {
             ConversationMessage m = msgs.get(i);
             if ("assistant".equals(m.getRole()) && (m.getContent() == null || m.getContent().isBlank())) {

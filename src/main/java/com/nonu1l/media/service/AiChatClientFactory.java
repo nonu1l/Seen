@@ -4,6 +4,7 @@ import com.nonu1l.media.config.TokenUsageAdvisor;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -17,18 +18,24 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AiChatClientFactory {
 
     private static final String CACHE_VERSION = "anthropic-client-v1";
-    private static final int DEFAULT_MAX_TOKENS = 4096;
-    private static final int THINKING_MAX_TOKENS = 8192;
-    private static final int THINKING_BUDGET_TOKENS = 2048;
 
     private final SettingsService settingsService;
     private final TokenUsageAdvisor tokenUsageAdvisor;
+    private final int defaultMaxTokens;
+    private final int thinkingMaxTokens;
+    private final int thinkingBudgetTokens;
     private final ConcurrentHashMap<String, ChatClient> cache = new ConcurrentHashMap<>();
 
     public AiChatClientFactory(SettingsService settingsService,
-                               TokenUsageAdvisor tokenUsageAdvisor) {
+                               TokenUsageAdvisor tokenUsageAdvisor,
+                               @Value("${app.runtime.ai.default-max-tokens:4096}") int defaultMaxTokens,
+                               @Value("${app.runtime.ai.thinking-max-tokens:8192}") int thinkingMaxTokens,
+                               @Value("${app.runtime.ai.thinking-budget-tokens:2048}") int thinkingBudgetTokens) {
         this.settingsService = settingsService;
         this.tokenUsageAdvisor = tokenUsageAdvisor;
+        this.defaultMaxTokens = defaultMaxTokens;
+        this.thinkingMaxTokens = thinkingMaxTokens;
+        this.thinkingBudgetTokens = thinkingBudgetTokens;
     }
 
     /**
@@ -73,10 +80,10 @@ public class AiChatClientFactory {
                 .apiKey(setting.apiKey())
                 .model(setting.model())
                 .temperature(mode == AiThinkingMode.ENABLED ? 1.0 : setting.temperature())
-                .maxTokens(mode == AiThinkingMode.ENABLED ? THINKING_MAX_TOKENS : DEFAULT_MAX_TOKENS);
+                .maxTokens(mode == AiThinkingMode.ENABLED ? thinkingMaxTokens : defaultMaxTokens);
 
         if (mode == AiThinkingMode.ENABLED) {
-            options.thinkingEnabled(THINKING_BUDGET_TOKENS);
+            options.thinkingEnabled(thinkingBudgetTokens);
         }
 
         AnthropicChatModel model = AnthropicChatModel.builder()

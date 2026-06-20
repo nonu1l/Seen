@@ -8,6 +8,7 @@ import com.nonu1l.media.repository.SubjectTypeRepository;
 import com.nonu1l.media.util.CachedHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -22,13 +23,13 @@ import tools.jackson.databind.ObjectMapper;
 public class BangumiService {
 
     private static final Logger log = LoggerFactory.getLogger(BangumiService.class);
-    private static final long TTL_CHARACTER = 1209600; // 14 days
 
     private final ObjectMapper objectMapper;
     private final SubjectTypeRepository subjectTypeRepository;
     private final CachedHttpClient httpClient;
     private final PreCacheService preCacheService;
     private final SettingsService settingsService;
+    private final long characterTtlSeconds;
 
     private volatile List<Integer> cachedSubjectTypes;
 
@@ -38,15 +39,18 @@ public class BangumiService {
      * @param httpClient 带缓存的 HTTP 客户端
      * @param preCacheService 预缓存服务
      * @param settingsService 设置读取服务
+     * @param characterTtlSeconds 角色/人物名称缓存 TTL
      */
     public BangumiService(ObjectMapper objectMapper, SubjectTypeRepository subjectTypeRepository,
                           CachedHttpClient httpClient, PreCacheService preCacheService,
-                          SettingsService settingsService) {
+                          SettingsService settingsService,
+                          @Value("${app.runtime.cache.bangumi-character-ttl-seconds:1209600}") long characterTtlSeconds) {
         this.objectMapper = objectMapper;
         this.subjectTypeRepository = subjectTypeRepository;
         this.httpClient = httpClient;
         this.preCacheService = preCacheService;
         this.settingsService = settingsService;
+        this.characterTtlSeconds = characterTtlSeconds;
     }
 
     /** 搜索 bangumi，默认返回 20 条结果。
@@ -362,7 +366,8 @@ public class BangumiService {
     public String getCharacterName(Long id) {
         String base = settingsService.bangumiApiBase();
         try {
-            String json = get(base + "/characters/" + id, TTL_CHARACTER);
+            String json = get(base + "/characters/" + id,
+                    Math.max(1, characterTtlSeconds));
             if (json == null) return null;
             return extractChineseName(objectMapper.readTree(json));
         } catch (Exception e) {
@@ -382,7 +387,8 @@ public class BangumiService {
     public String getPersonName(Long id) {
         String base = settingsService.bangumiApiBase();
         try {
-            String json = get(base + "/persons/" + id, TTL_CHARACTER);
+            String json = get(base + "/persons/" + id,
+                    Math.max(1, characterTtlSeconds));
             if (json == null) return null;
             return extractChineseName(objectMapper.readTree(json));
         } catch (Exception e) {

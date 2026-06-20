@@ -5,6 +5,7 @@ import com.nonu1l.media.model.dto.AiProviderSettingRequest;
 import com.nonu1l.media.model.dto.test.SettingsTestRequests;
 import com.nonu1l.media.model.dto.test.SettingsTestResponse;
 import org.springframework.boot.restclient.RestTemplateBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -27,27 +28,33 @@ import java.util.Map;
 @Service
 public class SettingsTestService {
 
-    private static final String TEST_QUERY = "孤独摇滚";
-
     private final SettingsService settingsService;
     private final ExternalEndpointProperties endpointProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final AiChatClientFactory chatClientFactory;
+    private final String defaultQuery;
+    private final int previewTitleLimit;
 
     public SettingsTestService(SettingsService settingsService,
                                ExternalEndpointProperties endpointProperties,
                                RestTemplateBuilder builder,
                                ObjectMapper objectMapper,
-                               AiChatClientFactory chatClientFactory) {
+                               AiChatClientFactory chatClientFactory,
+                               @Value("${app.runtime.settings-test.query:孤独摇滚}") String defaultQuery,
+                               @Value("${app.runtime.settings-test.connect-timeout:10s}") Duration connectTimeout,
+                               @Value("${app.runtime.settings-test.read-timeout:20s}") Duration readTimeout,
+                               @Value("${app.runtime.settings-test.preview-title-limit:5}") int previewTitleLimit) {
         this.settingsService = settingsService;
         this.endpointProperties = endpointProperties;
         this.restTemplate = builder
-                .connectTimeout(Duration.ofSeconds(10))
-                .readTimeout(Duration.ofSeconds(20))
+                .connectTimeout(connectTimeout)
+                .readTimeout(readTimeout)
                 .build();
         this.objectMapper = objectMapper;
         this.chatClientFactory = chatClientFactory;
+        this.defaultQuery = defaultQuery;
+        this.previewTitleLimit = Math.max(1, previewTitleLimit);
     }
 
     public SettingsTestResponse testAiProfile(SettingsTestRequests.AiTestRequest request) {
@@ -84,7 +91,7 @@ public class SettingsTestService {
         String tavilyApiKey = valueOrCurrent(request != null ? request.tavilyApiKey() : null, SettingsService.TAVILY_API_KEY);
         String query = request != null && request.query() != null && !request.query().isBlank()
                 ? request.query().trim()
-                : TEST_QUERY;
+                : defaultQuery;
         return testSingleSearch(start, provider, query, serperApiKey, tavilyApiKey);
     }
 
@@ -141,7 +148,7 @@ public class SettingsTestService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("query", query);
         body.put("search_depth", "basic");
-        body.put("max_results", 5);
+        body.put("max_results", previewTitleLimit);
         body.put("include_answer", false);
         body.put("include_raw_content", false);
         String json = restTemplate.postForObject(endpointProperties.getTavilySearchUrl(), new HttpEntity<>(objectMapper.writeValueAsString(body), headers), String.class);
@@ -192,7 +199,8 @@ public class SettingsTestService {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("provider", provider);
         details.put("count", titles.size());
-        details.put("titles", titles.stream().limit(5).toList());
+        details.put("titles", titles.stream()
+                .limit(previewTitleLimit).toList());
         details.put("attempts", attempts);
         return response(ok, message, start, details);
     }
@@ -204,7 +212,7 @@ public class SettingsTestService {
         List<String> titles = new ArrayList<>();
         for (JsonNode item : organic) {
             if (item.has("title")) titles.add(item.get("title").asText());
-            if (titles.size() >= 5) break;
+            if (titles.size() >= previewTitleLimit) break;
         }
         return titles;
     }
@@ -216,7 +224,7 @@ public class SettingsTestService {
         List<String> titles = new ArrayList<>();
         for (JsonNode item : results) {
             if (item.has("title")) titles.add(item.get("title").asText());
-            if (titles.size() >= 5) break;
+            if (titles.size() >= previewTitleLimit) break;
         }
         return titles;
     }

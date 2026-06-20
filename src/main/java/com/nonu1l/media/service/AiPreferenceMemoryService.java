@@ -12,6 +12,7 @@ import com.nonu1l.media.repository.WorkRepository;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -44,8 +45,6 @@ public class AiPreferenceMemoryService {
 
     private static final Logger log = LoggerFactory.getLogger(AiPreferenceMemoryService.class);
     private static final Long SINGLE_USER_MEMORY_ID = 1L;
-    private static final int MAX_CONTEXT_LENGTH = 1200;
-    private static final int MAX_EVIDENCE_FOR_LLM = 80;
 
     private final UserPreferenceMemoryRepository memoryRepo;
     private final UserPreferenceEvidenceRepository evidenceRepo;
@@ -54,6 +53,8 @@ public class AiPreferenceMemoryService {
     private final AiTextTaskService aiTextTaskService;
     private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
+    private final int maxContextLength;
+    private final int maxEvidenceForLlm;
     private final String memoryPrompt;
     private final ScheduledExecutorService rebuildExecutor;
 
@@ -69,6 +70,8 @@ public class AiPreferenceMemoryService {
      * @param aiTextTaskService 文本型 LLM 任务服务
      * @param settingsService 运行时设置服务
      * @param objectMapper JSON 映射工具
+     * @param maxContextLength 进入记忆生成提示词的最大上下文字符数
+     * @param maxEvidenceForLlm 进入 LLM 的最大偏好证据数量
      */
     public AiPreferenceMemoryService(UserPreferenceMemoryRepository memoryRepo,
                                      UserPreferenceEvidenceRepository evidenceRepo,
@@ -76,7 +79,9 @@ public class AiPreferenceMemoryService {
                                      RecordRepository recordRepo,
                                      AiTextTaskService aiTextTaskService,
                                      SettingsService settingsService,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     @Value("${app.runtime.memory.max-context-length:1200}") int maxContextLength,
+                                     @Value("${app.runtime.memory.max-evidence-for-llm:80}") int maxEvidenceForLlm) {
         this.memoryRepo = memoryRepo;
         this.evidenceRepo = evidenceRepo;
         this.workRepo = workRepo;
@@ -84,6 +89,8 @@ public class AiPreferenceMemoryService {
         this.aiTextTaskService = aiTextTaskService;
         this.settingsService = settingsService;
         this.objectMapper = objectMapper;
+        this.maxContextLength = maxContextLength;
+        this.maxEvidenceForLlm = maxEvidenceForLlm;
         this.memoryPrompt = loadPrompt("prompts/preference-memory.st");
         this.rebuildExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "ai-preference-memory-rebuild");
@@ -263,7 +270,7 @@ public class AiPreferenceMemoryService {
         candidates.sort(Comparator.comparingDouble(EvidenceCandidate::weight).reversed());
 
         List<UserPreferenceEvidence> evidences = candidates.stream()
-                .limit(MAX_EVIDENCE_FOR_LLM)
+                .limit(Math.max(1, maxEvidenceForLlm))
                 .map(this::toEvidence)
                 .toList();
         return new PreferenceSnapshot(evidences, sha256(buildSourceText(evidences)));
@@ -463,10 +470,11 @@ public class AiPreferenceMemoryService {
     }
 
     private String limitContext(String context) {
-        if (context.length() <= MAX_CONTEXT_LENGTH) {
+        int limit = Math.max(1, maxContextLength);
+        if (context.length() <= limit) {
             return context;
         }
-        return context.substring(0, MAX_CONTEXT_LENGTH);
+        return context.substring(0, limit);
     }
 
     private boolean hasMeaningfulJson(String json) {

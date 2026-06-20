@@ -11,6 +11,7 @@ import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import com.nonu1l.media.service.AiPreferenceMemoryService;
 import com.nonu1l.media.service.AiWorkOperationService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class AiAutonomousTools {
     private final WorkRepository workRepo;
     private final SearchPipeline searchPipeline;
     private final AiToolSafetyService safetyService;
+    private final int presentCardLimit;
 
     /**
      * 创建自主 Agent 工具集合。
@@ -37,19 +39,22 @@ public class AiAutonomousTools {
      * @param workRepo 作品仓储
      * @param searchPipeline 推荐/搜索流水线
      * @param safetyService AI 工具安全策略
+     * @param presentCardLimit presentWorks 单次最多生成的展示卡片数量
      */
     public AiAutonomousTools(AiPreferenceMemoryService memoryService,
                              AiWorkOperationService operationService,
                              RecordRepository recordRepo,
                              WorkRepository workRepo,
                              SearchPipeline searchPipeline,
-                             AiToolSafetyService safetyService) {
+                             AiToolSafetyService safetyService,
+                             @Value("${app.runtime.agent.present-card-limit:8}") int presentCardLimit) {
         this.memoryService = memoryService;
         this.operationService = operationService;
         this.recordRepo = recordRepo;
         this.workRepo = workRepo;
         this.searchPipeline = searchPipeline;
         this.safetyService = safetyService;
+        this.presentCardLimit = presentCardLimit;
     }
 
     /**
@@ -103,7 +108,7 @@ public class AiAutonomousTools {
         try {
             List<ConversationCardDTO> cards = subjectIds.stream()
                     .distinct()
-                    .limit(8)
+                    .limit(Math.max(1, presentCardLimit))
                     .map(id -> operationService.presentWork(id, reason))
                     .toList();
             if (cards.isEmpty()) {

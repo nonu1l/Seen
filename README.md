@@ -75,6 +75,7 @@ Seen 是一个轻量、自部署的影视 / 番剧记录系统，适合用来维
 
 - AI 主链路从 OpenAI-compatible Chat Completions 切换为 Anthropic-compatible Messages，设置页仍配置 Base URL、模型和 API Key。
 - 移除各家 OpenAI 兼容 thinking 参数适配，AI 回复支持保存和展示 Anthropic-like text / thinking / tool 内容块。
+- 将 AI token 限额、对话上下文、搜索/抓取超时、缓存 TTL 和 Agent 安全阈值等运行参数集中到 `application.yml`。
 
 ---
 
