@@ -19,7 +19,7 @@ app:
     # AI 对话运行参数：SSE 连接超时、进入 Agent 的最近消息数、页面恢复时保留的最近状态数。
     conversation:
       stream-timeout: 10m
-      history-message-limit: 8
+      history-message-limit: 20
       active-status-limit: 6
     # Agent 工具安全与展示上限：presentWorks 最多生成卡片数，单轮自动取消标记的安全上限。
     agent:
