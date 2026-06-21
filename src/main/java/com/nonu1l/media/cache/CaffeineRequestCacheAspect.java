@@ -13,6 +13,7 @@ import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.StandardTypeLocator;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
@@ -75,6 +76,11 @@ public class CaffeineRequestCacheAspect {
 
     private EvaluationContext evaluationContext(ProceedingJoinPoint joinPoint, Method method) {
         StandardEvaluationContext context = new StandardEvaluationContext(joinPoint.getTarget());
+        // Spring Boot 可执行 jar 中应用类位于 BOOT-INF/classes；当缓存切面运行在
+        // CompletableFuture/ForkJoinPool 线程时，线程上下文 ClassLoader 可能不是
+        // Spring Boot 的 LaunchedClassLoader，导致 SpEL 的 T(...) 找不到应用类。
+        // 显式使用本切面所在 ClassLoader，确保 RequestCacheKeys 等应用类型可解析。
+        context.setTypeLocator(new StandardTypeLocator(CaffeineRequestCacheAspect.class.getClassLoader()));
         Object[] args = joinPoint.getArgs();
         String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
         for (int i = 0; i < args.length; i++) {
