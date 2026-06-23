@@ -25,6 +25,12 @@ app:
     agent:
       present-card-limit: 8
       unmark-limit-per-request: 5
+      # Analysis 子 Agent 的显式 ReAct 循环边界：限制分析步数、工具调用和 observation 上下文长度。
+      analysis-react:
+        max-steps: 4
+        max-tool-calls: 4
+        max-observation-chars: 2000
+        max-scratchpad-chars: 6000
     # 推荐/搜索管道参数：控制搜索关键词、抓取页面、Bangumi 重试和进入 LLM 的文本长度。
     search-pipeline:
       # 最多返回给 Agent 的候选作品卡片数。

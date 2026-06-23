@@ -69,4 +69,18 @@ abstract class AbstractAgentRunner implements AgentRunner {
         params.put("history", history != null ? history : "");
         return params;
     }
+
+    /**
+     * @return 当前 Runner 复用的 LLM 调用服务，供需要自定义调用流程的子类使用。
+     */
+    protected AiChatCallService aiChatCallService() {
+        return aiChatCallService;
+    }
+
+    /**
+     * @return 当前 Runner 复用的内容块转换服务，供需要自定义响应组装的子类使用。
+     */
+    protected AnthropicContentBlockService contentBlockService() {
+        return contentBlockService;
+    }
 }
