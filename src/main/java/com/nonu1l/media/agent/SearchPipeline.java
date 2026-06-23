@@ -3,6 +3,7 @@ package com.nonu1l.media.agent;
 import com.nonu1l.media.agent.tool.AiBangumiTools;
 import com.nonu1l.media.agent.tool.AiWebSearchTools;
 import com.nonu1l.media.model.dto.FindWorksCandidateDTO;
+import com.nonu1l.media.model.dto.WebFetchResultDTO;
 import com.nonu1l.media.model.dto.WebSearchItemDTO;
 import com.nonu1l.media.service.AiChatCallService;
 import org.slf4j.Logger;
@@ -16,6 +17,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -141,59 +145,49 @@ public class SearchPipeline {
         var seenSubjectIds = new HashSet<Long>();
         int tried = 0;
 
-        for (String kw : keywords) {
-            log.info("Pipeline: trying keyword '{}'", kw);
-            runListener.status("正在搜索作品资料");
-            tried++;
+        try (ExecutorService ioExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (String kw : keywords) {
+                log.info("Pipeline: trying keyword '{}'", kw);
+                runListener.status("正在搜索作品资料");
+                tried++;
 
-            // 2a. 搜索
-            List<WebSearchItemDTO> webResults = webSearchTools.searchWebItems(kw);
+                // 2a. 搜索。关键词仍按顺序尝试，避免描述找片已命中后继续放大外部请求。
+                List<WebSearchItemDTO> webResults = webSearchTools.searchWebItems(kw);
 
-            // 2b. 多线程抓取 + 清洗
-            runListener.status("正在读取搜索结果");
-            List<String> pageTexts = webResults.isEmpty()
-                    ? fetchDirectUrls(context, kw)
-                    : webResults.stream().limit(Math.max(1, maxPages)).parallel()
-                            .map(r -> webSearchTools.fetchWebText(r.url()))
-                            .filter(t -> t != null && !t.isBlank())
-                            .toList();
-            if (pageTexts.isEmpty()) continue;
+                // 2b. 虚拟线程抓取 + 清洗，避免阻塞 commonPool。
+                runListener.status("正在读取搜索结果");
+                List<String> pageTexts = webResults.isEmpty()
+                        ? fetchDirectUrls(context, kw, ioExecutor)
+                        : fetchSearchResultPages(webResults, ioExecutor);
+                if (pageTexts.isEmpty()) continue;
 
-            // 2c. LLM 提炼片名
-            runListener.status("正在整理候选片名");
-            List<String> titles = extractTitles(String.join("\n---\n", pageTexts), context);
-            if (titles.isEmpty()) continue;
+                // 2c. LLM 提炼片名
+                runListener.status("正在整理候选片名");
+                List<String> titles = extractTitles(String.join("\n---\n", pageTexts), context);
+                if (titles.isEmpty()) continue;
 
-            // 2d. 并发搜索→title→card映射，剔除空匹配和重复 subjectId
-            // 使用原 .parallel() 对Map结果映射同时进行去重，过滤空值
-            // 可能会与 LangGraph4j（共用ForkJoinPool.commonPool） 冲突引发 NullPointerException 问题
+                // 2d. 虚拟线程搜索 Bangumi，剔除空匹配和重复 subjectId。
+                runListener.status("正在查询 Bangumi");
+                var cardMap = searchBangumiTitles(titles, ioExecutor);
+                var seen = new HashSet<Long>();
+                cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
+                // 跨关键词去重
+                cardMap.values().removeIf(c -> !seenSubjectIds.add(c.subjectId()));
 
-            var futures = titles.stream().distinct()
-                    .collect(Collectors.toMap(
-                            t -> t, t -> CompletableFuture.supplyAsync(() ->
-                                    searchBangumiWithRetry(t, Math.max(1, bangumiRetryLimit)))));
+                // 校验匹配结果
+                if (!cardMap.isEmpty()) {
+                    runListener.status("正在校验候选作品");
+                    var validIds = validateMatchIds(cardMap, context);
+                    cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
+                }
 
-            runListener.status("正在查询 Bangumi");
-            CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
-            var cardMap = new java.util.LinkedHashMap<String, FindWorksCandidateDTO>();
-            futures.forEach((t, f) -> { var c = f.join(); if (c != null) cardMap.put(t, c); });
-            cardMap.values().removeIf(Objects::isNull);
-            var seen = new HashSet<Long>();
-            cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
-            // 跨关键词去重
-            cardMap.values().removeIf(c -> !seenSubjectIds.add(c.subjectId()));
+                allCards.addAll(cardMap.values());
+                log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
 
-            // 校验匹配结果
-            if (!cardMap.isEmpty()) {
-                runListener.status("正在校验候选作品");
-                var validIds = validateMatchIds(cardMap, context);
-                cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
+                if (allCards.size() >= Math.max(1, maxCards) || shouldStopAfterUsefulHit(context, allCards)) {
+                    break;
+                }
             }
-
-            allCards.addAll(cardMap.values());
-            log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
-
-            if (allCards.size() >= Math.max(1, maxCards)) break;
         }
 
         if (allCards.isEmpty()) {
@@ -284,7 +278,7 @@ public class SearchPipeline {
      * @param keyword 当前失败的搜索关键词
      * @return 可用于标题提炼的页面文本
      */
-    List<String> fetchDirectUrls(String context, String keyword) {
+    List<String> fetchDirectUrls(String context, String keyword, ExecutorService executor) {
         String system = """
                 你是影视资料检索助手。当前配置的 Web 搜索源没有可用结果。
                 请根据用户需求和你的知识，选择最多 3 个公开 HTTP(S) URL，用于直接获取影视榜单、热门列表或资料页面。
@@ -307,13 +301,68 @@ public class SearchPipeline {
                 .toList();
         if (urls.isEmpty()) return List.of();
         log.info("Pipeline: direct fetch fallback urls={}", urls);
-        return urls.stream()
-                .map(url -> webSearchTools.fetchWeb(url, "search-source-fallback",
-                        directFetchMaxChars))
+        var futures = urls.stream()
+                .map(url -> CompletableFuture.supplyAsync(() ->
+                        webSearchTools.fetchWeb(url, "search-source-fallback", directFetchMaxChars), executor))
+                .toList();
+        return futures.stream()
+                .map(this::joinQuietly)
                 .filter(resultItem -> resultItem != null && resultItem.ok())
-                .map(resultItem -> resultItem.text())
+                .map(WebFetchResultDTO::text)
                 .filter(text -> text != null && !text.isBlank())
                 .toList();
+    }
+
+    /**
+     * 并发抓取搜索结果页面正文。
+     */
+    private List<String> fetchSearchResultPages(List<WebSearchItemDTO> webResults, ExecutorService executor) {
+        var futures = webResults.stream()
+                .limit(Math.max(1, maxPages))
+                .map(result -> CompletableFuture.supplyAsync(() -> webSearchTools.fetchWebText(result.url()), executor))
+                .toList();
+        return futures.stream()
+                .map(this::joinQuietly)
+                .filter(text -> text != null && !text.isBlank())
+                .toList();
+    }
+
+    /**
+     * 并发搜索 Bangumi 并保留标题到候选卡片的映射。
+     */
+    private LinkedHashMap<String, FindWorksCandidateDTO> searchBangumiTitles(List<String> titles,
+                                                                              ExecutorService executor) {
+        var futures = titles.stream().distinct()
+                .collect(Collectors.toMap(
+                        title -> title,
+                        title -> CompletableFuture.supplyAsync(() ->
+                                searchBangumiWithRetry(title, Math.max(1, bangumiRetryLimit)), executor),
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        var cardMap = new LinkedHashMap<String, FindWorksCandidateDTO>();
+        futures.forEach((title, future) -> {
+            var card = joinQuietly(future);
+            if (card != null) {
+                cardMap.put(title, card);
+            }
+        });
+        return cardMap;
+    }
+
+    /**
+     * 描述找片通常只需要识别目标候选，命中后立即停止，避免继续消耗多轮搜索。
+     */
+    private boolean shouldStopAfterUsefulHit(String context, List<FindWorksCandidateDTO> cards) {
+        return context != null && context.contains("模式：description") && !cards.isEmpty();
+    }
+
+    private <T> T joinQuietly(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            log.warn("Pipeline async task failed: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

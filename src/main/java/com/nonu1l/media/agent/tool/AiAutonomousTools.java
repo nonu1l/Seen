@@ -93,6 +93,38 @@ public class AiAutonomousTools {
     }
 
     /**
+     * 查找候选作品并直接创建 PENDING 展示卡片，避免 Agent 查到候选后遗漏 presentWorks。
+     *
+     * @param query 查询或推荐需求
+     * @param mode search / recommend / description
+     * @param reason 展示理由
+     * @return 展示操作结构化结果
+     */
+    @Tool(name = "findAndPresentWorks", description = "根据推荐、搜索或描述找片需求查找候选，并直接创建 AI 页面 PENDING 展示卡片；不会写入观看记录")
+    public AgentWorkActionResultDTO findAndPresentWorks(
+            @ToolParam(description = "查询、推荐或描述找片需求") String query,
+            @ToolParam(description = "工具模式：search / recommend / description", required = false) String mode,
+            @ToolParam(description = "展示理由", required = false) String reason) {
+        AgentFindWorksResultDTO found = findWorks(query, mode);
+        if (!found.ok() || found.cards() == null || found.cards().isEmpty()) {
+            return new AgentWorkActionResultDTO(false, "present", null, null, List.of(),
+                    found.failReason() != null ? found.failReason() : "未找到可展示候选",
+                    found.hint() != null ? found.hint() : "请直接说明没有找到可靠候选。");
+        }
+        List<Long> subjectIds = found.cards().stream()
+                .map(card -> card.subjectId())
+                .filter(id -> id != null)
+                .distinct()
+                .limit(Math.max(1, presentCardLimit))
+                .toList();
+        if (subjectIds.isEmpty()) {
+            return new AgentWorkActionResultDTO(false, "present", null, null, List.of(),
+                    "no valid subjectIds", "请直接说明没有找到可靠候选。");
+        }
+        return presentWorks(subjectIds, reason != null && !reason.isBlank() ? reason : query);
+    }
+
+    /**
      * 将候选作品展示为 AI 卡片，不写入用户记录。
      *
      * @param subjectIds 作品 ID 列表

@@ -53,7 +53,7 @@
 ### 片源 / 在线观看
 
 用户询问“哪里可以看 / 在哪看 / 在线观看 / 在线播放 / 播放地址 / 片源”时：
-1. 调用 searchWatchSources(query)，query 使用用户原始问题。
+1. 调用 searchWatchSources(query)。如果当前输入是对上一轮片源失败后的补充，query 必须合并上一轮片源问题和当前补充。
 2. 不要调用 findWorks，除非 searchWatchSources 明确表示无法解析作品且需要用户补充片名。
 3. searchWatchSources 内部会抽取影视名称、执行一轮 Web 搜索、并发打开候选 URL 获取页面内容，再用 LLM 按页面内容筛选；你不要再手动多轮 searchWeb 重试。
 4. 工具返回 ok=true 时，只列工具返回的候选链接，并说明这些链接已按打开后的页面内容筛选，实际是否可播放仍需用户打开确认。
@@ -66,16 +66,15 @@
 
 用户要求推荐、热门、排行、搜索、找片，或描述但记不清片名时：
 1. 可以按需调用 readUserMemory(query)，但不要让历史偏好覆盖当前需求。
-2. 调用 findWorks(query, mode)，mode 可为 recommend / search / description。
-3. 如果 findWorks 返回 ok=false，可换关键词重试一次；仍失败则说明没有找到可靠结果。
-4. 对需要展示给用户的候选 subjectId 调用 presentWorks(subjectIds, reason)，只有 presentWorks ok=true 才能说已展示候选。
-5. 推荐和搜索默认不调用 markWork，不自动标记。
+2. 调用 findAndPresentWorks(query, mode, reason)，mode 可为 recommend / search / description。
+3. 如果 findAndPresentWorks 返回 ok=false，说明没有找到可靠结果，不要继续循环换关键词。
+4. 推荐和搜索默认不调用 markWork，不自动标记。
 
 ### 分析 / 问答
 
 用户只是询问作品、系列、记录、偏好或普通聊天时：
 1. 可调用 searchLocal(keyword)、getWorkState(subjectId)、readUserMemory(query)。
-{webFailureGuidance}
+2. searchWeb / fetchWeb 返回 ok=false 时，按 error 判断是否重试：搜索源或访问异常不要反复重试，明确无结果时可改写关键词重试 1 次；多次失败后直接说明资料源访问失败。
 3. 没有明确要求标记/取消时，不要调用 markWork 或 unmarkWork。
 
 ## 匹配约束

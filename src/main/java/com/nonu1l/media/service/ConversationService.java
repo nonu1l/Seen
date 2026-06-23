@@ -3,7 +3,7 @@ package com.nonu1l.media.service;
 import com.nonu1l.media.agent.AgentRunEvents;
 import com.nonu1l.media.agent.AgentRunListener;
 import com.nonu1l.media.agent.AgentResponse;
-import com.nonu1l.media.agent.AutonomousAgentService;
+import com.nonu1l.media.agent.AgentOrchestratorService;
 import com.nonu1l.media.agent.tool.AiToolContextHolder;
 import com.nonu1l.media.agent.tool.AiToolExecutionContext;
 import com.nonu1l.media.config.TokenUsageAdvisor;
@@ -47,7 +47,7 @@ public class ConversationService {
     private final ConversationMessageRepository messageRepo;
     private final ConversationCardRepository cardRepo;
     private final AiWorkSnapshotRepository snapshotRepo;
-    private final AutonomousAgentService autonomousAgentService;
+    private final AgentOrchestratorService agentOrchestratorService;
     private final AiWorkOperationService operationService;
     private final TransactionTemplate transactionTemplate;
     private final ConversationRunStore runStore;
@@ -62,7 +62,7 @@ public class ConversationService {
      * @param messageRepo 消息仓储
      * @param cardRepo 卡片仓储
      * @param snapshotRepo AI 快照仓储
-     * @param autonomousAgentService 自主 Agent 服务
+     * @param agentOrchestratorService 受控 Agent 编排服务
      * @param operationService AI 作品操作服务
      * @param transactionTemplate 事务模板
      * @param runStore 活动运行状态存储
@@ -73,7 +73,7 @@ public class ConversationService {
                                ConversationMessageRepository messageRepo,
                                ConversationCardRepository cardRepo,
                                AiWorkSnapshotRepository snapshotRepo,
-                               AutonomousAgentService autonomousAgentService,
+                               AgentOrchestratorService agentOrchestratorService,
                                AiWorkOperationService operationService,
                                TransactionTemplate transactionTemplate,
                                ConversationRunStore runStore,
@@ -83,7 +83,7 @@ public class ConversationService {
         this.messageRepo = messageRepo;
         this.cardRepo = cardRepo;
         this.snapshotRepo = snapshotRepo;
-        this.autonomousAgentService = autonomousAgentService;
+        this.agentOrchestratorService = agentOrchestratorService;
         this.operationService = operationService;
         this.transactionTemplate = transactionTemplate;
         this.runStore = runStore;
@@ -272,7 +272,7 @@ public class ConversationService {
 
             AgentResponse agentResponse;
             try {
-                agentResponse = autonomousAgentService.invoke(userInput, history, listener);
+                agentResponse = agentOrchestratorService.invoke(userInput, history, listener);
             } finally {
                 AiToolContextHolder.clear();
                 TokenUsageAdvisor.clearSession();
