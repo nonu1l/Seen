@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +35,15 @@ import java.util.stream.Collectors;
 public class SearchPipeline {
 
     private static final Logger log = LoggerFactory.getLogger(SearchPipeline.class);
+    private static final List<Pattern> TITLE_WRAPPER_PATTERNS = List.of(
+            Pattern.compile("《([^》]{1,60})》"),
+            Pattern.compile("「([^」]{1,60})」"),
+            Pattern.compile("『([^』]{1,60})』"),
+            Pattern.compile("“([^”]{1,60})”")
+    );
+    private static final List<String> GENERIC_TITLE_WORDS = List.of(
+            "动画", "動漫", "新番", "推荐", "推薦", "排行", "榜单", "榜單", "列表", "上映", "必看", "热门", "熱門"
+    );
 
     private final AiChatCallService AiChatCallService;
     private final AiBangumiTools bangumiTools;
@@ -151,41 +161,51 @@ public class SearchPipeline {
                 runListener.status("正在搜索作品资料");
                 tried++;
 
-                // 2a. 搜索。关键词仍按顺序尝试，避免描述找片已命中后继续放大外部请求。
-                List<WebSearchItemDTO> webResults = webSearchTools.searchWebItems(kw);
+                try {
+                    // 2a. 搜索。关键词仍按顺序尝试，避免描述找片已命中后继续放大外部请求。
+                    List<WebSearchItemDTO> webResults = searchWebItemsQuietly(kw);
 
-                // 2b. 虚拟线程抓取 + 清洗，避免阻塞 commonPool。
-                runListener.status("正在读取搜索结果");
-                List<String> pageTexts = webResults.isEmpty()
-                        ? fetchDirectUrls(context, kw, ioExecutor)
-                        : fetchSearchResultPages(webResults, ioExecutor);
-                if (pageTexts.isEmpty()) continue;
+                    // 2b. 虚拟线程抓取 + 清洗，避免阻塞 commonPool。
+                    runListener.status("正在读取搜索结果");
+                    List<String> pageTexts = webResults.isEmpty()
+                            ? fetchDirectUrls(context, kw, ioExecutor)
+                            : fetchSearchResultPages(webResults, ioExecutor);
+                    if (pageTexts.isEmpty()) continue;
 
-                // 2c. LLM 提炼片名
-                runListener.status("正在整理候选片名");
-                List<String> titles = extractTitles(String.join("\n---\n", pageTexts), context);
-                if (titles.isEmpty()) continue;
+                    // 2c. LLM 提炼片名；失败时退回到网页正文和搜索结果摘要中的结构化片名。
+                    runListener.status("正在整理候选片名");
+                    List<String> titles = extractTitlesSafely(String.join("\n---\n", pageTexts), context, kw);
+                    if (titles.isEmpty()) {
+                        titles = fallbackTitlesFromFetchedData(pageTexts, webResults);
+                        if (!titles.isEmpty()) {
+                            log.info("Pipeline: keyword '{}' used local title fallback, titles={}", kw, titles);
+                        }
+                    }
+                    if (titles.isEmpty()) continue;
 
-                // 2d. 虚拟线程搜索 Bangumi，剔除空匹配和重复 subjectId。
-                runListener.status("正在查询 Bangumi");
-                var cardMap = searchBangumiTitles(titles, ioExecutor);
-                var seen = new HashSet<Long>();
-                cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
-                // 跨关键词去重
-                cardMap.values().removeIf(c -> !seenSubjectIds.add(c.subjectId()));
+                    // 2d. 虚拟线程搜索 Bangumi，剔除空匹配和重复 subjectId。
+                    runListener.status("正在查询 Bangumi");
+                    var cardMap = searchBangumiTitles(titles, ioExecutor);
+                    var seen = new HashSet<Long>();
+                    cardMap.values().removeIf(c -> !seen.add(c.subjectId()));
+                    // 跨关键词去重
+                    cardMap.values().removeIf(c -> !seenSubjectIds.add(c.subjectId()));
 
-                // 校验匹配结果
-                if (!cardMap.isEmpty()) {
-                    runListener.status("正在校验候选作品");
-                    var validIds = validateMatchIds(cardMap, context);
-                    cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
-                }
+                    // 校验匹配结果
+                    if (!cardMap.isEmpty()) {
+                        runListener.status("正在校验候选作品");
+                        var validIds = validateMatchIdsSafely(cardMap, context, kw);
+                        cardMap.values().removeIf(c -> !validIds.contains(c.subjectId()));
+                    }
 
-                allCards.addAll(cardMap.values());
-                log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
+                    allCards.addAll(cardMap.values());
+                    log.info("Pipeline: keyword '{}' → {} cards", kw, cardMap.size());
 
-                if (allCards.size() >= Math.max(1, maxCards) || shouldStopAfterUsefulHit(context, allCards)) {
-                    break;
+                    if (allCards.size() >= Math.max(1, maxCards) || shouldStopAfterUsefulHit(context, allCards)) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.warn("Pipeline: keyword '{}' failed, trying next keyword: {}", kw, e.toString(), e);
                 }
             }
         }
@@ -249,6 +269,20 @@ public class SearchPipeline {
         }
         return result.lines().map(String::trim).filter(l -> l.matches("\\d+"))
                 .map(Long::parseLong).collect(Collectors.toSet());
+    }
+
+    /**
+     * LLM 校验失败时保留已匹配候选，避免推荐链路因校验节点异常整批丢失卡片。
+     */
+    private java.util.Set<Long> validateMatchIdsSafely(Map<String, FindWorksCandidateDTO> cardMap,
+                                                       String context,
+                                                       String keyword) {
+        try {
+            return validateMatchIds(cardMap, context);
+        } catch (Exception e) {
+            log.warn("Pipeline: validateMatchIds failed for keyword '{}': {}", keyword, e.toString(), e);
+            return cardMap.values().stream().map(FindWorksCandidateDTO::subjectId).collect(Collectors.toSet());
+        }
     }
 
     // ── 内部方法 ──
@@ -328,6 +362,19 @@ public class SearchPipeline {
     }
 
     /**
+     * 包装 Web 搜索异常，避免单个搜索源问题中断后续关键词和直访兜底。
+     */
+    private List<WebSearchItemDTO> searchWebItemsQuietly(String keyword) {
+        try {
+            List<WebSearchItemDTO> results = webSearchTools.searchWebItems(keyword);
+            return results != null ? results : List.of();
+        } catch (Exception e) {
+            log.warn("Pipeline: searchWebItems '{}' failed: {}", keyword, e.toString(), e);
+            return List.of();
+        }
+    }
+
+    /**
      * 并发搜索 Bangumi 并保留标题到候选卡片的映射。
      */
     private LinkedHashMap<String, FindWorksCandidateDTO> searchBangumiTitles(List<String> titles,
@@ -384,6 +431,75 @@ public class SearchPipeline {
                 .call();
         if (result == null || result.isBlank()) return List.of();
         return result.lines().map(String::trim).filter(l -> !l.isEmpty() && l.length() < 100).toList();
+    }
+
+    /**
+     * 调用 LLM 抽取标题；异常时返回空列表，让调用方可继续使用本地降级提取。
+     */
+    private List<String> extractTitlesSafely(String text, String userInput, String keyword) {
+        try {
+            return extractTitles(text, userInput);
+        } catch (Exception e) {
+            log.warn("Pipeline: extractTitles failed for keyword '{}': {}", keyword, e.toString(), e);
+            return List.of();
+        }
+    }
+
+    /**
+     * 从已抓取正文和搜索结果元信息中提取书名号/引号包裹的候选片名，作为 LLM 标题抽取失败时的兜底。
+     *
+     * @param pageTexts 已抓取页面正文
+     * @param webResults 搜索结果标题与摘要
+     * @return 去重后的候选片名
+     */
+    List<String> fallbackTitlesFromFetchedData(List<String> pageTexts, List<WebSearchItemDTO> webResults) {
+        LinkedHashSet<String> titles = new LinkedHashSet<>();
+        if (pageTexts != null) {
+            pageTexts.forEach(text -> addWrappedTitles(titles, text));
+        }
+        if (webResults != null) {
+            for (WebSearchItemDTO item : webResults) {
+                if (item == null) continue;
+                addWrappedTitles(titles, item.title());
+                addWrappedTitles(titles, item.snippet());
+            }
+        }
+        int limit = Math.max(Math.max(1, maxCards) * 4, 12);
+        return titles.stream().limit(limit).toList();
+    }
+
+    private void addWrappedTitles(Set<String> titles, String text) {
+        if (text == null || text.isBlank()) return;
+        for (Pattern pattern : TITLE_WRAPPER_PATTERNS) {
+            var matcher = pattern.matcher(text);
+            while (matcher.find()) {
+                String title = cleanFallbackTitle(matcher.group(1));
+                if (isPlausibleFallbackTitle(title)) {
+                    titles.add(title);
+                }
+            }
+        }
+    }
+
+    private String cleanFallbackTitle(String title) {
+        String result = title == null ? "" : title.trim()
+                .replace('\u3000', ' ')
+                .replaceAll("\\s+", " ");
+        while (!result.isBlank() && "，,。.!！?？:：;；、|｜-—_ ".indexOf(result.charAt(result.length() - 1)) >= 0) {
+            result = result.substring(0, result.length() - 1).trim();
+        }
+        return result;
+    }
+
+    private boolean isPlausibleFallbackTitle(String title) {
+        if (title == null || title.isBlank() || title.length() > 60) {
+            return false;
+        }
+        String lower = title.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http") || lower.contains("www.")) {
+            return false;
+        }
+        return GENERIC_TITLE_WORDS.stream().noneMatch(title::contains);
     }
 
     /**

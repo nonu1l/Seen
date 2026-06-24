@@ -10,6 +10,8 @@ import com.nonu1l.media.repository.RecordRepository;
 import com.nonu1l.media.repository.WorkRepository;
 import com.nonu1l.media.service.AiPreferenceMemoryService;
 import com.nonu1l.media.service.AiWorkOperationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -22,6 +24,8 @@ import java.util.List;
  */
 @Component
 public class AiAutonomousTools {
+
+    private static final Logger log = LoggerFactory.getLogger(AiAutonomousTools.class);
 
     private final AiPreferenceMemoryService memoryService;
     private final AiWorkOperationService operationService;
@@ -87,6 +91,7 @@ public class AiAutonomousTools {
             }
             return new AgentFindWorksResultDTO(true, query, normalizedMode, result.cards(), null, null);
         } catch (Exception e) {
+            log.warn("findWorks failed query='{}' mode='{}': {}", query, normalizedMode, e.toString(), e);
             return new AgentFindWorksResultDTO(false, query, normalizedMode, List.of(),
                     "findWorks failed: " + e.getMessage(), "可以换一种搜索表达，或告知用户当前搜索流程失败。");
         }
